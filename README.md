@@ -1,1 +1,95 @@
-# cloudphone
+# Cloud Phone Reseller
+
+A Laravel storefront for reselling [VMOS Cloud](https://cloud.vmoscloud.com/) cloud
+phones: customers browse plans, pay in USDT (TRC20), and get their own cloud phone
+instances provisioned automatically. You set your own markup on top of VMOS's cost.
+
+Built to run on cheap shared cPanel hosting (PHP + MySQL, no persistent Node/queue
+workers required — a single cron entry drives everything).
+
+## How it works
+
+1. **Plans** (`skus` table) are synced from VMOS's `getCloudGoodList` API
+   (`php artisan vmos:sync-skus`). New plans default to a 30% markup; adjust
+   prices under **Admin → Plans**.
+2. A customer buys a plan → an **Order** is created and a **USDT (TRC20)**
+   payment quote is generated (shared wallet address, matched by tx hash).
+3. Customer sends USDT and submits the transaction hash.
+4. `php artisan crypto:verify-payments` (runs every minute via the scheduler)
+   checks the tx hash against [TronGrid](https://www.trongrid.io/)'s public API.
+   Once confirmed, the order is marked paid and the cloud phone is purchased via
+   VMOS's `createMoneyOrder` API.
+5. `php artisan vmos:sync-instances` fills in the `padCode` once VMOS finishes
+   provisioning (also updated live via the `/api/vmos/callback` webhook, if
+   configured in the VMOS console).
+6. Customers manage their cloud phones (restart / reset / screenshot) from
+   **My Cloud Phones**.
+
+## Local development
+
+```bash
+composer install
+npm install && npm run build
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan serve
+```
+
+SQLite is fine locally (`DB_CONNECTION=sqlite`, default in `.env.example` is
+MySQL for production — switch it back to `sqlite` for local dev if you prefer).
+
+## Deploying to cPanel shared hosting
+
+1. **PHP version**: In cPanel → *MultiPHP Manager*, set PHP 8.2+ for the domain.
+2. **Database**: In cPanel → *MySQL® Databases*, create a database and user
+   (cPanel prefixes both, e.g. `cpuser_cloudphone` / `cpuser_dbuser`), and add
+   the user to the database with **all privileges**.
+3. **Upload the code** outside `public_html` (e.g. into `~/cloudphone`), and
+   point the domain's document root at `~/cloudphone/public` (cPanel →
+   *Domains* → edit document root, or symlink `public_html` to `public/*` if
+   your host doesn't allow changing the document root).
+4. **Install dependencies** via cPanel's *Terminal* (or SSH if enabled):
+   ```bash
+   cd ~/cloudphone
+   composer install --no-dev --optimize-autoloader
+   npm install && npm run build   # only needed once, at deploy time — not at runtime
+   ```
+5. **Configure `.env`**: copy `.env.example` to `.env`, fill in `DB_*`,
+   `APP_URL`, `VMOS_ACCESS_KEY` / `VMOS_SECRET_KEY` (from the VMOS console →
+   Developer → API), and `CRYPTO_USDT_TRC20_ADDRESS` (your receiving wallet).
+   Then run:
+   ```bash
+   php artisan key:generate
+   php artisan migrate --force
+   php artisan config:cache
+   php artisan vmos:sync-skus
+   ```
+6. **Cron job**: cPanel → *Cron Jobs* → add one entry that runs every minute:
+   ```
+   * * * * * php /home/YOURUSER/cloudphone/artisan schedule:run >> /dev/null 2>&1
+   ```
+   This single entry drives `crypto:verify-payments` (every minute),
+   `vmos:sync-instances` (every 5 minutes), and `vmos:sync-skus` (hourly) — see
+   `routes/console.php`. No separate queue worker process is needed.
+7. **VMOS callback (optional but recommended)**: in the VMOS console, set the
+   callback URL to `https://your-domain.com/api/vmos/callback?token=<VMOS_WEBHOOK_TOKEN>`
+   for near-instant instance status updates instead of waiting on the 5-minute sync.
+8. **Make yourself an admin** (to set plan prices) via Terminal:
+   ```bash
+   php artisan tinker --execute="\App\Models\User::where('email','you@example.com')->update(['is_admin'=>true]);"
+   ```
+
+## Before accepting real payments
+
+The crypto payment verifier (`app/Services/Payments/TronUsdtVerifier.php`) checks
+a submitted transaction hash against TronGrid's public API for a matching TRC20
+USDT transfer to your configured address. Test it end-to-end with a small real
+transaction before relying on it — this is the part of the app that touches real
+money, so verify it yourself rather than trusting it blindly.
+
+## Key VMOS docs
+
+- API reference: <https://cloud.vmoscloud.com/vmoscloud/doc/en/server/OpenAPI.html>
+- Auth / signing walkthrough: <https://cloud.vmoscloud.com/vmoscloud/doc/en/server/example.html>
+- Callback payloads: <https://cloud.vmoscloud.com/vmoscloud/doc/en/server/callback.html>
