@@ -49,11 +49,13 @@ migrations). Once it finishes, run:
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-and open the forwarded port 8000 in your browser. You can register, log in, and
-click around the storefront UI. Without real `VMOS_ACCESS_KEY`/`SECRET_KEY` and
-`CRYPTO_USDT_TRC20_ADDRESS` in `.env`, there won't be any plans to buy and no
-real purchase will go through — it's a UI/flow preview, not a functional store,
-until those are filled in.
+and open the forwarded port 8000 in your browser. The setup script seeds 3 fake
+`[DEMO]` plans and a demo login (`demo@example.com` / `password`, admin) so
+there's something to click through. Without real `VMOS_ACCESS_KEY`/`SECRET_KEY`
+and `CRYPTO_USDT_TRC20_ADDRESS` in `.env`, no real purchase will go through —
+it's a UI/flow preview, not a functional store, until those are filled in. This
+works entirely from a phone browser too — no PC required, everything runs on
+GitHub's servers.
 
 ## Deploying to cPanel shared hosting
 
