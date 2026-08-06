@@ -59,7 +59,7 @@ GitHub's servers.
 
 ## Deploying to cPanel shared hosting
 
-1. **PHP version**: In cPanel → *MultiPHP Manager*, set PHP 8.2+ for the domain.
+1. **PHP version**: In cPanel → *MultiPHP Manager*, set PHP 8.4+ for the domain.
 2. **Database**: In cPanel → *MySQL® Databases*, create a database and user
    (cPanel prefixes both, e.g. `cpuser_cloudphone` / `cpuser_dbuser`), and add
    the user to the database with **all privileges**.
