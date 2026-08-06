@@ -36,8 +36,24 @@ php artisan migrate
 php artisan serve
 ```
 
-SQLite is fine locally (`DB_CONNECTION=sqlite`, default in `.env.example` is
-MySQL for production — switch it back to `sqlite` for local dev if you prefer).
+SQLite is fine locally (`.env.example` defaults to it — switch to MySQL for
+production per the cPanel steps below).
+
+### Or test it in a GitHub Codespace (no local setup, no real credentials needed)
+
+Open this repo in a Codespace (**Code → Codespaces → Create codespace**) and it
+runs `.devcontainer/setup.sh` automatically (composer/npm install, sqlite db,
+migrations). Once it finishes, run:
+
+```bash
+php artisan serve --host=0.0.0.0 --port=8000
+```
+
+and open the forwarded port 8000 in your browser. You can register, log in, and
+click around the storefront UI. Without real `VMOS_ACCESS_KEY`/`SECRET_KEY` and
+`CRYPTO_USDT_TRC20_ADDRESS` in `.env`, there won't be any plans to buy and no
+real purchase will go through — it's a UI/flow preview, not a functional store,
+until those are filled in.
 
 ## Deploying to cPanel shared hosting
 
