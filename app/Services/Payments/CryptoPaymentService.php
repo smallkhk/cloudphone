@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Exceptions\PaymentsNotConfiguredException;
 use App\Models\CryptoPayment;
 use App\Models\Order;
 use RuntimeException;
@@ -21,7 +22,10 @@ class CryptoPaymentService
         };
 
         if (empty($address)) {
-            throw new RuntimeException('No receiving wallet address configured for '.$network.' — set CRYPTO_USDT_TRC20_ADDRESS in .env');
+            throw new PaymentsNotConfiguredException(
+                'No receiving wallet address configured for '.$network.
+                ' — set it under Admin → Settings → Payments.'
+            );
         }
 
         return $order->payments()->create([

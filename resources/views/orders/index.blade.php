@@ -1,46 +1,52 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('My Orders') }}</h2>
+        <x-page-header title="My orders" subtitle="Your purchase history and payment status.">
+            <x-slot name="actions">
+                <a href="{{ route('plans.index') }}" class="btn-primary">Buy a device</a>
+            </x-slot>
+        </x-page-header>
     </x-slot>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white shadow-sm rounded-lg overflow-hidden">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        </tr>
+    @if ($orders->isEmpty())
+        <div class="card p-12 text-center">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50">
+                <svg class="h-7 w-7 text-brand-600" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+            </div>
+            <h2 class="mt-6 text-lg font-semibold text-ink-900">No orders yet</h2>
+            <p class="mt-2 text-sm text-ink-500">Your purchases will show up here.</p>
+            <a href="{{ route('plans.index') }}" class="btn-primary mt-7">Browse plans</a>
+        </div>
+    @else
+        <div class="card">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr><th>Order</th><th>Plan</th><th>Total</th><th>Status</th><th>Date</th><th></th></tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        @forelse ($orders as $order)
+                    <tbody>
+                        @foreach ($orders as $order)
                             <tr>
-                                <td class="px-6 py-4 text-sm">
-                                    <a href="{{ route('orders.show', $order) }}" class="text-indigo-600 hover:underline">{{ $order->reference }}</a>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-700">{{ $order->sku->name }} &times; {{ $order->quantity }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-700">${{ number_format($order->total_price, 2) }}</td>
-                                <td class="px-6 py-4 text-sm">
-                                    <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{{ str($order->status)->headline() }}</span>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $order->created_at->diffForHumans() }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="px-6 py-8 text-center text-gray-500">
-                                    No orders yet. <a href="{{ route('plans.index') }}" class="text-indigo-600 hover:underline">Browse plans</a>.
+                                <td class="font-mono text-xs font-medium text-ink-900">{{ $order->reference }}</td>
+                                <td class="text-sm text-ink-600">{{ $order->sku?->name }} &times;{{ $order->quantity }}</td>
+                                <td class="text-sm font-medium">${{ number_format($order->total_price, 2) }}</td>
+                                <td><x-order-status :status="$order->status" /></td>
+                                <td class="text-sm text-ink-500">{{ $order->created_at->format('d M Y') }}</td>
+                                <td class="text-right">
+                                    <a href="{{ route('orders.show', $order) }}" class="btn-secondary btn-sm">
+                                        {{ $order->status === 'pending_payment' ? 'Pay now' : 'View' }}
+                                    </a>
                                 </td>
                             </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
 
-            <div class="mt-4">{{ $orders->links() }}</div>
+            @if ($orders->hasPages())
+                <div class="border-t border-ink-100 px-5 py-4">{{ $orders->links() }}</div>
+            @endif
         </div>
-    </div>
+    @endif
 </x-app-layout>

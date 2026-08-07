@@ -27,7 +27,15 @@ class StorefrontFlowTest extends TestCase
     {
         Sku::factory()->create(['name' => 'Samsung Galaxy A53', 'price' => 9.99, 'active' => true]);
 
-        $this->get('/')->assertOk()->assertSee('Samsung Galaxy A53')->assertSee('Log in to buy');
+        $this->get(route('plans.index'))->assertOk()->assertSee('Samsung Galaxy A53')->assertSee('Log in to buy');
+    }
+
+    #[Test]
+    public function the_landing_page_renders_for_guests(): void
+    {
+        Sku::factory()->create(['name' => 'Samsung Galaxy A53', 'price' => 9.99, 'active' => true]);
+
+        $this->get('/')->assertOk()->assertSee('Samsung Galaxy A53');
     }
 
     #[Test]
@@ -36,7 +44,7 @@ class StorefrontFlowTest extends TestCase
         Sku::factory()->create(['name' => 'Hidden Plan', 'active' => false]);
         Sku::factory()->create(['name' => 'Sold Out Plan', 'sell_out' => true]);
 
-        $this->get('/')->assertOk()->assertDontSee('Hidden Plan')->assertDontSee('Sold Out Plan');
+        $this->get(route('plans.index'))->assertOk()->assertDontSee('Hidden Plan')->assertDontSee('Sold Out Plan');
     }
 
     #[Test]
@@ -58,6 +66,37 @@ class StorefrontFlowTest extends TestCase
         $this->assertNotNull($payment);
         $this->assertEquals(15.00, $payment->amount_crypto);
         $this->assertSame('TReceivingAddressXXXXXXXXXXXXXXXXX', $payment->pay_to_address);
+    }
+
+    #[Test]
+    public function checkout_fails_gracefully_when_no_wallet_is_configured(): void
+    {
+        config(['crypto.usdt_trc20_address' => null]);
+
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/orders', ['sku_id' => $sku->id, 'quantity' => 1])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        // No orphaned order is left behind when the payment quote can't be made.
+        $this->assertSame(0, Order::count());
+        $this->assertSame(0, CryptoPayment::count());
+    }
+
+    #[Test]
+    public function admins_see_the_underlying_reason_checkout_is_unavailable(): void
+    {
+        config(['crypto.usdt_trc20_address' => null]);
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $sku = Sku::factory()->create();
+
+        $this->actingAs($admin)
+            ->post('/orders', ['sku_id' => $sku->id, 'quantity' => 1])
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'receiving wallet'));
     }
 
     #[Test]

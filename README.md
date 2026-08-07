@@ -25,6 +25,33 @@ workers required — a single cron entry drives everything).
 6. Customers manage their cloud phones (restart / reset / screenshot) from
    **My Cloud Phones**.
 
+## Admin panel
+
+Everything below is configurable from `/admin` — no SSH or file editing needed
+after the first deploy.
+
+| Section | What you can do |
+| --- | --- |
+| **Dashboard** | Revenue, orders, devices and customer stats, plus a setup checklist |
+| **Orders** | Filter/search orders, mark an order paid manually, retry provisioning, cancel |
+| **Devices** | Every cloud phone, who owns it, **allocate/reassign a device to a customer**, return to stock, and **import existing devices from your VMOS account** |
+| **Users** | Create, edit, promote to admin, delete (their devices return to stock), see per-customer orders/devices/spend |
+| **Plans & pricing** | Sync the catalogue from VMOS, set per-plan prices, bulk re-price at cost + markup%, toggle what's live |
+| **Settings → Site** | Site name, tagline, URL, support links, default markup |
+| **Settings → Payments** | USDT (TRC20) receiving wallet, payment window, underpayment tolerance, TronGrid key |
+| **Settings → VMOS API** | Access/Secret key, callback token, plus a **Test connection** button |
+| **Settings → Email** | SMTP host/port/credentials and a **Send test email** button |
+
+Secrets (API keys, mail password) are encrypted at rest with `APP_KEY` and are
+never rendered back into the page — leave a secret field blank to keep the
+stored value.
+
+**Database credentials are the one thing that stays in `.env`** — the app needs
+them to reach the settings table in the first place.
+
+> Note: settings are cached. If you edit `.env` directly on the server, run
+> `php artisan config:clear` so the change is picked up.
+
 ## Local development
 
 ```bash

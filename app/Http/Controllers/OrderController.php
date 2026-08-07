@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\PaymentsNotConfiguredException;
 use App\Models\Order;
 use App\Models\Sku;
 use App\Services\Payments\CryptoPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
@@ -28,16 +31,30 @@ class OrderController extends Controller
         $sku = Sku::available()->findOrFail($validated['sku_id']);
         $quantity = $validated['quantity'];
 
-        $order = Auth::user()->orders()->create([
-            'sku_id' => $sku->id,
-            'quantity' => $quantity,
-            'unit_price' => $sku->price,
-            'total_price' => round($sku->price * $quantity, 2),
-            'auto_renew' => $request->boolean('auto_renew', true),
-            'country_code' => $sku->default_country_code,
-        ]);
+        try {
+            // The order and its payment quote must succeed together — otherwise a
+            // misconfigured store leaves orphaned pending orders behind.
+            $order = DB::transaction(function () use ($sku, $quantity, $request, $payments) {
+                $order = Auth::user()->orders()->create([
+                    'sku_id' => $sku->id,
+                    'quantity' => $quantity,
+                    'unit_price' => $sku->price,
+                    'total_price' => round($sku->price * $quantity, 2),
+                    'auto_renew' => $request->boolean('auto_renew', true),
+                    'country_code' => $sku->default_country_code,
+                ]);
 
-        $payments->createForOrder($order);
+                $payments->createForOrder($order);
+
+                return $order;
+            });
+        } catch (PaymentsNotConfiguredException $e) {
+            Log::error('checkout.payments_not_configured', ['error' => $e->getMessage()]);
+
+            return back()->with('error', Auth::user()->is_admin
+                ? $e->getMessage()
+                : 'Checkout is temporarily unavailable. Please contact support — we\'ve been notified.');
+        }
 
         return redirect()->route('orders.show', $order)
             ->with('status', 'Order created — send the exact USDT (TRC20) amount shown below to complete your purchase.');
