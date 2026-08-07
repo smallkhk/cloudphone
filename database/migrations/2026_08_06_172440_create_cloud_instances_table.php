@@ -20,7 +20,7 @@ return new class extends Migration
 
             $table->integer('pad_status')->nullable();  // VMOS cvmStatus / padStatus code, cached
             $table->boolean('online')->default(false);
-            $table->string('screenshot_url')->nullable();
+            $table->string('screenshot_url', 512)->nullable(); // VMOS signed URLs can be long
             $table->boolean('auto_renew')->default(true);
             $table->timestamp('expires_at')->nullable(); // signExpirationTime
 

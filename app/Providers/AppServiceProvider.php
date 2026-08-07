@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\Vmos\VmosClient;
 use App\Services\Vmos\VmosCloudPhoneService;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Older MySQL/MariaDB defaults (common on shared hosting) cap index
+        // key length at 767 bytes; utf8mb4 varchar(255) columns exceed that.
+        // 191 chars * 4 bytes/char stays safely under the limit.
+        Schema::defaultStringLength(191);
     }
 }
