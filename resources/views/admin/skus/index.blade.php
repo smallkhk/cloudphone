@@ -1,6 +1,7 @@
 <x-admin-layout>
     <x-slot name="header">
-        <x-page-header title="Plans &amp; pricing" subtitle="Your selling price versus what VMOS charges you.">
+        {{-- Plain "&" here: the component escapes it, so "&amp;" would double-escape. --}}
+        <x-page-header title="Plans & pricing" subtitle="Your selling price versus what VMOS charges you.">
             <x-slot name="actions">
                 <form method="POST" action="{{ route('admin.skus.sync') }}">
                     @csrf
