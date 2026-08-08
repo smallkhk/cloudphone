@@ -1,0 +1,388 @@
+@php
+    $d = $details ?? [];
+    $ready = (bool) $instance->pad_code;
+@endphp
+
+<x-app-layout>
+    <x-slot name="header">
+        <x-page-header :title="$instance->nickname ?? $instance->sku?->name ?? 'Cloud Phone'"
+                       :subtitle="$instance->pad_code ?? 'Provisioning…'">
+            <x-slot name="actions">
+                <a href="{{ route('instances.index') }}" class="btn-ghost">&larr; All devices</a>
+                @if ($ready)
+                    <form method="POST" action="{{ route('instances.screenshot', $instance) }}">
+                        @csrf
+                        <button class="btn-secondary">Refresh screen</button>
+                    </form>
+                    <form method="POST" action="{{ route('instances.restart', $instance) }}">
+                        @csrf
+                        <button class="btn-secondary">Restart</button>
+                    </form>
+                @endif
+            </x-slot>
+        </x-page-header>
+    </x-slot>
+
+    @unless ($ready)
+        <div class="card p-8 text-center">
+            <p class="text-sm text-ink-600">This device is still being provisioned. Controls appear once VMOS assigns it.</p>
+        </div>
+    @else
+        @if ($detailsError)
+            <div class="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20">
+                Couldn't load live device info from VMOS: {{ $detailsError }}
+            </div>
+        @endif
+
+        <div class="grid gap-6 lg:grid-cols-3">
+            {{-- Screen + identity ------------------------------------------ --}}
+            <div class="space-y-6">
+                <div class="card overflow-hidden">
+                    <div class="relative aspect-[9/16] bg-gradient-to-br from-ink-900 to-ink-950">
+                        @if ($instance->screenshot_url)
+                            <img src="{{ $instance->screenshot_url }}" alt="Screen" class="h-full w-full object-contain">
+                        @else
+                            <div class="flex h-full items-center justify-center text-xs text-ink-500">No preview yet</div>
+                        @endif
+                        <span class="absolute left-3 top-3 {{ $instance->online ? 'badge bg-emerald-500/90 text-white ring-emerald-400/30' : 'badge bg-ink-800/90 text-ink-300 ring-white/10' }}">
+                            <span class="h-1.5 w-1.5 rounded-full {{ $instance->online ? 'bg-white' : 'bg-ink-400' }}"></span>
+                            {{ $instance->statusLabel() }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card p-5">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-ink-400">Device identity</h2>
+                    <dl class="mt-4 space-y-2.5 text-sm">
+                        @foreach ([
+                            'Model' => $d['padType'] ?? $instance->sku?->name,
+                            'Android' => $d['androidVersion'] ?? $instance->sku?->android_version,
+                            'Phone number' => $d['phoneNumber'] ?? null,
+                            'IMEI' => $d['padImei'] ?? null,
+                            'Carrier' => $d['simIso'] ?? null,
+                            'SIM country' => $d['simCountry'] ?? null,
+                            'Public IP' => $d['publicIp'] ?? null,
+                            'IP location' => $d['ipAddress'] ?? null,
+                            'Timezone' => $d['timeZone'] ?? null,
+                            'Language' => $d['explain'] ?? null,
+                            'GPS' => isset($d['latitude'], $d['longitude']) ? $d['latitude'].', '.$d['longitude'] : null,
+                            'WLAN MAC' => $d['wlanMac'] ?? null,
+                            'Bluetooth' => $d['bluetoothAddress'] ?? null,
+                        ] as $label => $value)
+                            @if (filled($value))
+                                <div class="flex items-start justify-between gap-3">
+                                    <dt class="flex-none text-ink-500">{{ $label }}</dt>
+                                    <dd class="break-all text-right font-medium text-ink-900">{{ $value }}</dd>
+                                </div>
+                            @endif
+                        @endforeach
+                        @if ($instance->expires_at)
+                            <div class="flex justify-between gap-3 border-t border-ink-100 pt-2.5">
+                                <dt class="text-ink-500">Expires</dt>
+                                <dd class="font-medium {{ $instance->isExpired() ? 'text-red-600' : 'text-ink-900' }}">
+                                    {{ $instance->expires_at->format('d M Y') }}
+                                </dd>
+                            </div>
+                        @endif
+                    </dl>
+                </div>
+            </div>
+
+            {{-- Controls --------------------------------------------------- --}}
+            <div class="space-y-6 lg:col-span-2" x-data="{ tab: 'identity' }">
+                <div class="card overflow-hidden p-1.5">
+                    <div class="flex flex-wrap gap-1">
+                        @foreach ([
+                            'identity' => 'Phone number & location',
+                            'proxy' => 'Proxy',
+                            'apps' => 'Apps',
+                            'advanced' => 'Advanced',
+                        ] as $key => $label)
+                            <button @click="tab = '{{ $key }}'"
+                                    :class="tab === '{{ $key }}' ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-100'"
+                                    class="rounded-lg px-3.5 py-2 text-sm font-medium transition-colors">
+                                {{ $label }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Identity tab --}}
+                <div x-show="tab === 'identity'" class="space-y-6">
+                    <form method="POST" action="{{ route('instances.sim', $instance) }}" class="card p-6">
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">New phone number &amp; SIM</h3>
+                        <p class="mt-1 text-sm text-ink-500">
+                            Generates a fresh phone number, IMEI, IMSI and carrier for the country you pick.
+                            The device restarts to apply it.
+                        </p>
+                        <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div class="flex-1">
+                                <label class="label" for="country_code">Country</label>
+                                <select id="country_code" name="country_code" class="input" required>
+                                    @foreach ($countries as $code => $name)
+                                        <option value="{{ $code }}" @selected(($d['simCountry'] ?? null) === $code)>{{ $name }} ({{ $code }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button class="btn-primary" onclick="return confirm('This restarts the device. Continue?')">
+                                Generate new number
+                            </button>
+                        </div>
+                    </form>
+
+                    <form method="POST" action="{{ route('instances.gps', $instance) }}" class="card p-6">
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">GPS location</h3>
+                        <p class="mt-1 text-sm text-ink-500">Set the coordinates apps see. Match these to your proxy's location for consistency.</p>
+                        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                            <div>
+                                <label class="label" for="latitude">Latitude</label>
+                                <input id="latitude" name="latitude" type="number" step="any" class="input"
+                                       value="{{ old('latitude', $d['latitude'] ?? '') }}" placeholder="1.3398" required>
+                            </div>
+                            <div>
+                                <label class="label" for="longitude">Longitude</label>
+                                <input id="longitude" name="longitude" type="number" step="any" class="input"
+                                       value="{{ old('longitude', $d['longitude'] ?? '') }}" placeholder="103.6967" required>
+                            </div>
+                            <div class="flex items-end">
+                                <button class="btn-primary w-full">Set location</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <form method="POST" action="{{ route('instances.locale', $instance) }}" class="card p-6">
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">Language &amp; timezone</h3>
+                        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                            <div>
+                                <label class="label" for="timezone">Timezone</label>
+                                <select id="timezone" name="timezone" class="input">
+                                    <option value="">— unchanged —</option>
+                                    @foreach (timezone_identifiers_list() as $tz)
+                                        <option value="{{ $tz }}" @selected(($d['timeZone'] ?? null) === $tz)>{{ $tz }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="label" for="language">Language</label>
+                                <select id="language" name="language" class="input">
+                                    <option value="">— unchanged —</option>
+                                    @foreach (['en' => 'English', 'es' => 'Spanish', 'pt' => 'Portuguese', 'fr' => 'French', 'de' => 'German', 'ar' => 'Arabic', 'hi' => 'Hindi', 'id' => 'Indonesian', 'zh' => 'Chinese', 'ru' => 'Russian', 'tr' => 'Turkish', 'vi' => 'Vietnamese'] as $code => $name)
+                                        <option value="{{ $code }}">{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <button class="btn-primary w-full">Apply</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                {{-- Proxy tab --}}
+                <div x-show="tab === 'proxy'" x-cloak class="space-y-6">
+                    <form method="POST" action="{{ route('instances.proxy', $instance) }}" class="card p-6" x-data>
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">Set a proxy</h3>
+                        <p class="mt-1 text-sm text-ink-500">
+                            Route this device's traffic through your own proxy, so it appears to browse from that location.
+                        </p>
+
+                        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="label" for="ip">Host / IP</label>
+                                <input id="ip" name="ip" class="input" placeholder="154.81.40.200" value="{{ old('ip') }}" required>
+                            </div>
+                            <div>
+                                <label class="label" for="port">Port</label>
+                                <input id="port" name="port" type="number" class="input" placeholder="63007" value="{{ old('port') }}" required>
+                            </div>
+                            <div>
+                                <label class="label" for="account">Username</label>
+                                <input id="account" name="account" class="input" autocomplete="off" value="{{ old('account') }}">
+                            </div>
+                            <div>
+                                <label class="label" for="password">Password</label>
+                                <input id="password" name="password" type="password" class="input" autocomplete="off">
+                            </div>
+                            <div>
+                                <label class="label" for="proxy_name">Protocol</label>
+                                <select id="proxy_name" name="proxy_name" class="input">
+                                    <option value="socks5">SOCKS5</option>
+                                    <option value="http-relay">HTTP / HTTPS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="label" for="proxy_type">Mode</label>
+                                <select id="proxy_type" name="proxy_type" class="input">
+                                    <option value="proxy">Proxy</option>
+                                    <option value="vpn">VPN (all traffic)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex flex-wrap justify-end gap-2 border-t border-ink-100 pt-5">
+                            <button type="submit" formaction="{{ route('instances.proxy.test', $instance) }}" class="btn-secondary">
+                                Test first
+                            </button>
+                            <button class="btn-primary">Apply proxy</button>
+                        </div>
+                    </form>
+
+                    <form method="POST" action="{{ route('instances.proxy.clear', $instance) }}"
+                          class="card flex flex-wrap items-center justify-between gap-4 p-5">
+                        @csrf @method('DELETE')
+                        <div>
+                            <p class="text-sm font-semibold text-ink-900">Remove proxy</p>
+                            <p class="text-xs text-ink-500">Returns the device to its default data centre connection.</p>
+                        </div>
+                        <button class="btn-secondary">Disable proxy</button>
+                    </form>
+                </div>
+
+                {{-- Apps tab --}}
+                <div x-show="tab === 'apps'" x-cloak class="space-y-6">
+                    <form method="POST" action="{{ route('instances.apps.install', $instance) }}" class="card p-6">
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">Install an app</h3>
+                        <p class="mt-1 text-sm text-ink-500">Paste a direct link to an APK — it's downloaded onto the device and installed.</p>
+                        <div class="mt-5 space-y-3">
+                            <div>
+                                <label class="label" for="apk_url">APK URL</label>
+                                <input id="apk_url" name="apk_url" type="url" class="input" placeholder="https://example.com/app.apk" required>
+                            </div>
+                            <div>
+                                <label class="label" for="package_name">Package name (optional)</label>
+                                <input id="package_name" name="package_name" class="input font-mono text-sm" placeholder="com.zhiliaoapp.musically">
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end border-t border-ink-100 pt-5">
+                            <button class="btn-primary">Download &amp; install</button>
+                        </div>
+                    </form>
+
+                    <div class="card">
+                        <div class="flex items-center justify-between px-5 py-4">
+                            <h3 class="text-base font-semibold text-ink-900">Installed apps</h3>
+                            <form method="POST" action="{{ route('instances.apps.refresh', $instance) }}">
+                                @csrf
+                                <button class="btn-ghost btn-sm">Refresh</button>
+                            </form>
+                        </div>
+
+                        @php $appList = collect($apps ?? [])->flatMap(fn ($e) => $e['apps'] ?? $e['appList'] ?? (is_array($e) && isset($e['packageName']) ? [$e] : [])); @endphp
+
+                        @if ($appList->isEmpty())
+                            <p class="border-t border-ink-100 px-5 py-8 text-center text-sm text-ink-500">
+                                No apps reported. If you just installed one, hit Refresh in a moment.
+                            </p>
+                        @else
+                            <ul class="divide-y divide-ink-100 border-t border-ink-100">
+                                @foreach ($appList as $app)
+                                    @php $pkg = $app['packageName'] ?? $app['pkgName'] ?? null; @endphp
+                                    @continue(! $pkg)
+                                    <li class="flex flex-wrap items-center gap-3 px-5 py-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-medium text-ink-900">{{ $app['appName'] ?? $app['name'] ?? $pkg }}</p>
+                                            <p class="truncate font-mono text-xs text-ink-500">{{ $pkg }}</p>
+                                        </div>
+                                        <div class="flex gap-1.5">
+                                            @foreach (['start' => 'Start', 'stop' => 'Stop', 'uninstall' => 'Uninstall'] as $action => $label)
+                                                <form method="POST" action="{{ route('instances.apps.action', $instance) }}"
+                                                      @if ($action === 'uninstall') onsubmit="return confirm('Uninstall {{ $pkg }}?')" @endif>
+                                                    @csrf
+                                                    <input type="hidden" name="package_name" value="{{ $pkg }}">
+                                                    <input type="hidden" name="action" value="{{ $action }}">
+                                                    <button class="{{ $action === 'uninstall' ? 'btn-ghost text-red-600 hover:bg-red-50' : 'btn-secondary' }} btn-sm">{{ $label }}</button>
+                                                </form>
+                                            @endforeach
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Advanced tab --}}
+                <div x-show="tab === 'advanced'" x-cloak class="space-y-6">
+                    <form method="POST" action="{{ route('instances.new-device', $instance) }}" class="card p-6"
+                          onsubmit="return confirm('This ERASES the device and gives it a brand new identity. This cannot be undone. Continue?')">
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">One-key new device</h3>
+                        <p class="mt-1 text-sm text-ink-500">
+                            Wipes everything and generates a completely new hardware identity — new IMEI, MAC, phone number,
+                            and matching GPS/timezone. Use this to start fresh with no trace of the previous account.
+                        </p>
+                        <label class="mt-4 flex items-center gap-2.5 text-sm text-ink-700">
+                            <input type="checkbox" name="wipe_data" value="1" checked
+                                   class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
+                            Erase all data (recommended)
+                        </label>
+                        <div class="mt-6 flex justify-end border-t border-ink-100 pt-5">
+                            <button class="btn-danger">Reset to a new device</button>
+                        </div>
+                    </form>
+
+                    <div class="card p-6">
+                        <h3 class="text-base font-semibold text-ink-900">ADB access</h3>
+                        <p class="mt-1 text-sm text-ink-500">
+                            Enable Android Debug Bridge to drive this device from your computer with scripts or automation tools.
+                        </p>
+                        <div class="mt-5 flex gap-2">
+                            <form method="POST" action="{{ route('instances.adb', $instance) }}">
+                                @csrf
+                                <input type="hidden" name="enable" value="1">
+                                <button class="btn-primary">Enable ADB</button>
+                            </form>
+                            <form method="POST" action="{{ route('instances.adb', $instance) }}">
+                                @csrf
+                                <input type="hidden" name="enable" value="0">
+                                <button class="btn-secondary">Disable</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{{ route('instances.reset', $instance) }}" class="card border-l-4 border-l-red-400 p-6"
+                          onsubmit="return confirm('Factory reset erases ALL data on this device. Continue?')">
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">Factory reset</h3>
+                        <p class="mt-1 text-sm text-ink-500">Clears all data but keeps the same hardware identity.</p>
+                        <div class="mt-5 flex justify-end">
+                            <button class="btn-danger btn-sm">Factory reset</button>
+                        </div>
+                    </form>
+                </div>
+
+                {{-- Recent tasks --}}
+                @if ($instance->tasks->isNotEmpty())
+                    <div class="card">
+                        <h3 class="px-5 py-4 text-base font-semibold text-ink-900">Recent actions</h3>
+                        <div class="table-wrap border-t border-ink-100">
+                            <table class="table">
+                                <thead><tr><th>Action</th><th>Status</th><th>When</th></tr></thead>
+                                <tbody>
+                                    @foreach ($instance->tasks->sortByDesc('id')->take(8) as $task)
+                                        <tr>
+                                            <td class="text-sm">{{ str($task->type)->headline() }}</td>
+                                            <td>
+                                                <span class="{{ match ($task->status) {
+                                                    'completed' => 'badge-green',
+                                                    'failed' => 'badge-red',
+                                                    default => 'badge-amber',
+                                                } }}">{{ str($task->status)->headline() }}</span>
+                                            </td>
+                                            <td class="text-sm text-ink-500">{{ $task->created_at->diffForHumans() }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endunless
+</x-app-layout>

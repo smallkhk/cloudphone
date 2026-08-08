@@ -66,7 +66,12 @@ class SettingsController extends Controller
             'vmos_access_key' => ['nullable', 'string', 'max:255'],
             'vmos_secret_key' => ['nullable', 'string', 'max:255'],
             'vmos_webhook_token' => ['nullable', 'string', 'max:255'],
+            'vmos_price_unit' => ['nullable', 'in:cents,units'],
         ]);
+
+        // Keep whatever is already stored when the field isn't submitted, so a
+        // partial update doesn't silently reset the price unit.
+        $data['vmos_price_unit'] = $data['vmos_price_unit'] ?? Setting::get('vmos_price_unit', 'cents');
 
         $this->save($data);
 

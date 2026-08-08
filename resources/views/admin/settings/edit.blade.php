@@ -195,6 +195,19 @@
                         </div>
 
                         <div>
+                            <label class="label" for="vmos_price_unit">Price unit VMOS quotes in</label>
+                            <select id="vmos_price_unit" name="vmos_price_unit" class="input">
+                                <option value="cents" @selected(($settings['vmos_price_unit'] ?? 'cents') === 'cents')>Cents — a $4.99 plan arrives as 499</option>
+                                <option value="units" @selected(($settings['vmos_price_unit'] ?? '') === 'units')>Whole units — a $4.99 plan arrives as 4.99</option>
+                            </select>
+                            <p class="hint">
+                                VMOS documents proxy prices in cents, so plan prices are almost certainly cents too.
+                                Confirm on the <a href="{{ route('admin.diagnostics.index', ['probe' => 'catalogue_all']) }}" class="font-medium text-brand-600 hover:underline">diagnostics page</a>
+                                before syncing, or your prices will be 100&times; off.
+                            </p>
+                        </div>
+
+                        <div>
                             <label class="label" for="vmos_webhook_token">
                                 Callback token
                                 @if ($stored('vmos_webhook_token'))

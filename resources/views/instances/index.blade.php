@@ -55,7 +55,13 @@
 
                     <div class="p-5">
                         <h3 class="truncate text-base font-semibold text-ink-900">
-                            {{ $instance->nickname ?? $instance->sku?->name ?? 'Cloud Phone' }}
+                            @if ($instance->pad_code)
+                                <a href="{{ route('instances.show', $instance) }}" class="hover:text-brand-600">
+                                    {{ $instance->nickname ?? $instance->sku?->name ?? 'Cloud Phone' }}
+                                </a>
+                            @else
+                                {{ $instance->nickname ?? $instance->sku?->name ?? 'Cloud Phone' }}
+                            @endif
                         </h3>
                         <p class="mt-0.5 font-mono text-xs text-ink-500">{{ $instance->pad_code ?? 'Provisioning…' }}</p>
 
@@ -70,6 +76,7 @@
 
                         @if ($instance->pad_code)
                             <div class="mt-5 flex flex-wrap gap-2">
+                                <a href="{{ route('instances.show', $instance) }}" class="btn-primary btn-sm">Manage</a>
                                 <form method="POST" action="{{ route('instances.screenshot', $instance) }}">
                                     @csrf
                                     <button class="btn-secondary btn-sm">

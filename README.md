@@ -41,6 +41,29 @@ after the first deploy.
 | **Settings → Payments** | USDT (TRC20) receiving wallet, payment window, underpayment tolerance, TronGrid key |
 | **Settings → VMOS API** | Access/Secret key, callback token, plus a **Test connection** button |
 | **Settings → Email** | SMTP host/port/credentials and a **Send test email** button |
+| **Proxies** | Buy static residential IPs from VMOS, see what you own, attach a proxy to one or many devices, delete |
+| **API diagnostics** | Raw VMOS responses for read-only endpoints — use this when a sync returns nothing, and to confirm whether prices are quoted in cents |
+
+### Customer device controls
+
+Each cloud phone has its own control panel (**My cloud phones → Manage**):
+
+- **Phone number & SIM** — generate a fresh number, IMEI, IMSI and carrier for any supported country
+- **GPS** — set the coordinates apps see
+- **Language & timezone**
+- **Proxy** — apply a SOCKS5/HTTP proxy (with a test-before-apply button) or disable it
+- **Apps** — install by APK URL, then start / stop / uninstall installed apps
+- **ADB** — enable remote debugging and get the `adb connect` command
+- **One-key new device** — wipe and regenerate a completely new hardware identity
+- **Factory reset**, restart, and live screenshot
+
+### A note on prices
+
+VMOS documents proxy prices in **cents**, and plan prices appear to use the same
+minor unit — so a $4.99 plan arrives from the API as `499`. The sync divides by
+100 by default. **Confirm this on the diagnostics page before trusting your
+prices**, and flip *Settings → VMOS → Price unit* if your account quotes whole
+units instead. Getting this wrong makes every price 100× off.
 
 Secrets (API keys, mail password) are encrypted at rest with `APP_KEY` and are
 never rendered back into the page — leave a secret field blank to keep the

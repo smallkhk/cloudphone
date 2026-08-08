@@ -2,11 +2,14 @@
 
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
+use App\Http\Controllers\Admin\DiagnosticsController as AdminDiagnosticsController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\ProxyController as AdminProxyController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\SkuController as AdminSkuController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\CloudInstanceController;
+use App\Http\Controllers\DeviceControlController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PlanController;
@@ -34,6 +37,20 @@ Route::middleware('auth')->group(function () {
     Route::post('/instances/{instance}/restart', [CloudInstanceController::class, 'restart'])->name('instances.restart');
     Route::post('/instances/{instance}/reset', [CloudInstanceController::class, 'reset'])->name('instances.reset');
     Route::post('/instances/{instance}/screenshot', [CloudInstanceController::class, 'screenshot'])->name('instances.screenshot');
+
+    // Per-device control panel
+    Route::get('/instances/{instance}', [DeviceControlController::class, 'show'])->name('instances.show');
+    Route::post('/instances/{instance}/sim', [DeviceControlController::class, 'updateSim'])->name('instances.sim');
+    Route::post('/instances/{instance}/gps', [DeviceControlController::class, 'updateGps'])->name('instances.gps');
+    Route::post('/instances/{instance}/locale', [DeviceControlController::class, 'updateLocale'])->name('instances.locale');
+    Route::post('/instances/{instance}/new-device', [DeviceControlController::class, 'newDevice'])->name('instances.new-device');
+    Route::post('/instances/{instance}/proxy', [DeviceControlController::class, 'setProxy'])->name('instances.proxy');
+    Route::post('/instances/{instance}/proxy/test', [DeviceControlController::class, 'testProxy'])->name('instances.proxy.test');
+    Route::delete('/instances/{instance}/proxy', [DeviceControlController::class, 'clearProxy'])->name('instances.proxy.clear');
+    Route::post('/instances/{instance}/apps/install', [DeviceControlController::class, 'installApp'])->name('instances.apps.install');
+    Route::post('/instances/{instance}/apps/action', [DeviceControlController::class, 'appAction'])->name('instances.apps.action');
+    Route::post('/instances/{instance}/apps/refresh', [DeviceControlController::class, 'refreshApps'])->name('instances.apps.refresh');
+    Route::post('/instances/{instance}/adb', [DeviceControlController::class, 'toggleAdb'])->name('instances.adb');
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -66,6 +83,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
     Route::patch('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
     Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+
+    // Proxies
+    Route::get('/proxies', [AdminProxyController::class, 'index'])->name('proxies.index');
+    Route::post('/proxies/buy', [AdminProxyController::class, 'buy'])->name('proxies.buy');
+    Route::post('/proxies/attach', [AdminProxyController::class, 'attach'])->name('proxies.attach');
+    Route::delete('/proxies', [AdminProxyController::class, 'destroy'])->name('proxies.destroy');
+
+    // API diagnostics
+    Route::get('/diagnostics', [AdminDiagnosticsController::class, 'index'])->name('diagnostics.index');
 
     // Settings
     Route::get('/settings/{tab?}', [AdminSettingsController::class, 'edit'])->name('settings.edit');
