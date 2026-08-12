@@ -29,6 +29,14 @@ class SettingsServiceProvider extends ServiceProvider
         'crypto_amount_tolerance_percent' => 'crypto.amount_tolerance_percent',
         'trongrid_api_key' => 'crypto.trongrid_api_key',
 
+        'assistant_enabled' => 'assistant.enabled',
+        'anthropic_api_key' => 'assistant.api_key',
+        'assistant_model' => 'assistant.model',
+        'assistant_max_tokens' => 'assistant.max_tokens',
+        'assistant_greeting' => 'assistant.greeting',
+        'assistant_rate_limit_per_hour' => 'assistant.rate_limit_per_hour',
+        'assistant_knowledge' => 'assistant.knowledge',
+
         'mail_mailer' => 'mail.default',
         'mail_host' => 'mail.mailers.smtp.host',
         'mail_port' => 'mail.mailers.smtp.port',

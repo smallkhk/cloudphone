@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ChatController as AdminChatController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
 use App\Http\Controllers\Admin\DiagnosticsController as AdminDiagnosticsController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Admin\ProxyController as AdminProxyController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\SkuController as AdminSkuController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CloudInstanceController;
 use App\Http\Controllers\DeviceControlController;
 use App\Http\Controllers\OrderController;
@@ -18,6 +20,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
+
+// Live chat — open to guests as well as customers.
+Route::get('/chat/history', [ChatController::class, 'history'])->name('chat.history');
+Route::post('/chat', [ChatController::class, 'store'])->middleware('throttle:30,1')->name('chat.store');
+Route::post('/chat/reset', [ChatController::class, 'reset'])->name('chat.reset');
 
 Route::get('/dashboard', function () {
     return redirect()->route('instances.index');
@@ -61,6 +68,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/skus/{sku}', [AdminSkuController::class, 'update'])->name('skus.update');
     Route::post('/skus/sync', [AdminSkuController::class, 'sync'])->name('skus.sync');
     Route::post('/skus/bulk-markup', [AdminSkuController::class, 'bulkMarkup'])->name('skus.bulk-markup');
+    Route::post('/skus/bulk-status', [AdminSkuController::class, 'bulkStatus'])->name('skus.bulk-status');
 
     // Orders
     Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
@@ -90,6 +98,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/proxies/attach', [AdminProxyController::class, 'attach'])->name('proxies.attach');
     Route::delete('/proxies', [AdminProxyController::class, 'destroy'])->name('proxies.destroy');
 
+    // Live chat transcripts
+    Route::get('/chat', [AdminChatController::class, 'index'])->name('chat.index');
+    Route::get('/chat/{conversation}', [AdminChatController::class, 'show'])->name('chat.show');
+    Route::delete('/chat/{conversation}', [AdminChatController::class, 'destroy'])->name('chat.destroy');
+
     // API diagnostics
     Route::get('/diagnostics', [AdminDiagnosticsController::class, 'index'])->name('diagnostics.index');
 
@@ -99,6 +112,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/settings/payments', [AdminSettingsController::class, 'updatePayments'])->name('settings.payments');
     Route::patch('/settings/vmos', [AdminSettingsController::class, 'updateVmos'])->name('settings.vmos');
     Route::patch('/settings/mail', [AdminSettingsController::class, 'updateMail'])->name('settings.mail');
+    Route::patch('/settings/assistant', [AdminSettingsController::class, 'updateAssistant'])->name('settings.assistant');
+    Route::post('/settings/test-assistant', [AdminSettingsController::class, 'testAssistant'])->name('settings.test-assistant');
     Route::post('/settings/test-vmos', [AdminSettingsController::class, 'testVmos'])->name('settings.test-vmos');
     Route::post('/settings/test-mail', [AdminSettingsController::class, 'testMail'])->name('settings.test-mail');
 });

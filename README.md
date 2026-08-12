@@ -41,6 +41,8 @@ after the first deploy.
 | **Settings → Payments** | USDT (TRC20) receiving wallet, payment window, underpayment tolerance, TronGrid key |
 | **Settings → VMOS API** | Access/Secret key, callback token, plus a **Test connection** button |
 | **Settings → Email** | SMTP host/port/credentials and a **Send test email** button |
+| **Settings → AI live chat** | Turn the chat widget on, store your Anthropic API key, pick the model, cap messages per visitor per hour, and **teach it your business rules** |
+| **Live chat** | Read every conversation the assistant has had, see token usage, delete transcripts |
 | **Proxies** | Buy static residential IPs from VMOS, see what you own, attach a proxy to one or many devices, delete |
 | **API diagnostics** | Raw VMOS responses for read-only endpoints — use this when a sync returns nothing, and to confirm whether prices are quoted in cents |
 
@@ -147,6 +149,44 @@ GitHub's servers.
    ```bash
    php artisan tinker --execute="\App\Models\User::where('email','you@example.com')->update(['is_admin'=>true]);"
    ```
+
+## AI live chat
+
+A floating chat bubble on every page, answered by Claude via the official
+[Anthropic PHP SDK](https://github.com/anthropics/anthropic-sdk-php). It is
+**off by default** — turn it on under **Admin → Settings → AI live chat** and
+paste an API key from <https://console.anthropic.com>.
+
+It isn't trained or fine-tuned. On every message the system prompt is rebuilt
+from the live database (`app/Services/Chat/SiteKnowledge.php`):
+
+- your site name, tagline and support channels
+- every plan on sale, with its durations and **your** prices
+- how the USDT (TRC20) checkout works, including the payment window
+- what a customer can do from the device control panel
+- whatever you type into **What else should it know?** — refund policy,
+  delivery times, what you don't support. This overrides everything else.
+- for a signed-in customer: their own devices (pad code, status, expiry) and
+  recent orders, so "where is my phone?" gets a real answer
+
+So prices and stock are always current, with no retraining step.
+
+**It costs money per message**, billed to your own Anthropic account and
+separate from any Claude subscription. Three things keep that in check:
+
+1. The static half of the prompt (the catalogue) carries a **prompt-cache
+   breakpoint**, so repeat questions don't re-bill the whole catalogue.
+2. **Messages per visitor per hour** is a hard cap (default 25).
+3. Switching the model to Haiku costs a fraction of Opus and is plenty for
+   routine questions.
+
+Set a spend limit in the Anthropic console as well.
+
+The assistant is told never to repeat a wallet address, quote a price that
+isn't in the catalogue, promise refunds, or accept passwords and seed phrases —
+and to ignore instructions inside a visitor's message. Treat those as
+guardrails, not guarantees: read the transcripts under **Admin → Live chat**
+for the first few days.
 
 ## Before accepting real payments
 

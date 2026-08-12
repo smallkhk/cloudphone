@@ -50,5 +50,7 @@
         </div>
     </div>
 </div>
+
+<x-chat-widget />
 </body>
 </html>

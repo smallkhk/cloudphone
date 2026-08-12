@@ -16,15 +16,27 @@
         </x-page-header>
     </x-slot>
 
+    <div class="grid gap-4 sm:grid-cols-3">
+        <x-stat-card label="Plans in catalogue" :value="number_format($stats['total'])" />
+        <x-stat-card label="Live on storefront" :value="number_format($stats['live'])" tone="green" />
+        <x-stat-card label="Matching your filter" :value="number_format($stats['matching'])" tone="amber" />
+    </div>
+
     {{-- Bulk pricing --}}
-    <form method="POST" action="{{ route('admin.skus.bulk-markup') }}" class="card mb-6 p-5">
+    <form method="POST" action="{{ route('admin.skus.bulk-markup') }}" class="card mt-6 p-5">
         @csrf
+        {{-- Carry the filter through so "only these" re-prices what's on screen. --}}
+        <input type="hidden" name="q" value="{{ $search }}">
+        <input type="hidden" name="android" value="{{ $android }}">
+        <input type="hidden" name="duration" value="{{ $duration }}">
+        <input type="hidden" name="status" value="{{ $status }}">
+
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div>
                 <label class="label" for="markup_percent">Bulk re-price at cost +</label>
                 <div class="flex items-center gap-2">
                     <input id="markup_percent" name="markup_percent" type="number" step="1" min="0" max="1000"
-                           class="input w-28" value="30" required>
+                           class="input w-28" value="{{ \App\Models\Setting::get('default_markup_percent', 30) }}" required>
                     <span class="text-sm font-medium text-ink-600">%</span>
                 </div>
             </div>
@@ -32,16 +44,73 @@
                 <input type="checkbox" name="only_unpriced" value="1" class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
                 Only plans without a price
             </label>
+            <label class="flex items-center gap-2.5 pb-2.5 text-sm text-ink-700">
+                <input type="checkbox" name="scoped" value="1" class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
+                Only the {{ number_format($stats['matching']) }} plan(s) matching my filter
+            </label>
             <button class="btn-secondary sm:ml-auto"
                     onclick="return confirm('Re-price plans using this markup?')">Apply markup</button>
         </div>
     </form>
 
-    <div class="card">
-        <form method="GET" class="flex gap-2 p-5">
-            <input name="q" value="{{ $search }}" class="input max-w-sm" placeholder="Search plans…">
+    <div class="card mt-6">
+        {{-- Search & filters --}}
+        <form method="GET" class="flex flex-wrap items-center gap-2 p-5">
+            <div class="relative min-w-[14rem] flex-1">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                <input name="q" value="{{ $search }}" class="input w-full pl-9" placeholder="Search device, model or duration…">
+            </div>
+
+            <select name="android" class="input w-auto">
+                <option value="">Any Android</option>
+                @foreach ($androidVersions as $version)
+                    <option value="{{ $version }}" @selected($android === (string) $version)>Android {{ $version }}</option>
+                @endforeach
+            </select>
+
+            <select name="duration" class="input w-auto">
+                <option value="">Any duration</option>
+                @foreach ($durations as $d)
+                    <option value="{{ $d->duration_minutes }}" @selected($duration === (string) $d->duration_minutes)>
+                        {{ $d->duration_label ?: $d->duration_minutes.' min' }}
+                    </option>
+                @endforeach
+            </select>
+
+            <select name="status" class="input w-auto">
+                <option value="">Any status</option>
+                <option value="live" @selected($status === 'live')>Live only</option>
+                <option value="hidden" @selected($status === 'hidden')>Hidden only</option>
+                <option value="unpriced" @selected($status === 'unpriced')>No price set</option>
+            </select>
+
             <button class="btn-secondary">Search</button>
+
+            @if ($search || $android || $duration || $status)
+                <a href="{{ route('admin.skus.index') }}" class="btn-ghost btn-sm">Clear</a>
+            @endif
         </form>
+
+        {{-- Show/hide everything currently matching --}}
+        @if ($search || $android || $duration || $status)
+            <div class="flex flex-wrap items-center gap-2 border-t border-ink-100 bg-ink-50/60 px-5 py-3 text-sm text-ink-600">
+                <span>Apply to all {{ number_format($stats['matching']) }} matching plan(s):</span>
+                @foreach ([['1', 'Show on storefront'], ['0', 'Hide from storefront']] as [$value, $label])
+                    <form method="POST" action="{{ route('admin.skus.bulk-status') }}">
+                        @csrf
+                        <input type="hidden" name="active" value="{{ $value }}">
+                        <input type="hidden" name="q" value="{{ $search }}">
+                        <input type="hidden" name="android" value="{{ $android }}">
+                        <input type="hidden" name="duration" value="{{ $duration }}">
+                        <input type="hidden" name="status" value="{{ $status }}">
+                        <button class="btn-secondary btn-sm"
+                                onclick="return confirm('{{ $label }} for all {{ number_format($stats['matching']) }} matching plans?')">{{ $label }}</button>
+                    </form>
+                @endforeach
+            </div>
+        @endif
 
         <div class="table-wrap border-t border-ink-100">
             <table class="table">
@@ -102,13 +171,22 @@
                     @empty
                         <tr>
                             <td colspan="7" class="py-14 text-center">
-                                <p class="text-sm text-ink-500">No plans synced yet.</p>
-                                <p class="mt-1 text-xs text-ink-400">Add your VMOS credentials in Settings, then hit “Sync from VMOS”.</p>
+                                @if ($search || $android || $duration || $status)
+                                    <p class="text-sm text-ink-500">No plans match that search.</p>
+                                    <a href="{{ route('admin.skus.index') }}" class="btn-secondary btn-sm mt-4">Clear filters</a>
+                                @else
+                                    <p class="text-sm text-ink-500">No plans synced yet.</p>
+                                    <p class="mt-1 text-xs text-ink-400">Add your VMOS credentials in Settings, then hit “Sync from VMOS”.</p>
+                                @endif
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+
+        @if ($skus->hasPages())
+            <div class="border-t border-ink-100 px-5 py-4">{{ $skus->links() }}</div>
+        @endif
     </div>
 </x-admin-layout>

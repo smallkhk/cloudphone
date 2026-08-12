@@ -3,13 +3,83 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sku;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 class PlanController extends Controller
 {
-    public function index()
-    {
-        $skus = Sku::available()->orderBy('sort_order')->orderBy('price')->get();
+    /** Device families per page — the catalogue can run to hundreds of them. */
+    protected const GROUPS_PER_PAGE = 12;
 
-        return view('plans.index', compact('skus'));
+    public function index(Request $request)
+    {
+        $search = $request->string('q')->trim()->value();
+        $android = $request->string('android')->trim()->value();
+        $duration = $request->string('duration')->trim()->value();
+
+        // Paginate device families rather than individual plans: a customer
+        // wants to pick a phone first and a duration second, and rendering
+        // every duration of every device at once is what made this page slow.
+        $groups = $this->filtered($request)
+            ->select('name')
+            ->selectRaw('MIN(price) as from_price')
+            ->selectRaw('MIN(sort_order) as group_sort')
+            ->groupBy('name')
+            ->orderBy('group_sort')
+            ->orderBy('from_price')
+            ->paginate(self::GROUPS_PER_PAGE)
+            ->withQueryString();
+
+        $names = collect($groups->items())->pluck('name')->all();
+
+        // Second query so each family shows all of its durations, even the ones
+        // that didn't set the "from" price.
+        $skus = $this->filtered($request)
+            ->whereIn('name', $names)
+            ->orderBy('duration_minutes')
+            ->get()
+            ->groupBy('name');
+
+        return view('plans.index', [
+            'groups' => $groups,
+            'skus' => $skus,
+            'search' => $search,
+            'android' => $android,
+            'duration' => $duration,
+            'androidVersions' => $this->facet('android_version'),
+            'durations' => Sku::available()
+                ->select('duration_minutes', 'duration_label')
+                ->groupBy('duration_minutes', 'duration_label')
+                ->orderBy('duration_minutes')
+                ->get()
+                ->unique('duration_minutes')
+                ->values(),
+            'totalPlans' => Sku::available()->count(),
+        ]);
+    }
+
+    protected function filtered(Request $request): Builder
+    {
+        $search = $request->string('q')->trim()->value();
+
+        return Sku::available()
+            ->where('price', '>', 0)
+            ->when($search, fn ($q) => $q->where(fn ($w) => $w
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('config_model', 'like', "%{$search}%")))
+            ->when($request->filled('android'), fn ($q) => $q->where('android_version', $request->string('android')->value()))
+            ->when($request->filled('duration'), fn ($q) => $q->where('duration_minutes', (int) $request->string('duration')->value()));
+    }
+
+    /** @return array<int, string> */
+    protected function facet(string $column): array
+    {
+        return Sku::available()
+            ->whereNotNull($column)
+            ->where($column, '!=', '')
+            ->distinct()
+            ->orderBy($column)
+            ->pluck($column)
+            ->all();
     }
 }

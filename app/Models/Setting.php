@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Providers\SettingsServiceProvider;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -77,9 +78,13 @@ class Setting extends Model
     {
         Cache::forget(self::CACHE_KEY);
 
+        // The assistant's system prompt is built from these values, so it has
+        // to be rebuilt when any of them change.
+        Cache::forget('assistant.site_prompt');
+
         // Re-apply over config so changes are visible immediately, not just on
         // the next request.
-        \App\Providers\SettingsServiceProvider::apply();
+        SettingsServiceProvider::apply();
     }
 
     /** True when a secret has a stored value, without revealing it. */

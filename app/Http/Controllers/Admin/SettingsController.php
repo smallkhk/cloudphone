@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Admin;
 
+use Anthropic\Client as AnthropicClient;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Services\Chat\SiteKnowledge;
 use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -14,12 +16,12 @@ class SettingsController extends Controller
     /** Setting keys that are encrypted and never rendered back to the browser. */
     protected const SECRET_KEYS = [
         'vmos_access_key', 'vmos_secret_key', 'vmos_webhook_token',
-        'trongrid_api_key', 'mail_password',
+        'trongrid_api_key', 'mail_password', 'anthropic_api_key',
     ];
 
     public function edit(string $tab = 'site')
     {
-        abort_unless(in_array($tab, ['site', 'payments', 'vmos', 'mail'], true), 404);
+        abort_unless(in_array($tab, ['site', 'payments', 'vmos', 'mail', 'assistant'], true), 404);
 
         return view('admin.settings.edit', [
             'tab' => $tab,
@@ -94,6 +96,59 @@ class SettingsController extends Controller
         $this->save($data);
 
         return back()->with('status', 'Mail settings saved.');
+    }
+
+    public function updateAssistant(Request $request)
+    {
+        $data = $request->validate([
+            'anthropic_api_key' => ['nullable', 'string', 'max:255'],
+            'assistant_model' => ['nullable', 'string', 'max:100'],
+            'assistant_max_tokens' => ['nullable', 'integer', 'min:256', 'max:8192'],
+            'assistant_greeting' => ['nullable', 'string', 'max:500'],
+            'assistant_rate_limit_per_hour' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'assistant_knowledge' => ['nullable', 'string', 'max:20000'],
+        ]);
+
+        // Checkboxes don't post when unticked, so the toggle is set explicitly.
+        $data['assistant_enabled'] = $request->boolean('assistant_enabled') ? '1' : '0';
+
+        $this->save($data);
+
+        if ($request->boolean('assistant_enabled') && ! filled(config('assistant.api_key'))) {
+            return back()->with('error', 'Saved, but live chat stays hidden until you add an Anthropic API key.');
+        }
+
+        return back()->with('status', 'Assistant settings saved.');
+    }
+
+    /** Sends one real message to Claude so the owner knows the key works. */
+    public function testAssistant(SiteKnowledge $knowledge)
+    {
+        if (! filled(config('assistant.api_key'))) {
+            return back()->with('error', 'Add your Anthropic API key first.');
+        }
+
+        try {
+            $client = new AnthropicClient(apiKey: (string) config('assistant.api_key'));
+
+            $message = $client->messages->create(
+                model: (string) config('assistant.model', 'claude-opus-5'),
+                maxTokens: 200,
+                system: [['type' => 'text', 'text' => $knowledge->sitePrompt()]],
+                messages: [['role' => 'user', 'content' => 'In one short sentence, what is the cheapest plan on this site?']],
+            );
+
+            $text = '';
+            foreach ($message->content as $block) {
+                if ($block->type === 'text') {
+                    $text .= $block->text;
+                }
+            }
+
+            return back()->with('status', 'Assistant is working. It replied: “'.trim($text).'”');
+        } catch (Throwable $e) {
+            return back()->with('error', 'Assistant test failed: '.$e->getMessage());
+        }
     }
 
     /** Verifies the stored VMOS credentials by making a real signed API call. */

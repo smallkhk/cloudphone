@@ -4,6 +4,7 @@
         'payments' => ['Payments', 'M3 10h18M7 15h2m4 0h4M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z'],
         'vmos' => ['VMOS API', 'M5 12h14M12 5l7 7-7 7'],
         'mail' => ['Email', 'M3 8l9 6 9-6M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z'],
+        'assistant' => ['AI live chat', 'M8 10h8M8 14h5M21 12a8 8 0 01-8 8H7l-4 3v-5.2A8 8 0 1121 12z'],
     ];
 
     // Secrets are never echoed back; show whether one is stored instead.
@@ -320,6 +321,116 @@
                         <button class="btn-secondary">Send test</button>
                     </div>
                 </form>
+            @endif
+
+            {{-- AI assistant ------------------------------------------------ --}}
+            @if ($tab === 'assistant')
+                <form method="POST" action="{{ route('admin.settings.assistant') }}" class="card p-6">
+                    @csrf @method('PATCH')
+                    <h2 class="text-lg font-semibold text-ink-900">AI live chat</h2>
+                    <p class="mt-1 text-sm text-ink-500">
+                        A chat bubble on every page, answered by Claude. It reads your live plans, prices, payment
+                        flow and — for signed-in customers — their own devices and orders, so it stays correct
+                        without you retraining anything.
+                    </p>
+
+                    <div class="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20">
+                        <p class="font-semibold">This costs money per message.</p>
+                        <p class="mt-1 text-xs leading-relaxed">
+                            Replies are billed to your own Anthropic account at
+                            <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener" class="underline">console.anthropic.com</a>,
+                            separately from any Claude subscription. Set a spend limit there, and keep the hourly
+                            message cap below sensible. Turn the toggle off to hide the widget entirely.
+                        </p>
+                    </div>
+
+                    <div class="mt-6 space-y-5">
+                        <label class="flex items-start gap-3">
+                            <input type="checkbox" name="assistant_enabled" value="1" class="mt-0.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+                                   @checked(old('assistant_enabled', $settings['assistant_enabled'] ?? '0') === '1')>
+                            <span>
+                                <span class="block text-sm font-medium text-ink-900">Show live chat on the site</span>
+                                <span class="block text-xs text-ink-500">Visitors and customers both get the chat bubble.</span>
+                            </span>
+                        </label>
+
+                        <div>
+                            <label class="label" for="anthropic_api_key">Anthropic API key</label>
+                            <input id="anthropic_api_key" name="anthropic_api_key" type="password" class="input"
+                                   placeholder="{{ $stored('anthropic_api_key') ? '•••••••• stored — leave blank to keep' : 'sk-ant-…' }}"
+                                   autocomplete="new-password">
+                            <p class="hint">
+                                Create one at console.anthropic.com → API keys. Stored encrypted; never shown again.
+                            </p>
+                        </div>
+
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <div>
+                                <label class="label" for="assistant_model">Model</label>
+                                <select id="assistant_model" name="assistant_model" class="input">
+                                    @foreach ([
+                                        'claude-opus-5' => 'Claude Opus 5 — smartest, most expensive',
+                                        'claude-sonnet-5' => 'Claude Sonnet 5 — balanced',
+                                        'claude-haiku-4-5' => 'Claude Haiku 4.5 — cheapest, fastest',
+                                    ] as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('assistant_model', $settings['assistant_model'] ?? config('assistant.model')) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="hint">Haiku is plenty for routine questions and costs a fraction as much.</p>
+                            </div>
+
+                            <div>
+                                <label class="label" for="assistant_rate_limit_per_hour">Messages per visitor per hour</label>
+                                <input id="assistant_rate_limit_per_hour" name="assistant_rate_limit_per_hour" type="number" min="1" max="500" class="input"
+                                       value="{{ old('assistant_rate_limit_per_hour', $settings['assistant_rate_limit_per_hour'] ?? config('assistant.rate_limit_per_hour')) }}">
+                                <p class="hint">Your cap against one person running up a bill.</p>
+                            </div>
+
+                            <div>
+                                <label class="label" for="assistant_max_tokens">Max reply length (tokens)</label>
+                                <input id="assistant_max_tokens" name="assistant_max_tokens" type="number" min="256" max="8192" step="128" class="input"
+                                       value="{{ old('assistant_max_tokens', $settings['assistant_max_tokens'] ?? config('assistant.max_tokens')) }}">
+                                <p class="hint">1200 is roughly 900 words. Shorter replies cost less.</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="label" for="assistant_greeting">Opening message</label>
+                            <textarea id="assistant_greeting" name="assistant_greeting" rows="2" class="input">{{ old('assistant_greeting', $settings['assistant_greeting'] ?? config('assistant.greeting')) }}</textarea>
+                            <p class="hint">The first thing a visitor sees when they open the chat.</p>
+                        </div>
+
+                        <div>
+                            <label class="label" for="assistant_knowledge">What else should it know?</label>
+                            <textarea id="assistant_knowledge" name="assistant_knowledge" rows="12" class="input font-mono text-xs"
+                                      placeholder="Refund policy: no refunds once a device is provisioned; contact support within 24h if the device never came online.&#10;Delivery: devices are usually ready within 2 minutes of payment confirming.&#10;We do not support: banking apps, anything requiring Google Play certification.&#10;Bulk orders: 10+ devices — email us for a discount.">{{ old('assistant_knowledge', $settings['assistant_knowledge'] ?? '') }}</textarea>
+                            <p class="hint">
+                                Plain text, one fact per line. This is how you teach it your business rules —
+                                refunds, delivery times, what you don't support, bulk pricing, anything customers keep
+                                asking. It takes priority over everything else the assistant knows.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-7 flex justify-end border-t border-ink-100 pt-5">
+                        <button class="btn-primary">Save assistant settings</button>
+                    </div>
+                </form>
+
+                <form method="POST" action="{{ route('admin.settings.test-assistant') }}" class="card mt-4 flex flex-wrap items-center gap-3 p-5">
+                    @csrf
+                    <div class="flex-1">
+                        <p class="text-sm font-semibold text-ink-900">Test the assistant</p>
+                        <p class="text-xs text-ink-500">Sends one real question and shows you the answer. Costs a fraction of a cent.</p>
+                    </div>
+                    <button class="btn-secondary">Send test question</button>
+                </form>
+
+                <div class="card mt-4 p-5">
+                    <p class="text-sm font-semibold text-ink-900">Read what customers are asking</p>
+                    <p class="mt-1 text-xs text-ink-500">Every conversation is saved so you can see where the assistant helped — and where it didn't.</p>
+                    <a href="{{ route('admin.chat.index') }}" class="btn-secondary btn-sm mt-3">Open chat transcripts</a>
+                </div>
             @endif
         </div>
     </div>

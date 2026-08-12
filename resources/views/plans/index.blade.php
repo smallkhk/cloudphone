@@ -1,7 +1,4 @@
-@php
-    $layout = auth()->check() ? 'app' : 'marketing';
-    $grouped = $skus->groupBy('name');
-@endphp
+@php $layout = auth()->check() ? 'app' : 'marketing'; @endphp
 
 @if ($layout === 'marketing')
 <x-marketing-layout>
