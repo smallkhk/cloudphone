@@ -73,7 +73,17 @@ class VmosClient
     {
         $signBody = ! in_array($path, self::UNSIGNED_BODY_PATHS, true);
 
-        $body = empty($params) ? '' : json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        // An endpoint whose parameters are all optional (userPadList, for one)
+        // is still sent an object in every example in the VMOS docs, never an
+        // empty body — and an empty body with a JSON content type is what a
+        // server typically can't parse. Suspected cause of the generic
+        // "System is busy" from userPadList, though not confirmed: VMOS
+        // rejects the key before parsing the body, so it can't be reproduced
+        // without live credentials. The signature covers the bytes actually
+        // sent, so it signs "{}" too.
+        $body = empty($params)
+            ? '{}'
+            : json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $response = $this->send($path, function () use ($path, $body, $signBody) {
             $timestamp = (string) time();

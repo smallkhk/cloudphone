@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Exceptions\VmosApiException;
 use App\Services\Vmos\VmosClient;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -83,6 +84,34 @@ class VmosClientSigningTest extends TestCase
         });
     }
 
+    /**
+     * userPadList takes only optional parameters, so it's normally called with
+     * none. Every example in the VMOS docs still sends an object, and a bare
+     * empty body with a JSON content type is unparseable to a typical server —
+     * a plausible source of the generic "System is busy" this endpoint returns.
+     * Unconfirmed (VMOS rejects the key before it parses the body, so it can't
+     * be reproduced without live credentials), but "{}" matches the docs either
+     * way and costs nothing.
+     */
+    #[Test]
+    public function a_post_with_no_parameters_still_sends_an_empty_json_object(): void
+    {
+        Http::fake(['*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => []])]);
+
+        $client = new VmosClient('https://api.vmoscloud.com', 'ak_test', 'sk_test');
+        $client->post('/vcpcloud/api/padApi/userPadList');
+
+        Http::assertSent(function ($request) {
+            $this->assertSame('{}', $request->body());
+
+            // The signature has to cover the bytes actually sent, not "".
+            $ts = $request->header('X-Timestamp')[0];
+            $expected = hash('sha256', 'sk_test'.$ts.'/vcpcloud/api/padApi/userPadList'.'{}');
+
+            return $request->header('X-Sign')[0] === $expected;
+        });
+    }
+
     #[Test]
     public function it_throws_when_the_api_returns_a_non_200_code(): void
     {
@@ -90,7 +119,7 @@ class VmosClientSigningTest extends TestCase
 
         $client = new VmosClient('https://api.vmoscloud.com', 'ak_test', 'sk_test');
 
-        $this->expectException(\App\Exceptions\VmosApiException::class);
+        $this->expectException(VmosApiException::class);
         $this->expectExceptionMessage('Signature verification failed');
 
         $client->post('/vcpcloud/api/padApi/padInfo', ['padCode' => 'AC1']);
