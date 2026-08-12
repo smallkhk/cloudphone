@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Services\Vmos\VmosClient;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
@@ -53,6 +54,67 @@ class DiagnosticsController extends Controller
             'result' => $result,
             'error' => $error,
             'configured' => filled(config('vmos.access_key')) && filled(config('vmos.secret_key')),
+            'connectivity' => $request->boolean('connectivity') ? $this->connectivity() : null,
         ]);
+    }
+
+    /**
+     * Can this server reach VMOS at all?
+     *
+     * "cURL error 28: Connection timed out" means the TCP handshake never
+     * completed — nothing to do with credentials or signing. Separating DNS
+     * from the connection tells you whether it's a name that won't resolve or
+     * a route that won't open, which are different fixes.
+     *
+     * @return array<string, mixed>
+     */
+    protected function connectivity(): array
+    {
+        $host = parse_url((string) config('vmos.base_url'), PHP_URL_HOST) ?: 'api.vmoscloud.com';
+
+        $started = microtime(true);
+        $addresses = @gethostbynamel($host);
+        $dnsMs = (int) round((microtime(true) - $started) * 1000);
+
+        $result = [
+            'host' => $host,
+            'dns_ok' => is_array($addresses) && $addresses !== [],
+            'dns_ms' => $dnsMs,
+            'addresses' => is_array($addresses) ? $addresses : [],
+            'force_ipv4' => (bool) config('vmos.force_ipv4', true),
+            'connect_timeout' => (int) config('vmos.connect_timeout', 15),
+        ];
+
+        if (! $result['dns_ok']) {
+            $result['connect_ok'] = false;
+            $result['message'] = "DNS lookup for {$host} failed on this server. Check the host's resolver before anything else.";
+
+            return $result;
+        }
+
+        // An unauthenticated HEAD: we only care whether the socket opens, so a
+        // 401/403/404 from VMOS is still a success for this test.
+        $started = microtime(true);
+
+        try {
+            $status = Http::connectTimeout((int) config('vmos.connect_timeout', 15))
+                ->timeout((int) config('vmos.timeout', 30))
+                ->withOptions(config('vmos.force_ipv4', true) && defined('CURL_IPRESOLVE_V4')
+                    ? ['curl' => [CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4]]
+                    : [])
+                ->get(rtrim((string) config('vmos.base_url'), '/').'/')
+                ->status();
+
+            $result['connect_ok'] = true;
+            $result['connect_ms'] = (int) round((microtime(true) - $started) * 1000);
+            $result['message'] = "Reached {$host} (HTTP {$status}). Outbound HTTPS from this server is working, "
+                .'so any failure above is VMOS answering, not a network problem.';
+        } catch (Throwable $e) {
+            $result['connect_ok'] = false;
+            $result['connect_ms'] = (int) round((microtime(true) - $started) * 1000);
+            $result['message'] = 'Could not open a connection: '.$e->getMessage();
+        }
+
+        return $result;
     }
 }

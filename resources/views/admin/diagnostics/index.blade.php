@@ -11,6 +11,66 @@
         </div>
     @endunless
 
+    {{-- Network reachability. Answers "is this VMOS saying no, or my server
+         failing to get there at all?" — a distinction the raw probes can't make. --}}
+    <div class="card mb-6 p-5">
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="flex-1">
+                <p class="text-sm font-semibold text-ink-900">Can this server reach VMOS?</p>
+                <p class="mt-1 text-xs text-ink-500">
+                    Run this first if you see “Connection timed out”. It checks DNS and opens a plain connection —
+                    no credentials involved.
+                </p>
+            </div>
+            <a href="{{ route('admin.diagnostics.index', array_filter(['probe' => $probe, 'connectivity' => 1])) }}"
+               class="btn-secondary">Test connection</a>
+        </div>
+
+        @if ($connectivity)
+            <div class="mt-4 rounded-xl p-4 text-sm ring-1 ring-inset {{ $connectivity['connect_ok'] ? 'bg-emerald-50 text-emerald-900 ring-emerald-600/15' : 'bg-red-50 text-red-900 ring-red-600/15' }}">
+                <p class="font-medium">{{ $connectivity['message'] }}</p>
+                <dl class="mt-3 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+                    <div class="flex justify-between gap-3">
+                        <dt class="opacity-70">Host</dt>
+                        <dd class="font-mono">{{ $connectivity['host'] }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-3">
+                        <dt class="opacity-70">DNS</dt>
+                        <dd class="font-mono">{{ $connectivity['dns_ok'] ? 'resolved in '.$connectivity['dns_ms'].'ms' : 'failed' }}</dd>
+                    </div>
+                    @if ($connectivity['addresses'])
+                        <div class="flex justify-between gap-3">
+                            <dt class="opacity-70">Resolves to</dt>
+                            <dd class="font-mono">{{ implode(', ', $connectivity['addresses']) }}</dd>
+                        </div>
+                    @endif
+                    @isset ($connectivity['connect_ms'])
+                        <div class="flex justify-between gap-3">
+                            <dt class="opacity-70">Connect time</dt>
+                            <dd class="font-mono">{{ $connectivity['connect_ms'] }}ms</dd>
+                        </div>
+                    @endisset
+                    <div class="flex justify-between gap-3">
+                        <dt class="opacity-70">Connect timeout</dt>
+                        <dd class="font-mono">{{ $connectivity['connect_timeout'] }}s</dd>
+                    </div>
+                    <div class="flex justify-between gap-3">
+                        <dt class="opacity-70">Force IPv4</dt>
+                        <dd class="font-mono">{{ $connectivity['force_ipv4'] ? 'on' : 'off' }}</dd>
+                    </div>
+                </dl>
+
+                @unless ($connectivity['connect_ok'])
+                    <p class="mt-3 text-xs leading-relaxed">
+                        Nothing in the app can fix this — the request never left your server, or never got a reply.
+                        Ask your host whether outbound HTTPS to <span class="font-mono">{{ $connectivity['host'] }}</span>
+                        is blocked or firewalled. It's often temporary, so try again in a few minutes first.
+                    </p>
+                @endunless
+            </div>
+        @endif
+    </div>
+
     <div class="grid gap-6 lg:grid-cols-4">
         <nav class="lg:col-span-1">
             <div class="card overflow-hidden p-2">
