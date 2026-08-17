@@ -100,6 +100,27 @@ export default function liveScreen({ tokenUrl, csrf }) {
 
             this.hint = 'Connecting to the device…';
 
+            // The SDK leans on WebRTC APIs the browser withholds on insecure
+            // origins, and it reports that by throwing rather than through a
+            // callback. Without this the failure is invisible: no callback
+            // fires, and the panel just sits on "Connecting" until the
+            // watchdog. Everything from construction to start() is wrapped.
+            // start() also fails asynchronously, which a try/catch can't see.
+            this.captureAsyncErrors();
+
+            try {
+                this.startEngine(ArmcloudEngine, session);
+            } catch (e) {
+                this.note(`SDK threw: ${e?.name || 'Error'}: ${e?.message || e}`);
+                this.fail(
+                    window.isSecureContext
+                        ? `The screen player failed to start: ${e?.message || 'unknown error'}`
+                        : 'The screen player couldn\'t start because this page isn\'t using HTTPS. Browsers block video streaming on insecure pages — enable SSL on your domain and try again.'
+                );
+            }
+        },
+
+        startEngine(ArmcloudEngine, session) {
             this.engine = new ArmcloudEngine({
                 baseUrl: session.baseUrl,
                 token: session.token,
@@ -135,6 +156,7 @@ export default function liveScreen({ tokenUrl, csrf }) {
                     // not onConnectSuccess — is the moment there's a picture.
                     onRenderedFirstFrame: () => {
                         this.note('first frame rendered');
+                        this.releaseAsyncErrors();
                         this.clearWatchdog();
                         this.state = 'live';
                         this.hint = '';
@@ -186,7 +208,28 @@ export default function liveScreen({ tokenUrl, csrf }) {
             this.engine.start();
         },
 
+        /** Records rejections thrown inside the SDK while we're connecting. */
+        captureAsyncErrors() {
+            if (this.rejectionHandler) return;
+
+            this.rejectionHandler = (event) => {
+                if (this.state === 'connecting') {
+                    this.note(`unhandled: ${event.reason?.message || event.reason}`);
+                }
+            };
+
+            window.addEventListener('unhandledrejection', this.rejectionHandler);
+        },
+
+        releaseAsyncErrors() {
+            if (this.rejectionHandler) {
+                window.removeEventListener('unhandledrejection', this.rejectionHandler);
+                this.rejectionHandler = null;
+            }
+        },
+
         fail(message) {
+            this.releaseAsyncErrors();
             this.clearWatchdog();
             this.state = 'error';
             this.hint = '';
@@ -201,6 +244,7 @@ export default function liveScreen({ tokenUrl, csrf }) {
         },
 
         disconnect() {
+            this.releaseAsyncErrors();
             this.clearWatchdog();
 
             try {
