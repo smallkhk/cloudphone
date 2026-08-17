@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CloudInstanceController;
 use App\Http\Controllers\DeviceControlController;
+use App\Http\Controllers\EmailAccountController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PlanController;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
+Route::get('/email-accounts', [EmailAccountController::class, 'index'])->name('email-accounts.index');
 
 // Live chat — open to guests as well as customers.
 Route::get('/chat/history', [ChatController::class, 'history'])->name('chat.history');
@@ -59,6 +61,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/instances/{instance}/apps/action', [DeviceControlController::class, 'appAction'])->name('instances.apps.action');
     Route::post('/instances/{instance}/apps/refresh', [DeviceControlController::class, 'refreshApps'])->name('instances.apps.refresh');
     Route::post('/instances/{instance}/adb', [DeviceControlController::class, 'toggleAdb'])->name('instances.adb');
+
+    Route::post('/email-accounts/{emailAccount}/refresh', [EmailAccountController::class, 'refresh'])->name('email-accounts.refresh');
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -68,6 +72,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/skus', [AdminSkuController::class, 'index'])->name('skus.index');
     Route::patch('/skus/{sku}', [AdminSkuController::class, 'update'])->name('skus.update');
     Route::post('/skus/sync', [AdminSkuController::class, 'sync'])->name('skus.sync');
+    Route::post('/skus/sync-email', [AdminSkuController::class, 'syncEmail'])->name('skus.sync-email');
     Route::post('/skus/bulk-markup', [AdminSkuController::class, 'bulkMarkup'])->name('skus.bulk-markup');
     Route::post('/skus/bulk-status', [AdminSkuController::class, 'bulkStatus'])->name('skus.bulk-status');
 

@@ -48,13 +48,14 @@ class PlanController extends Controller
             'duration' => $duration,
             'androidVersions' => $this->facet('android_version'),
             'durations' => Sku::available()
+                ->cloudPhones()
                 ->select('duration_minutes', 'duration_label')
                 ->groupBy('duration_minutes', 'duration_label')
                 ->orderBy('duration_minutes')
                 ->get()
                 ->unique('duration_minutes')
                 ->values(),
-            'totalPlans' => Sku::available()->count(),
+            'totalPlans' => Sku::available()->cloudPhones()->count(),
         ]);
     }
 
@@ -63,6 +64,7 @@ class PlanController extends Controller
         $search = $request->string('q')->trim()->value();
 
         return Sku::available()
+            ->cloudPhones()
             ->where('price', '>', 0)
             ->when($search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$search}%")
@@ -75,6 +77,7 @@ class PlanController extends Controller
     protected function facet(string $column): array
     {
         return Sku::available()
+            ->cloudPhones()
             ->whereNotNull($column)
             ->where($column, '!=', '')
             ->distinct()

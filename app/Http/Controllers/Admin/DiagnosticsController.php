@@ -28,6 +28,9 @@ class DiagnosticsController extends Controller
         'static_proxies' => ['GET', '/vcpcloud/api/padApi/proxyGoodList', [], 'Static residential proxy products'],
         'proxy_regions' => ['GET', '/vcpcloud/api/padApi/getProxyRegion', [], 'Proxy regions'],
         'my_proxies' => ['POST', '/vcpcloud/api/padApi/queryProxyList', ['current' => 1, 'size' => 20], 'Proxies you own'],
+        'email_services' => ['POST', '/vcpcloud/api/padApi/getEmailServiceList', [], 'Email registration services (GitHub, TikTok…)'],
+        'email_types' => ['POST', '/vcpcloud/api/padApi/getEmailTypeList', [], 'Email account types & stock'],
+        'my_emails' => ['POST', '/vcpcloud/api/padApi/getEmailOrder', ['current' => 1, 'size' => 20], 'Email accounts you own'],
     ];
 
     public function index(Request $request, VmosClient $client)

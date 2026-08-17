@@ -50,6 +50,11 @@
                 My orders
             </x-side-nav-link>
 
+            <x-side-nav-link :href="route('email-accounts.index')" :active="request()->routeIs('email-accounts.*')"
+                             icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                Email accounts
+            </x-side-nav-link>
+
             <x-side-nav-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')"
                              icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
                 Profile

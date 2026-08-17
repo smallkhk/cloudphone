@@ -13,7 +13,11 @@ class SkuController extends Controller
 {
     public function index(Request $request)
     {
-        $skus = $this->filtered($request)
+        $type = $request->string('type')->value() === Sku::TYPE_EMAIL_ACCOUNT
+            ? Sku::TYPE_EMAIL_ACCOUNT
+            : Sku::TYPE_CLOUD_PHONE;
+
+        $skus = $this->filtered($request, $type)
             ->orderBy('name')
             ->orderBy('duration_minutes')
             ->paginate(40)
@@ -21,6 +25,7 @@ class SkuController extends Controller
 
         return view('admin.skus.index', [
             'skus' => $skus,
+            'type' => $type,
             'search' => $request->string('q')->trim()->value(),
             'android' => $request->string('android')->trim()->value(),
             'duration' => $request->string('duration')->trim()->value(),
@@ -28,8 +33,8 @@ class SkuController extends Controller
             'androidVersions' => $this->androidVersions(),
             'durations' => $this->durations(),
             'stats' => [
-                'total' => Sku::count(),
-                'live' => Sku::where('active', true)->count(),
+                'total' => Sku::where('type', $type)->count(),
+                'live' => Sku::where('type', $type)->where('active', true)->count(),
                 'matching' => $skus->total(),
             ],
         ]);
@@ -41,11 +46,13 @@ class SkuController extends Controller
      * plans in the catalogue, acting on the unfiltered table by accident would
      * be painful to undo.
      */
-    protected function filtered(Request $request): Builder
+    protected function filtered(Request $request, ?string $type = null): Builder
     {
         $search = $request->string('q')->trim()->value();
+        $type ??= ($request->string('type')->value() === Sku::TYPE_EMAIL_ACCOUNT ? Sku::TYPE_EMAIL_ACCOUNT : Sku::TYPE_CLOUD_PHONE);
 
         return Sku::query()
+            ->where('type', $type)
             ->when($search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('config_model', 'like', "%{$search}%")
@@ -61,6 +68,7 @@ class SkuController extends Controller
     protected function androidVersions(): array
     {
         return Sku::query()
+            ->cloudPhones()
             ->whereNotNull('android_version')
             ->where('android_version', '!=', '')
             ->distinct()
@@ -73,6 +81,7 @@ class SkuController extends Controller
     protected function durations(): array
     {
         return Sku::query()
+            ->cloudPhones()
             ->select('duration_minutes', 'duration_label')
             ->groupBy('duration_minutes', 'duration_label')
             ->orderBy('duration_minutes')
@@ -115,6 +124,22 @@ class SkuController extends Controller
         }
     }
 
+    /** Same as sync(), but for the email-account catalogue. */
+    public function syncEmail()
+    {
+        if (! filled(config('vmos.access_key'))) {
+            return back()->with('error', 'Add your VMOS credentials under Settings → VMOS first.');
+        }
+
+        try {
+            Artisan::call('vmos:sync-email-skus');
+
+            return back()->with('status', trim(Artisan::output()) ?: 'Sync complete.');
+        } catch (Throwable $e) {
+            return back()->with('error', 'Sync failed: '.$e->getMessage());
+        }
+    }
+
     /** Re-prices every plan at cost + markup%, so pricing can be set in one go. */
     public function bulkMarkup(Request $request)
     {
@@ -125,9 +150,12 @@ class SkuController extends Controller
 
         $multiplier = 1 + ((float) $data['markup_percent'] / 100);
 
+        $type = $request->string('type')->value() === Sku::TYPE_EMAIL_ACCOUNT ? Sku::TYPE_EMAIL_ACCOUNT : Sku::TYPE_CLOUD_PHONE;
+
         // Honour whatever the admin has filtered the table down to, so it's
-        // possible to re-price just one device family.
-        $query = $request->boolean('scoped') ? $this->filtered($request) : Sku::query();
+        // possible to re-price just one device family. Either way, stay within
+        // the catalogue (cloud phones / email accounts) the admin is looking at.
+        $query = $request->boolean('scoped') ? $this->filtered($request, $type) : Sku::query()->where('type', $type);
 
         if ($request->boolean('only_unpriced')) {
             $query->where(fn ($q) => $q->whereNull('price')->orWhere('price', 0));

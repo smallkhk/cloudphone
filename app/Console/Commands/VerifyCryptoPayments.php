@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\CryptoPayment;
 use App\Services\Payments\TronUsdtVerifier;
-use App\Services\Provisioning\CloudPhoneProvisioner;
+use App\Services\Provisioning\OrderProvisioner;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -15,7 +15,7 @@ class VerifyCryptoPayments extends Command
 
     protected $description = 'Check submitted crypto payments on-chain, confirm them, and provision paid orders';
 
-    public function handle(TronUsdtVerifier $verifier, CloudPhoneProvisioner $provisioner): int
+    public function handle(TronUsdtVerifier $verifier, OrderProvisioner $provisioner): int
     {
         $submitted = CryptoPayment::query()
             ->where('status', CryptoPayment::STATUS_SUBMITTED)

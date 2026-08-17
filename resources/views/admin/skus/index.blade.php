@@ -3,7 +3,7 @@
         {{-- Plain "&" here: the component escapes it, so "&amp;" would double-escape. --}}
         <x-page-header title="Plans & pricing" subtitle="Your selling price versus what VMOS charges you.">
             <x-slot name="actions">
-                <form method="POST" action="{{ route('admin.skus.sync') }}">
+                <form method="POST" action="{{ $type === 'email_account' ? route('admin.skus.sync-email') : route('admin.skus.sync') }}">
                     @csrf
                     <button class="btn-secondary">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -16,7 +16,18 @@
         </x-page-header>
     </x-slot>
 
-    <div class="grid gap-4 sm:grid-cols-3">
+    <div class="flex gap-2 border-b border-ink-200">
+        <a href="{{ route('admin.skus.index') }}"
+           class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'cloud_phone' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
+            Cloud phones
+        </a>
+        <a href="{{ route('admin.skus.index', ['type' => 'email_account']) }}"
+           class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'email_account' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
+            Email accounts
+        </a>
+    </div>
+
+    <div class="mt-6 grid gap-4 sm:grid-cols-3">
         <x-stat-card label="Plans in catalogue" :value="number_format($stats['total'])" />
         <x-stat-card label="Live on storefront" :value="number_format($stats['live'])" tone="green" />
         <x-stat-card label="Matching your filter" :value="number_format($stats['matching'])" tone="amber" />
@@ -26,6 +37,7 @@
     <form method="POST" action="{{ route('admin.skus.bulk-markup') }}" class="card mt-6 p-5">
         @csrf
         {{-- Carry the filter through so "only these" re-prices what's on screen. --}}
+        <input type="hidden" name="type" value="{{ $type }}">
         <input type="hidden" name="q" value="{{ $search }}">
         <input type="hidden" name="android" value="{{ $android }}">
         <input type="hidden" name="duration" value="{{ $duration }}">
@@ -56,6 +68,7 @@
     <div class="card mt-6">
         {{-- Search & filters --}}
         <form method="GET" class="flex flex-wrap items-center gap-2 p-5">
+            <input type="hidden" name="type" value="{{ $type }}">
             <div class="relative min-w-[14rem] flex-1">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
@@ -63,21 +76,23 @@
                 <input name="q" value="{{ $search }}" class="input w-full pl-9" placeholder="Search device, model or duration…">
             </div>
 
-            <select name="android" class="input w-auto">
-                <option value="">Any Android</option>
-                @foreach ($androidVersions as $version)
-                    <option value="{{ $version }}" @selected($android === (string) $version)>Android {{ $version }}</option>
-                @endforeach
-            </select>
+            @if ($type === 'cloud_phone')
+                <select name="android" class="input w-auto">
+                    <option value="">Any Android</option>
+                    @foreach ($androidVersions as $version)
+                        <option value="{{ $version }}" @selected($android === (string) $version)>Android {{ $version }}</option>
+                    @endforeach
+                </select>
 
-            <select name="duration" class="input w-auto">
-                <option value="">Any duration</option>
-                @foreach ($durations as $d)
-                    <option value="{{ $d->duration_minutes }}" @selected($duration === (string) $d->duration_minutes)>
-                        {{ $d->duration_label ?: $d->duration_minutes.' min' }}
-                    </option>
-                @endforeach
-            </select>
+                <select name="duration" class="input w-auto">
+                    <option value="">Any duration</option>
+                    @foreach ($durations as $d)
+                        <option value="{{ $d->duration_minutes }}" @selected($duration === (string) $d->duration_minutes)>
+                            {{ $d->duration_label ?: $d->duration_minutes.' min' }}
+                        </option>
+                    @endforeach
+                </select>
+            @endif
 
             <select name="status" class="input w-auto">
                 <option value="">Any status</option>
@@ -89,7 +104,7 @@
             <button class="btn-secondary">Search</button>
 
             @if ($search || $android || $duration || $status)
-                <a href="{{ route('admin.skus.index') }}" class="btn-ghost btn-sm">Clear</a>
+                <a href="{{ route('admin.skus.index', ['type' => $type]) }}" class="btn-ghost btn-sm">Clear</a>
             @endif
         </form>
 
@@ -101,6 +116,7 @@
                     <form method="POST" action="{{ route('admin.skus.bulk-status') }}">
                         @csrf
                         <input type="hidden" name="active" value="{{ $value }}">
+                        <input type="hidden" name="type" value="{{ $type }}">
                         <input type="hidden" name="q" value="{{ $search }}">
                         <input type="hidden" name="android" value="{{ $android }}">
                         <input type="hidden" name="duration" value="{{ $duration }}">
@@ -140,7 +156,11 @@
                             <td>
                                 <p class="text-sm font-medium text-ink-900">{{ $sku->name }}</p>
                                 <p class="text-xs text-ink-500">
-                                    Android {{ $sku->android_version }}
+                                    @if ($sku->type === 'email_account')
+                                        {{ $sku->config_model }}
+                                    @else
+                                        Android {{ $sku->android_version }}
+                                    @endif
                                     @if ($sku->sell_out) · <span class="text-red-600">Sold out at VMOS</span> @endif
                                 </p>
                             </td>

@@ -99,6 +99,39 @@
                 </div>
             @endif
 
+            {{-- Email accounts --}}
+            @if ($order->emailAccounts->isNotEmpty())
+                <div class="card p-6">
+                    <h2 class="text-base font-semibold text-ink-900">Your email accounts from this order</h2>
+                    <div class="mt-4 space-y-3">
+                        @foreach ($order->emailAccounts as $account)
+                            <div class="rounded-xl bg-ink-50 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div class="min-w-0">
+                                        <p class="font-mono text-sm font-medium text-ink-900">{{ $account->email }}</p>
+                                        @if ($account->password)
+                                            <p class="mt-1 text-xs text-ink-500">Password: <code class="rounded bg-white px-1.5 py-0.5 font-mono">{{ $account->password }}</code></p>
+                                        @endif
+                                    </div>
+                                    <div class="flex-none text-right">
+                                        @if ($account->latest_code)
+                                            <p class="text-xs uppercase tracking-wider text-ink-400">Latest code</p>
+                                            <p class="font-mono text-lg font-bold text-brand-600">{{ $account->latest_code }}</p>
+                                        @else
+                                            <p class="text-xs text-ink-400">No code fetched yet</p>
+                                        @endif
+                                        <form method="POST" action="{{ route('email-accounts.refresh', $account) }}" class="mt-2">
+                                            @csrf
+                                            <button class="btn-secondary btn-sm">Check for code</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- Devices --}}
             @if ($order->cloudInstances->isNotEmpty())
                 <div class="card p-6">

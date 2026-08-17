@@ -73,6 +73,27 @@
                 </div>
             </div>
 
+            @if ($order->emailAccounts->isNotEmpty())
+                <div class="card">
+                    <h2 class="px-6 py-4 text-base font-semibold text-ink-900">Delivered email accounts</h2>
+                    <div class="table-wrap border-t border-ink-100">
+                        <table class="table">
+                            <thead><tr><th>Email</th><th>Password</th><th>Latest code</th><th>Delivered</th></tr></thead>
+                            <tbody>
+                                @foreach ($order->emailAccounts as $account)
+                                    <tr>
+                                        <td class="font-mono text-xs">{{ $account->email }}</td>
+                                        <td class="font-mono text-xs">{{ $account->password ?? '—' }}</td>
+                                        <td class="font-mono text-xs">{{ $account->latest_code ?? '—' }}</td>
+                                        <td class="text-sm text-ink-600">{{ $account->delivered_at?->format('d M H:i') ?? '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
             @if ($order->cloudInstances->isNotEmpty())
                 <div class="card">
                     <h2 class="px-6 py-4 text-base font-semibold text-ink-900">Provisioned devices</h2>
@@ -115,7 +136,7 @@
                                 {{ $order->status === 'failed' ? 'Retry provisioning' : 'Provision now' }}
                             </button>
                         </form>
-                        <p class="text-xs text-ink-500">Buys the cloud phone from VMOS for this order.</p>
+                        <p class="text-xs text-ink-500">Buys the {{ $order->sku?->isEmailAccount() ? 'email account(s)' : 'cloud phone' }} from VMOS for this order.</p>
                     @endif
 
                     @unless (in_array($order->status, ['completed', 'canceled'], true))

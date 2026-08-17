@@ -21,14 +21,34 @@ provisioning, the per-device control panel (SIM/GPS/locale/proxy/apps/ADB),
 **live screen streaming** via the VMOS H5 SDK, admin panel, and **live chat**
 (Claude or any OpenAI-compatible provider, with human takeover).
 
-Not done yet:
+**Email verification accounts** (added, NOT yet tested against a live VMOS
+account): reuses the existing Sku/Order/CryptoPayment/OrderController pipeline
+rather than a parallel one — `Sku.type` is now `cloud_phone` or
+`email_account`, and `OrderProvisioner` dispatches a paid order to
+`CloudPhoneProvisioner` or the new `EmailAccountProvisioner` based on that.
+Storefront: `/email-accounts` (`EmailAccountController`). Admin: **Plans &
+pricing** now has an *Email accounts* tab (same page, `?type=email_account`).
+Sync with `php artisan vmos:sync-email-skus` (hourly, like the phone SKUs).
 
-- **Email Verification Service** — VMOS sells pre-made email accounts for
-  service registrations (GitHub, TikTok…) at ~$0.01–0.03 with verification-code
-  retrieval, over five `…/padApi/*Email*` endpoints. Resellable exactly like
-  the phones; the owner is interested. Note VMOS has **no** virtual phone
-  number / SMS-receiving product — `simulateSendSms` only injects a fake SMS
-  into your own device.
+Important caveats before relying on this:
+
+- The VMOS OpenAPI docs list the four endpoints used here
+  (`getEmailServiceList`, `getEmailTypeList`, `createEmailOrder`,
+  `getEmailOrder`) but — unlike the phone-plan endpoints — don't publish full
+  request/response field names. `VmosCloudPhoneService`'s email methods and
+  `EmailAccountProvisioner`'s parsing of the purchase response are best-effort,
+  matching naming conventions used elsewhere in the API. **Check Admin →
+  Diagnostics (the three new `email_*` probes) against a real account before
+  trusting a live purchase**, and compare the raw JSON there to what
+  `EmailAccountProvisioner`/`EmailAccountController::refresh` expect
+  (`app/Services/Provisioning/EmailAccountProvisioner.php`,
+  `app/Http/Controllers/EmailAccountController.php`). Every raw entry is kept
+  in `email_accounts.raw_payload` regardless, so a wrong field-name guess is
+  fixable without re-buying.
+- VMOS has **no** virtual phone number / SMS-receiving product —
+  `simulateSendSms` only injects a fake SMS into a device you already own.
+  Don't add a "phone verification" feature backed by VMOS; there's nothing to
+  back it with. The storefront copy on `/email-accounts` says this explicitly.
 - No real customer has completed a crypto purchase, so
   `TronUsdtVerifier` is untested against a live transaction.
 - `demo@example.com` / `password` was seeded as an **admin**. Confirm it's gone

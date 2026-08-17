@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\CryptoPayment;
 use App\Models\Order;
-use App\Services\Provisioning\CloudPhoneProvisioner;
+use App\Services\Provisioning\OrderProvisioner;
 use Illuminate\Http\Request;
 use Throwable;
 
@@ -31,7 +31,7 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
-        $order->load(['user', 'sku', 'payments', 'cloudInstances']);
+        $order->load(['user', 'sku', 'payments', 'cloudInstances', 'emailAccounts']);
 
         return view('admin.orders.show', compact('order'));
     }
@@ -60,7 +60,7 @@ class OrderController extends Controller
     }
 
     /** Runs (or retries) provisioning for a paid order. */
-    public function provision(Order $order, CloudPhoneProvisioner $provisioner)
+    public function provision(Order $order, OrderProvisioner $provisioner)
     {
         if (! in_array($order->status, [Order::STATUS_PAID, Order::STATUS_FAILED], true)) {
             return back()->with('error', 'Only paid or failed orders can be provisioned.');

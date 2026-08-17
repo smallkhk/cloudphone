@@ -381,4 +381,56 @@ class VmosCloudPhoneService
     {
         return $this->client->post('/vcpcloud/api/padApi/adb', ['padCodes' => $padCodes]);
     }
+
+    // --- Email verification accounts --------------------------------------
+    //
+    // VMOS sells pre-made email accounts for service-registration flows
+    // (GitHub, TikTok, …) with verification-code retrieval. There is NO
+    // virtual phone number / SMS-receiving product — simulateSendSms only
+    // injects a fake SMS into a device you already own, it does not provision
+    // a real inbound number.
+    //
+    // The VMOS OpenAPI docs list these four paths but don't publish full
+    // request/response field names the way they do for the phone-plan
+    // endpoints. Parameter names below follow the same conventions used
+    // elsewhere in this API (goodId/goodNum-style purchase, current/size-style
+    // pagination) but are NOT confirmed against a live account. Check
+    // Admin → Diagnostics after adding credentials, before relying on this.
+
+    /** Registration services email accounts are sold for (e.g. GitHub, TikTok). */
+    public function emailServiceList(): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getEmailServiceList');
+    }
+
+    /** Purchasable email account types and remaining stock, optionally scoped to a service. */
+    public function emailTypeList(?int $serviceId = null): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getEmailTypeList', array_filter([
+            'serviceId' => $serviceId,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** Buys one or more pre-made email accounts of a given type. */
+    public function createEmailOrder(int $emailTypeId, int $num = 1): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/createEmailOrder', [
+            'emailTypeId' => $emailTypeId,
+            'num' => $num,
+        ]);
+    }
+
+    /**
+     * Email accounts already purchased on this account, including whatever
+     * verification code VMOS currently has on file for them. Call again to
+     * poll for a fresh code after triggering a "send code" on the target site.
+     */
+    public function emailOrderList(?string $vmosOrderId = null, int $page = 1, int $size = 50): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getEmailOrder', array_filter([
+            'orderId' => $vmosOrderId,
+            'current' => $page,
+            'size' => $size,
+        ], fn ($v) => $v !== null));
+    }
 }

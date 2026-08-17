@@ -74,4 +74,9 @@ class Order extends Model
     {
         return $this->hasMany(CloudInstance::class);
     }
+
+    public function emailAccounts(): HasMany
+    {
+        return $this->hasMany(EmailAccount::class);
+    }
 }

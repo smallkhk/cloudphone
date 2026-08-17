@@ -25,6 +25,23 @@ workers required — a single cron entry drives everything).
 6. Customers manage their cloud phones (restart / reset / screenshot) from
    **My Cloud Phones**.
 
+### Email verification accounts
+
+The same checkout pipeline also sells pre-made **email accounts** for service
+registrations (GitHub, TikTok, …), with verification-code retrieval — VMOS's
+`…/padApi/*Email*` endpoints. From **Email accounts** a customer buys one or
+more accounts; once paid, `EmailAccountProvisioner` buys them from VMOS
+(`createEmailOrder`) and the address/password appear on the order. A **Check
+for code** button polls `getEmailOrder` for the latest verification code.
+
+Sync the catalogue with `php artisan vmos:sync-email-skus` (also runs hourly),
+and set prices under **Admin → Plans & pricing → Email accounts**.
+
+> **No virtual phone numbers.** VMOS does not sell an SMS-receiving / virtual
+> phone number product — `simulateSendSms` only injects a fake SMS into a
+> device you already own, it can't receive a real one. Only email accounts are
+> offered here.
+
 ## Admin panel
 
 Everything below is configurable from `/admin` — no SSH or file editing needed
