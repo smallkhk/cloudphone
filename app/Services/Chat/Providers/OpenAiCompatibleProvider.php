@@ -21,7 +21,7 @@ class OpenAiCompatibleProvider implements ChatProvider
     /** Ready-made endpoints, so nobody has to guess a base URL. */
     public const PRESETS = [
         'groq' => ['Groq (free tier)', 'https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile', 'https://console.groq.com/keys'],
-        'gemini' => ['Google Gemini (free tier)', 'https://generativelanguage.googleapis.com/v1beta/openai', 'gemini-2.0-flash', 'https://aistudio.google.com/apikey'],
+        'gemini' => ['Google Gemini (free tier)', 'https://generativelanguage.googleapis.com/v1beta/openai', 'gemini-3.6-flash', 'https://aistudio.google.com/apikey'],
         'openrouter' => ['OpenRouter', 'https://openrouter.ai/api/v1', 'meta-llama/llama-3.3-70b-instruct:free', 'https://openrouter.ai/keys'],
         'deepseek' => ['DeepSeek', 'https://api.deepseek.com/v1', 'deepseek-chat', 'https://platform.deepseek.com/api_keys'],
         'together' => ['Together AI', 'https://api.together.xyz/v1', 'meta-llama/Llama-3.3-70B-Instruct-Turbo', 'https://api.together.ai/settings/api-keys'],
