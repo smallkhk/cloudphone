@@ -52,9 +52,38 @@
         @endforeach
     </div>
 
-    {{-- Search & filters --}}
-    <form method="GET" action="{{ route('plans.index') }}" class="card flex flex-wrap items-center gap-2 p-4">
+    {{-- Android version --}}
+    @if (! empty($androidVersions))
+        <x-pill-filter label="Android" param="android" route="plans.index" all-label="Any"
+            :active="$android"
+            :options="collect($androidVersions)->mapWithKeys(fn ($v) => [$v => $v])"
+            :params="['tier' => $tier ?: null, 'q' => $search ?: null, 'model' => $model ?: null, 'region' => $preferredRegion ?: null, 'duration' => $duration ?: null]" />
+    @endif
+
+    {{-- Device model --}}
+    @if (! empty($models))
+        <x-pill-filter label="Model" param="model" route="plans.index" all-label="Any"
+            :active="$model"
+            :options="collect($models)->mapWithKeys(fn ($m) => [$m => $m])"
+            :params="['tier' => $tier ?: null, 'q' => $search ?: null, 'android' => $android ?: null, 'region' => $preferredRegion ?: null, 'duration' => $duration ?: null]" />
+    @endif
+
+    {{-- Region — doesn't filter devices (any device can be bought in any
+         region), it just pre-selects the "Buy now" region below so you don't
+         have to re-pick it per device. --}}
+    @if (! empty($regionOptions))
+        <x-pill-filter label="Region" param="region" route="plans.index" all-label="No preference"
+            :active="$preferredRegion"
+            :options="$regionOptions"
+            :params="['tier' => $tier ?: null, 'q' => $search ?: null, 'android' => $android ?: null, 'model' => $model ?: null, 'duration' => $duration ?: null]" />
+    @endif
+
+    {{-- Search & duration --}}
+    <form method="GET" action="{{ route('plans.index') }}" class="card mt-2 flex flex-wrap items-center gap-2 p-4">
         <input type="hidden" name="tier" value="{{ $tier }}">
+        <input type="hidden" name="android" value="{{ $android }}">
+        <input type="hidden" name="model" value="{{ $model }}">
+        <input type="hidden" name="region" value="{{ $preferredRegion }}">
         <div class="relative min-w-[14rem] flex-1">
             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
@@ -62,20 +91,6 @@
             <input name="q" value="{{ $search }}" class="input w-full pl-9"
                    placeholder="Search a device — “Samsung”, “Pixel”, “V08”…" autocomplete="off">
         </div>
-
-        <select name="android" class="input w-auto" onchange="this.form.submit()">
-            <option value="">Any Android</option>
-            @foreach ($androidVersions as $version)
-                <option value="{{ $version }}" @selected($android === (string) $version)>Android {{ $version }}</option>
-            @endforeach
-        </select>
-
-        <select name="model" class="input w-auto" onchange="this.form.submit()">
-            <option value="">Any model</option>
-            @foreach ($models as $m)
-                <option value="{{ $m }}" @selected($model === (string) $m)>{{ $m }}</option>
-            @endforeach
-        </select>
 
         <select name="duration" class="input w-auto" onchange="this.form.submit()">
             <option value="">Any duration</option>
@@ -88,7 +103,7 @@
 
         <button class="btn-primary">Search</button>
 
-        @if ($search || $android || $duration || $model)
+        @if ($search || $android || $duration || $model || $preferredRegion)
             <a href="{{ route('plans.index', array_filter(['tier' => $tier ?: null])) }}" class="btn-ghost btn-sm">Clear</a>
         @endif
     </form>
@@ -186,9 +201,9 @@
                                             @if (! empty($regionOptions))
                                                 <label class="label text-xs" for="region-{{ $sku->id }}">Region</label>
                                                 <select id="region-{{ $sku->id }}" name="country_code" class="input mb-3 text-sm">
-                                                    <option value="">Let us choose</option>
+                                                    <option value="" @selected(! $preferredRegion)>Let us choose</option>
                                                     @foreach ($regionOptions as $code => $label)
-                                                        <option value="{{ $code }}">{{ $label }}</option>
+                                                        <option value="{{ $code }}" @selected($preferredRegion === $code)>{{ $label }}</option>
                                                     @endforeach
                                                 </select>
                                             @endif

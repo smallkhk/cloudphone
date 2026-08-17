@@ -22,6 +22,7 @@ class PlanController extends Controller
         $duration = $request->string('duration')->trim()->value();
         $model = $request->string('model')->trim()->value();
         $tier = $request->string('tier')->trim()->value();
+        $preferredRegion = strtoupper($request->string('region')->trim()->value());
 
         // Paginate device families rather than individual plans: a customer
         // wants to pick a phone first and a duration second, and rendering
@@ -54,13 +55,16 @@ class PlanController extends Controller
             'duration' => $duration,
             'model' => $model,
             'tier' => $tier,
+            'preferredRegion' => $preferredRegion,
             'androidVersions' => $this->facet('android_version'),
             'models' => $this->facet('config_model'),
             // Region isn't a property of a plan — any device/duration can be
-            // bought in any region — so it's not a browse filter. It's a
-            // purchase-time choice: VMOS's live supported-country list, shown
-            // on each "Buy now" form and passed straight through to
-            // createOrder as countryCode.
+            // bought in any region — so it never filters which devices show.
+            // It's a purchase-time choice: VMOS's live supported-country
+            // list. Picking one up top just pre-selects it on every device's
+            // "Buy now" form below, so the customer doesn't have to re-pick
+            // it per device — whatever's picked still gets passed straight
+            // through to createOrder as countryCode.
             'regionOptions' => $this->regionCatalog->options(),
             // Optional proxy add-on at checkout — bought alongside the device
             // (VMOS residential proxy) or supplied by the customer (their own).
