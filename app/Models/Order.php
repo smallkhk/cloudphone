@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
     'reference', 'user_id', 'sku_id', 'quantity', 'unit_price', 'total_price',
     'auto_renew', 'country_code', 'status', 'vmos_order_id', 'vmos_equipment_id',
     'error_message', 'paid_at', 'provisioned_at',
+    'proxy_mode', 'proxy_config', 'proxy_price', 'proxy_cost_price', 'proxy_status', 'proxy_error',
 ])]
 class Order extends Model
 {
@@ -32,6 +33,18 @@ class Order extends Model
 
     public const STATUS_EXPIRED = 'expired';
 
+    public const PROXY_MODE_VMOS = 'vmos';
+
+    public const PROXY_MODE_CUSTOM = 'custom';
+
+    public const PROXY_STATUS_PENDING = 'pending';
+
+    public const PROXY_STATUS_PURCHASED = 'purchased';
+
+    public const PROXY_STATUS_ATTACHED = 'attached';
+
+    public const PROXY_STATUS_FAILED = 'failed';
+
     protected static function booted(): void
     {
         static::creating(function (Order $order) {
@@ -47,7 +60,15 @@ class Order extends Model
             'auto_renew' => 'boolean',
             'paid_at' => 'datetime',
             'provisioned_at' => 'datetime',
+            'proxy_config' => 'array',
+            'proxy_price' => 'decimal:2',
+            'proxy_cost_price' => 'decimal:2',
         ];
+    }
+
+    public function hasProxy(): bool
+    {
+        return in_array($this->proxy_mode, [self::PROXY_MODE_VMOS, self::PROXY_MODE_CUSTOM], true);
     }
 
     public function user(): BelongsTo

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sku;
+use App\Services\Vmos\VmosProxyCatalog;
 use App\Services\Vmos\VmosRegionCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ class PlanController extends Controller
     /** Device families per page — the catalogue can run to hundreds of them. */
     protected const GROUPS_PER_PAGE = 12;
 
-    public function __construct(protected VmosRegionCatalog $regionCatalog) {}
+    public function __construct(protected VmosRegionCatalog $regionCatalog, protected VmosProxyCatalog $proxyCatalog) {}
 
     public function index(Request $request)
     {
@@ -61,6 +62,10 @@ class PlanController extends Controller
             // on each "Buy now" form and passed straight through to
             // createOrder as countryCode.
             'regionOptions' => $this->regionCatalog->options(),
+            // Optional proxy add-on at checkout — bought alongside the device
+            // (VMOS residential proxy) or supplied by the customer (their own).
+            'proxyProducts' => $this->proxyCatalog->products(),
+            'proxyRegions' => $this->proxyCatalog->regions(),
             'durations' => Sku::available()
                 ->cloudPhones()
                 ->select('duration_minutes', 'duration_label')

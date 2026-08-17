@@ -162,6 +162,34 @@
                 </div>
             @endif
 
+            {{-- Proxy add-on --}}
+            @if ($order->hasProxy())
+                <div class="card p-6">
+                    <h2 class="text-base font-semibold text-ink-900">Proxy</h2>
+                    <div class="mt-3 flex items-center justify-between">
+                        <p class="text-sm text-ink-600">
+                            {{ $order->proxy_mode === 'vmos' ? 'VMOS residential proxy' : 'Your own proxy' }}
+                        </p>
+                        <span class="{{ match ($order->proxy_status) {
+                            'attached' => 'badge-green',
+                            'failed' => 'badge-red',
+                            'purchased' => 'badge-blue',
+                            default => 'badge-amber',
+                        } }}">{{ match ($order->proxy_status) {
+                            'attached' => 'Attached',
+                            'failed' => 'Needs attention',
+                            'purchased' => 'Bought — attaching…',
+                            default => 'Applying…',
+                        } }}</span>
+                    </div>
+                    @if ($order->proxy_status === 'failed' && $order->proxy_error)
+                        <p class="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{{ $order->proxy_error }}</p>
+                    @elseif (! in_array($order->proxy_status, ['attached', 'failed']))
+                        <p class="mt-2 text-xs text-ink-500">Applied automatically once your device finishes provisioning.</p>
+                    @endif
+                </div>
+            @endif
+
             {{-- Devices --}}
             @if ($order->cloudInstances->isNotEmpty())
                 <div class="card p-6">
@@ -207,6 +235,12 @@
                         <dt class="text-ink-500">Quantity</dt>
                         <dd class="font-medium text-ink-900">{{ $order->quantity }}</dd>
                     </div>
+                    @if ($order->proxy_price > 0)
+                        <div class="flex justify-between gap-3">
+                            <dt class="text-ink-500">Proxy add-on</dt>
+                            <dd class="font-medium text-ink-900">${{ number_format($order->proxy_price, 2) }}</dd>
+                        </div>
+                    @endif
                     <div class="flex justify-between gap-3 border-t border-ink-100 pt-3">
                         <dt class="font-medium text-ink-900">Total</dt>
                         <dd class="text-lg font-extrabold text-ink-900">${{ number_format($order->total_price, 2) }}</dd>

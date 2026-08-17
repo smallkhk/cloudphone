@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CloudInstance;
 use App\Models\CryptoPayment;
 use App\Models\Order;
+use App\Models\Setting;
 use App\Models\Sku;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -82,6 +83,92 @@ class StorefrontFlowTest extends TestCase
 
         // Normalised to uppercase, same convention as SIM regeneration.
         $this->assertSame('JP', Order::first()->country_code);
+    }
+
+    #[Test]
+    public function a_customer_can_add_their_own_proxy_at_checkout_for_free(): void
+    {
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create(['price' => 15.00]);
+
+        $this->actingAs($user)->post('/orders', [
+            'sku_id' => $sku->id,
+            'quantity' => 1,
+            'proxy_mode' => 'custom',
+            'proxy_ip' => '10.0.0.5',
+            'proxy_port' => 1080,
+            'proxy_account' => 'alice',
+            'proxy_password' => 'secret',
+            'proxy_name' => 'socks5',
+            'proxy_type' => 'proxy',
+        ])->assertRedirect();
+
+        $order = Order::first();
+        $this->assertSame('custom', $order->proxy_mode);
+        // proxy_status is set once provisioning actually runs (ProxyProvisioner),
+        // not at checkout — the order isn't even paid for yet at this point.
+        $this->assertNull($order->proxy_status);
+        $this->assertSame('10.0.0.5', $order->proxy_config['ip']);
+        $this->assertSame(1080, $order->proxy_config['port']);
+        $this->assertEquals(0, $order->proxy_price);
+        // A free custom proxy must not change the device's own price.
+        $this->assertEquals(15.00, $order->total_price);
+    }
+
+    #[Test]
+    public function buying_a_vmos_proxy_add_on_is_priced_with_markup_and_added_to_the_total(): void
+    {
+        Setting::set('default_markup_percent', '30');
+
+        Http::fake([
+            '*/proxyGoodList*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => [
+                ['proxyGoodId' => 9, 'proxyGoodName' => 'Residential', 'proxyGoodPrice' => 1000], // $10.00 cost, cents
+            ]]),
+            '*/getProxyRegion*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => [
+                ['country' => 'us', 'countryZh' => 'United States'],
+            ]]),
+        ]);
+
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create(['price' => 15.00]);
+
+        $this->actingAs($user)->post('/orders', [
+            'sku_id' => $sku->id,
+            'quantity' => 1,
+            'proxy_mode' => 'vmos',
+            'proxy_good_id' => 9,
+            'proxy_country' => 'us',
+        ])->assertRedirect();
+
+        $order = Order::first();
+        $this->assertSame('vmos', $order->proxy_mode);
+        $this->assertEquals(13.00, $order->proxy_price); // $10 cost + 30% markup
+        $this->assertEquals(10.00, $order->proxy_cost_price);
+        $this->assertEquals(28.00, $order->total_price); // $15 device + $13 proxy
+        $this->assertSame('US', $order->proxy_config['country']);
+        $this->assertSame('United States', $order->proxy_config['proxy_address']);
+    }
+
+    #[Test]
+    public function buying_an_unavailable_vmos_proxy_package_is_rejected(): void
+    {
+        Http::fake([
+            '*/proxyGoodList*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => []]),
+            '*/getProxyRegion*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => []]),
+        ]);
+
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create(['price' => 15.00]);
+
+        $this->actingAs($user)->post('/orders', [
+            'sku_id' => $sku->id,
+            'quantity' => 1,
+            'proxy_mode' => 'vmos',
+            'proxy_good_id' => 999,
+            'proxy_country' => 'us',
+        ])->assertSessionHasErrors('proxy_good_id');
+
+        $this->assertSame(0, Order::count());
     }
 
     #[Test]

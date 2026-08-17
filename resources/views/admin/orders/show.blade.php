@@ -41,6 +41,29 @@
                         <div class="sm:col-span-2"><dt class="text-xs uppercase tracking-wider text-ink-400">Error</dt>
                             <dd class="mt-1 rounded-lg bg-red-50 p-3 text-xs text-red-700">{{ $order->error_message }}</dd></div>
                     @endif
+                    @if ($order->hasProxy())
+                        <div class="sm:col-span-2">
+                            <dt class="text-xs uppercase tracking-wider text-ink-400">Proxy add-on</dt>
+                            <dd class="mt-1 flex items-center gap-2 text-sm text-ink-700">
+                                {{ $order->proxy_mode === 'vmos' ? 'VMOS residential proxy' : "Customer's own proxy" }}
+                                (${{ number_format($order->proxy_price, 2) }})
+                                <span class="{{ match ($order->proxy_status) {
+                                    'attached' => 'badge-green',
+                                    'failed' => 'badge-red',
+                                    'purchased' => 'badge-blue',
+                                    default => 'badge-amber',
+                                } }}">{{ str($order->proxy_status ?? 'pending')->headline() }}</span>
+                            </dd>
+                            @if ($order->proxy_status === 'failed')
+                                <dd class="mt-2 rounded-lg bg-red-50 p-3 text-xs text-red-700">
+                                    {{ $order->proxy_error }}
+                                    @if ($order->proxy_mode === 'vmos')
+                                        <a href="{{ route('admin.proxies.index') }}" class="ml-1 font-medium underline">Attach manually →</a>
+                                    @endif
+                                </dd>
+                            @endif
+                        </div>
+                    @endif
                 </dl>
             </div>
 

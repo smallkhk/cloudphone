@@ -73,6 +73,37 @@ Important caveats before relying on either:
 - `demo@example.com` / `password` was seeded as an **admin**. Confirm it's gone
   from the live database — this repo is public.
 
+**Proxy add-on at checkout** (added, NOT yet tested against a live VMOS
+account): the "Buy now" form on `/plans` now has a Proxy section — either the
+customer's own proxy (free, `Order.proxy_mode = 'custom'`) or a VMOS
+residential proxy bought alongside the device (`'vmos'`, priced at cost +
+markup like a SKU, combined into one USDT total via `Order.proxy_price`).
+Config lives in `Order.proxy_config` (JSON); `Order.proxy_status` tracks
+`pending → purchased (vmos only) → attached`, or `failed`.
+
+Two-step because VMOS's API forces it — `app/Services/Provisioning/ProxyProvisioner.php`
+has the full reasoning in its docblock:
+1. `purchase()` runs at provisioning time (`CloudPhoneProvisioner`, right
+   after the device purchase) — buying a proxy doesn't need a padCode. A
+   failure here does NOT fail the device order.
+2. `apply()` runs once `SyncCloudInstances` discovers the device's real
+   padCode (same hook point padCode itself gets filled in), since both
+   `setCustomProxy` and `attachProxies` require one.
+
+The `custom` path is fully deterministic (the customer's own IP/port, applied
+directly) — trust that one. The `vmos` path is not: `createProxyOrder`
+doesn't hand back a usable proxy ID (confirmed — Admin → Proxies' own
+existing purchase flow never uses one either, it just re-lists owned proxies
+afterward), so `apply()` has to *find* the just-bought proxy in
+`listStaticProxies()` by matching country + unused. If a customer buys two
+VMOS proxies in the same country close together, or another admin-side
+purchase lands in between, that match can be ambiguous. Rather than guess
+wrong on a paid purchase, it deliberately does NOT attach in that case — it
+marks the order `proxy_status = 'failed'` with a clear message and points to
+Admin → Proxies to attach by hand (visible on both the admin and customer
+order pages). **Watch Admin → Orders for a few real vmos-mode purchases
+before treating the auto-match as reliable.**
+
 ## Live deployment
 
 - **App directory:** `~/cloud` on the cPanel host.

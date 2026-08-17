@@ -177,7 +177,7 @@
                                     </div>
 
                                     @auth
-                                        <form method="POST" action="{{ route('orders.store') }}" class="mt-6">
+                                        <form method="POST" action="{{ route('orders.store') }}" class="mt-6" x-data="{ proxyMode: '' }">
                                             @csrf
                                             <input type="hidden" name="sku_id" value="{{ $sku->id }}">
                                             <input type="hidden" name="quantity" value="1">
@@ -191,6 +191,52 @@
                                                         <option value="{{ $code }}">{{ $label }}</option>
                                                     @endforeach
                                                 </select>
+                                            @endif
+
+                                            <label class="label text-xs" for="proxy-mode-{{ $sku->id }}">Proxy (optional)</label>
+                                            <select id="proxy-mode-{{ $sku->id }}" name="proxy_mode" x-model="proxyMode" class="input mb-2 text-sm">
+                                                <option value="">None</option>
+                                                <option value="custom">Use my own proxy</option>
+                                                @if (! empty($proxyProducts))
+                                                    <option value="vmos">Buy a residential proxy</option>
+                                                @endif
+                                            </select>
+
+                                            <div x-show="proxyMode === 'custom'" x-cloak class="mb-3 space-y-2 rounded-lg bg-ink-50 p-3">
+                                                <input name="proxy_ip" placeholder="Proxy IP" class="input text-sm" :required="proxyMode === 'custom'">
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <input name="proxy_port" type="number" min="1" max="65535" placeholder="Port" class="input text-sm" :required="proxyMode === 'custom'">
+                                                    <select name="proxy_type" class="input text-sm">
+                                                        <option value="proxy">Proxy</option>
+                                                        <option value="vpn">VPN</option>
+                                                    </select>
+                                                </div>
+                                                <select name="proxy_name" class="input text-sm">
+                                                    <option value="socks5">SOCKS5</option>
+                                                    <option value="http-relay">HTTP</option>
+                                                </select>
+                                                <input name="proxy_account" placeholder="Username (optional)" class="input text-sm" autocomplete="off">
+                                                <input name="proxy_password" type="password" placeholder="Password (optional)" class="input text-sm" autocomplete="new-password">
+                                                <p class="hint">Applied automatically once your device finishes provisioning — usually within a few minutes of payment.</p>
+                                            </div>
+
+                                            @if (! empty($proxyProducts))
+                                                <div x-show="proxyMode === 'vmos'" x-cloak class="mb-3 space-y-2 rounded-lg bg-ink-50 p-3">
+                                                    <select name="proxy_good_id" class="input text-sm" :required="proxyMode === 'vmos'">
+                                                        @foreach ($proxyProducts as $product)
+                                                            <option value="{{ $product['proxyGoodId'] ?? '' }}">
+                                                                {{ $product['proxyGoodName'] ?? 'Proxy package' }}
+                                                                — +${{ number_format(($product['proxyGoodPrice'] ?? 0) / 100 * (1 + (\App\Models\Setting::get('default_markup_percent', 30) / 100)), 2) }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                    <select name="proxy_country" class="input text-sm" :required="proxyMode === 'vmos'">
+                                                        @foreach ($proxyRegions as $r)
+                                                            <option value="{{ $r['country'] ?? '' }}">{{ $r['countryZh'] ?? ($r['country'] ?? '?') }} ({{ strtoupper($r['country'] ?? '') }})</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <p class="hint">Bought and attached automatically once your device is ready. Added to your total below.</p>
+                                                </div>
                                             @endif
 
                                             <button class="btn-primary w-full">Buy now</button>

@@ -19,9 +19,7 @@ use Throwable;
  */
 class CloudPhoneProvisioner
 {
-    public function __construct(protected VmosCloudPhoneService $vmos)
-    {
-    }
+    public function __construct(protected VmosCloudPhoneService $vmos, protected ProxyProvisioner $proxies) {}
 
     public function provision(Order $order): void
     {
@@ -59,6 +57,13 @@ class CloudPhoneProvisioner
                     'provisioned_at' => now(),
                 ]);
             });
+
+            // A proxy add-on failing must never take the device order down with
+            // it — the customer paid for a phone above all else, and gets one
+            // regardless of whether the proxy purchase succeeds.
+            if ($order->hasProxy()) {
+                $this->proxies->purchase($order->fresh());
+            }
         } catch (Throwable $e) {
             Log::error('provisioning.failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
 

@@ -48,6 +48,26 @@ pricing → Email accounts / Phone numbers**.
 > (the `sms_*` probes) against your real VMOS account and confirm a real
 > purchase works before making one live to customers.
 
+### Proxy add-on at checkout
+
+The "Buy now" form on the Plans page has an optional **Proxy** section — a
+customer can either supply their **own proxy** (IP/port/credentials, free) or
+**buy a VMOS residential proxy** alongside the device (priced at cost +
+markup, combined into one USDT total). Once paid, `CloudPhoneProvisioner`
+buys the VMOS proxy right away (doesn't need the device to be ready yet), and
+`ProxyProvisioner` applies whichever proxy was chosen the moment the new
+device's `padCode` becomes known — typically within a few minutes of payment,
+not instantly, since that's how long VMOS takes to actually provision a
+device. Progress shows on the order page: pending → (bought →) attached.
+
+> **The VMOS-proxy path can need a human.** Buying a proxy from VMOS doesn't
+> hand back a usable proxy ID, so attaching it means finding it afterward in
+> your list of owned proxies (matched by country + unused) — the same way
+> Admin → Proxies' existing manual flow already works. If that match is ever
+> ambiguous, the order is flagged `proxy_status: failed` with a link to
+> Admin → Proxies rather than risk attaching the wrong one. The customer's
+> own proxy path has no such issue — it's applied directly, every time.
+
 ## Admin panel
 
 Everything below is configurable from `/admin` — no SSH or file editing needed

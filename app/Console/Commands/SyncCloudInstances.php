@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\CloudInstance;
+use App\Services\Provisioning\ProxyProvisioner;
 use App\Services\Vmos\VmosCloudPhoneService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -13,7 +14,7 @@ class SyncCloudInstances extends Command
 
     protected $description = 'Refresh pad_code/status/expiry for cloud instances from VMOS (fills in padCode once provisioning finishes)';
 
-    public function handle(VmosCloudPhoneService $vmos): int
+    public function handle(VmosCloudPhoneService $vmos, ProxyProvisioner $proxies): int
     {
         $instances = CloudInstance::whereNotNull('equipment_id')->get()->keyBy('equipment_id');
 
@@ -37,6 +38,8 @@ class SyncCloudInstances extends Command
                     continue;
                 }
 
+                $justGotPadCode = ! $instance->pad_code && filled($pad['padCode'] ?? null);
+
                 $instance->update([
                     'pad_code' => $pad['padCode'] ?? $instance->pad_code,
                     'pad_status' => $pad['cvmStatus'] ?? $instance->pad_status,
@@ -47,6 +50,12 @@ class SyncCloudInstances extends Command
                         : $instance->expires_at,
                     'last_synced_at' => now(),
                 ]);
+
+                // A proxy add-on can only be applied once the padCode exists —
+                // this is the first moment that's true.
+                if ($justGotPadCode && $instance->order?->hasProxy()) {
+                    $proxies->apply($instance->fresh());
+                }
 
                 $updated++;
             }
