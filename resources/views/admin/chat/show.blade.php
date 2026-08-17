@@ -13,22 +13,48 @@
     </x-slot>
 
     <div class="grid gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2">
+        <div class="lg:col-span-2 space-y-4">
+            {{-- Who's answering --}}
+            <div class="card flex flex-wrap items-center gap-3 p-4">
+                @if ($conversation->human_handling)
+                    <span class="badge-green">You're handling this</span>
+                    <p class="flex-1 text-xs text-ink-500">
+                        The assistant won't reply while this is on{{ $conversation->agent ? ' · taken over by '.$conversation->agent->name : '' }}.
+                    </p>
+                    <form method="POST" action="{{ route('admin.chat.handling', $conversation) }}">
+                        @csrf
+                        <input type="hidden" name="human_handling" value="0">
+                        <button class="btn-secondary btn-sm">Hand back to the assistant</button>
+                    </form>
+                @else
+                    <span class="badge-blue">Assistant is answering</span>
+                    <p class="flex-1 text-xs text-ink-500">Take over to reply yourself and pause the assistant.</p>
+                    <form method="POST" action="{{ route('admin.chat.handling', $conversation) }}">
+                        @csrf
+                        <input type="hidden" name="human_handling" value="1">
+                        <button class="btn-primary btn-sm">Take over</button>
+                    </form>
+                @endif
+            </div>
+
             <div class="card space-y-4 p-5">
                 @foreach ($messages as $message)
                     <div class="flex" @class(['justify-end' => $message->role === 'user'])>
                         <div @class([
                             'max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed',
                             'rounded-br-sm bg-brand-600 text-white' => $message->role === 'user',
-                            'rounded-tl-sm bg-ink-100 text-ink-800' => $message->role !== 'user',
+                            'rounded-tl-sm bg-emerald-50 text-ink-800 ring-1 ring-inset ring-emerald-600/15' => $message->role === 'agent',
+                            'rounded-tl-sm bg-ink-100 text-ink-800' => $message->role === 'assistant',
                         ])>
                             {{ $message->content }}
                             <span @class([
                                 'mt-1.5 block text-[11px]',
                                 'text-brand-100' => $message->role === 'user',
-                                'text-ink-400' => $message->role !== 'user',
+                                'text-emerald-700' => $message->role === 'agent',
+                                'text-ink-400' => $message->role === 'assistant',
                             ])>
-                                {{ $message->role === 'user' ? 'Visitor' : 'Assistant' }} · {{ $message->created_at->format('H:i') }}
+                                {{ ['user' => 'Visitor', 'agent' => 'You', 'assistant' => 'Assistant'][$message->role] ?? $message->role }}
+                                · {{ $message->created_at->format('H:i') }}
                             </span>
                         </div>
                     </div>
@@ -40,6 +66,21 @@
                     @endif
                 @endforeach
             </div>
+
+            {{-- Reply as a human --}}
+            <form method="POST" action="{{ route('admin.chat.reply', $conversation) }}" class="card p-4">
+                @csrf
+                <label class="label" for="message">Reply to this customer</label>
+                <textarea id="message" name="message" rows="3" required maxlength="4000" class="input"
+                          placeholder="Type your reply…">{{ old('message') }}</textarea>
+                <div class="mt-3 flex flex-wrap items-center gap-3">
+                    <p class="flex-1 text-xs text-ink-500">
+                        Appears in their chat window within a few seconds, labelled <strong>Support team</strong>.
+                        Sending also takes the conversation over from the assistant.
+                    </p>
+                    <button class="btn-primary btn-sm">Send reply</button>
+                </div>
+            </form>
         </div>
 
         <div class="space-y-4">

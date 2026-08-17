@@ -102,6 +102,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Live chat transcripts
     Route::get('/chat', [AdminChatController::class, 'index'])->name('chat.index');
     Route::get('/chat/{conversation}', [AdminChatController::class, 'show'])->name('chat.show');
+    Route::post('/chat/{conversation}/reply', [AdminChatController::class, 'reply'])->name('chat.reply');
+    Route::post('/chat/{conversation}/handling', [AdminChatController::class, 'handling'])->name('chat.handling');
     Route::delete('/chat/{conversation}', [AdminChatController::class, 'destroy'])->name('chat.destroy');
 
     // API diagnostics

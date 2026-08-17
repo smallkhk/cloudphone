@@ -2,9 +2,11 @@
 
 namespace App\Services\Chat;
 
-use Anthropic\Client;
 use App\Models\ChatConversation;
 use App\Models\ChatMessage;
+use App\Services\Chat\Providers\ChatProvider;
+use App\Services\Chat\Providers\ClaudeProvider;
+use App\Services\Chat\Providers\OpenAiCompatibleProvider;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -21,10 +23,24 @@ class ChatAssistant
 {
     public function __construct(protected SiteKnowledge $knowledge) {}
 
-    /** Chat is only offered when it's switched on *and* an API key is stored. */
+    /** Chat is only offered when it's switched on *and* a key is stored. */
     public function isEnabled(): bool
     {
-        return (bool) config('assistant.enabled') && filled(config('assistant.api_key'));
+        if (! config('assistant.enabled')) {
+            return false;
+        }
+
+        return config('assistant.provider') === 'openai'
+            ? filled(config('assistant.openai_api_key')) && filled(config('assistant.openai_base_url'))
+            : filled(config('assistant.api_key'));
+    }
+
+    /** The configured backend. Claude unless the owner picked another. */
+    public function provider(): ChatProvider
+    {
+        return config('assistant.provider') === 'openai'
+            ? new OpenAiCompatibleProvider
+            : new ClaudeProvider;
     }
 
     /**
@@ -45,8 +61,10 @@ class ChatAssistant
             ->get()
             ->reverse()
             ->values()
+            // A human agent's reply is the assistant's own prior turn as far as
+            // the model is concerned — it's what the customer was answered with.
             ->map(fn (ChatMessage $m) => [
-                'role' => $m->role === 'assistant' ? 'assistant' : 'user',
+                'role' => in_array($m->role, ['assistant', 'agent'], true) ? 'assistant' : 'user',
                 'content' => $m->content,
             ])
             ->all();
@@ -54,22 +72,14 @@ class ChatAssistant
         $history = $this->normaliseTurns($history);
 
         try {
-            $message = $this->client()->messages->create(
-                model: (string) config('assistant.model', 'claude-opus-5'),
-                maxTokens: (int) config('assistant.max_tokens', 1200),
+            $result = $this->provider()->complete(
                 system: [
-                    // Identical for every visitor, so it earns a cache breakpoint —
-                    // the catalogue can run to thousands of tokens and would
-                    // otherwise be re-billed in full on every single message.
-                    [
-                        'type' => 'text',
-                        'text' => $this->knowledge->sitePrompt(),
-                        'cacheControl' => ['type' => 'ephemeral'],
-                    ],
-                    [
-                        'type' => 'text',
-                        'text' => $this->knowledge->visitorPrompt($conversation->user),
-                    ],
+                    // Identical for every visitor, so it earns a cache breakpoint
+                    // where the provider supports one — the catalogue runs to
+                    // thousands of tokens and would otherwise be re-billed in
+                    // full on every single message.
+                    ['type' => 'text', 'text' => $this->knowledge->sitePrompt(), 'cache' => true],
+                    ['type' => 'text', 'text' => $this->knowledge->visitorPrompt($conversation->user), 'cache' => false],
                 ],
                 messages: $history,
             );
@@ -81,26 +91,19 @@ class ChatAssistant
             throw new RuntimeException($this->friendlyError($e), previous: $e);
         }
 
-        $text = '';
-        foreach ($message->content as $block) {
-            if ($block->type === 'text') {
-                $text .= $block->text;
-            }
-        }
-
-        $text = trim($text) ?: "Sorry, I didn't catch that — could you rephrase?";
+        $text = trim($result['text']) ?: "Sorry, I didn't catch that — could you rephrase?";
 
         $reply = $conversation->messages()->create([
             'role' => 'assistant',
             'content' => $text,
-            'input_tokens' => $message->usage->inputTokens ?? 0,
-            'output_tokens' => $message->usage->outputTokens ?? 0,
+            'input_tokens' => $result['input_tokens'],
+            'output_tokens' => $result['output_tokens'],
         ]);
 
         $conversation->forceFill([
             'message_count' => $conversation->messages()->count(),
-            'input_tokens' => $conversation->input_tokens + ($message->usage->inputTokens ?? 0),
-            'output_tokens' => $conversation->output_tokens + ($message->usage->outputTokens ?? 0),
+            'input_tokens' => $conversation->input_tokens + $result['input_tokens'],
+            'output_tokens' => $conversation->output_tokens + $result['output_tokens'],
             'last_message_at' => now(),
         ])->save();
 
@@ -135,11 +138,6 @@ class ChatAssistant
         }
 
         return $merged;
-    }
-
-    protected function client(): Client
-    {
-        return new Client(apiKey: (string) config('assistant.api_key'));
     }
 
     /** Visitors shouldn't see raw API errors; the detail goes to the log instead. */

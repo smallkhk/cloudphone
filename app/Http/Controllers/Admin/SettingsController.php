@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
-use Anthropic\Client as AnthropicClient;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Services\Chat\ChatAssistant;
 use App\Services\Chat\SiteKnowledge;
 use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Http\Request;
@@ -17,6 +17,7 @@ class SettingsController extends Controller
     protected const SECRET_KEYS = [
         'vmos_access_key', 'vmos_secret_key', 'vmos_webhook_token',
         'trongrid_api_key', 'mail_password', 'anthropic_api_key',
+        'assistant_openai_api_key',
     ];
 
     public function edit(string $tab = 'site')
@@ -101,8 +102,13 @@ class SettingsController extends Controller
     public function updateAssistant(Request $request)
     {
         $data = $request->validate([
+            'assistant_provider' => ['required', 'in:claude,openai'],
             'anthropic_api_key' => ['nullable', 'string', 'max:255'],
             'assistant_model' => ['nullable', 'string', 'max:100'],
+            'assistant_openai_preset' => ['nullable', 'string', 'max:32'],
+            'assistant_openai_base_url' => ['nullable', 'url', 'max:255'],
+            'assistant_openai_api_key' => ['nullable', 'string', 'max:255'],
+            'assistant_openai_model' => ['nullable', 'string', 'max:128'],
             'assistant_max_tokens' => ['nullable', 'integer', 'min:256', 'max:8192'],
             'assistant_greeting' => ['nullable', 'string', 'max:500'],
             'assistant_rate_limit_per_hour' => ['nullable', 'integer', 'min:1', 'max:500'],
@@ -121,31 +127,26 @@ class SettingsController extends Controller
         return back()->with('status', 'Assistant settings saved.');
     }
 
-    /** Sends one real message to Claude so the owner knows the key works. */
-    public function testAssistant(SiteKnowledge $knowledge)
+    /** Sends one real message through whichever provider is selected. */
+    public function testAssistant(SiteKnowledge $knowledge, ChatAssistant $assistant)
     {
-        if (! filled(config('assistant.api_key'))) {
-            return back()->with('error', 'Add your Anthropic API key first.');
+        $provider = $assistant->provider();
+
+        $missing = config('assistant.provider') === 'openai'
+            ? ! filled(config('assistant.openai_api_key')) || ! filled(config('assistant.openai_base_url'))
+            : ! filled(config('assistant.api_key'));
+
+        if ($missing) {
+            return back()->with('error', 'Fill in the endpoint and API key for your chosen provider first, and save.');
         }
 
         try {
-            $client = new AnthropicClient(apiKey: (string) config('assistant.api_key'));
-
-            $message = $client->messages->create(
-                model: (string) config('assistant.model', 'claude-opus-5'),
-                maxTokens: 200,
-                system: [['type' => 'text', 'text' => $knowledge->sitePrompt()]],
+            $result = $provider->complete(
+                system: [['type' => 'text', 'text' => $knowledge->sitePrompt(), 'cache' => false]],
                 messages: [['role' => 'user', 'content' => 'In one short sentence, what is the cheapest plan on this site?']],
             );
 
-            $text = '';
-            foreach ($message->content as $block) {
-                if ($block->type === 'text') {
-                    $text .= $block->text;
-                }
-            }
-
-            return back()->with('status', 'Assistant is working. It replied: “'.trim($text).'”');
+            return back()->with('status', $provider->label().' is working. It replied: “'.trim($result['text']).'”');
         } catch (Throwable $e) {
             return back()->with('error', 'Assistant test failed: '.$e->getMessage());
         }

@@ -6,6 +6,8 @@
 <body class="bg-ink-50 font-sans">
 @php
     $pendingPayments = \App\Models\CryptoPayment::where('status', \App\Models\CryptoPayment::STATUS_SUBMITTED)->count();
+    // Customers waiting on a reply, so a live chat isn't missed.
+    $unreadChats = \App\Models\ChatConversation::unread()->count();
 @endphp
 
 <div x-data="{ sidebar: false }" class="min-h-screen">
@@ -46,7 +48,7 @@
                     ['admin.devices.index', 'Devices', 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', null],
                     ['admin.users.index', 'Users', 'M17 20h5v-2a3 3 0 00-5.4-1.8M17 20H7m10 0v-2c0-.7-.1-1.3-.4-1.8M7 20H2v-2a3 3 0 015.4-1.8M7 20v-2c0-.7.1-1.3.4-1.8m0 0a5 5 0 019.2 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', null],
                     ['admin.skus.index', 'Plans & pricing', 'M7 7h.01M7 3h5a2 2 0 011.4.6l7 7a2 2 0 010 2.8l-5 5a2 2 0 01-2.8 0l-7-7A2 2 0 013 10V5a2 2 0 012-2z', null],
-                    ['admin.chat.index', 'Live chat', 'M8 10h8M8 14h5M21 12a8 8 0 01-8 8H7l-4 3v-5.2A8 8 0 1121 12z', null],
+                    ['admin.chat.index', 'Live chat', 'M8 10h8M8 14h5M21 12a8 8 0 01-8 8H7l-4 3v-5.2A8 8 0 1121 12z', $unreadChats ?: null],
                     ['admin.proxies.index', 'Proxies', 'M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z', null],
                     ['admin.settings.edit', 'Settings', 'M10.3 4.3a2 2 0 013.4 0l.5.9a2 2 0 002 1l1-.1a2 2 0 011.8 3l-.5.9a2 2 0 000 2.2l.5.9a2 2 0 01-1.8 3l-1-.1a2 2 0 00-2 1l-.5.9a2 2 0 01-3.4 0l-.5-.9a2 2 0 00-2-1l-1 .1a2 2 0 01-1.8-3l.5-.9a2 2 0 000-2.2l-.5-.9a2 2 0 011.8-3l1 .1a2 2 0 002-1l.5-.9zM15 12a3 3 0 11-6 0 3 3 0 016 0z', null],
                     ['admin.diagnostics.index', 'API diagnostics', 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', null],

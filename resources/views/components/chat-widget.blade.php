@@ -1,7 +1,7 @@
 @php
-    // Rendered on every page, but only mounts when the owner has switched the
-    // assistant on and stored an API key.
-    $assistantEnabled = (bool) config('assistant.enabled') && filled(config('assistant.api_key'));
+    // Rendered on every page, but only mounts when the owner has switched chat
+    // on and configured whichever provider they picked.
+    $assistantEnabled = app(\App\Services\Chat\ChatAssistant::class)->isEnabled();
 @endphp
 
 @if ($assistantEnabled)
@@ -27,7 +27,8 @@
             </span>
             <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-semibold">{{ \App\Models\Setting::get('site_name', config('app.name')) }} support</p>
-                <p class="text-xs text-ink-400">AI assistant · replies instantly</p>
+                <p class="text-xs text-ink-400"
+                   x-text="human ? 'A person is with you now' : 'AI assistant · replies instantly'"></p>
             </div>
             <button @click="reset()" class="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-white/10 hover:text-white" title="Start a new chat" aria-label="Start a new chat">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -50,11 +51,17 @@
             </div>
 
             <template x-for="(m, i) in messages" :key="i">
-                <div class="flex" :class="m.role === 'user' ? 'justify-end' : ''">
+                <div class="flex flex-col" :class="m.role === 'user' ? 'items-end' : 'items-start'">
+                    {{-- A reply typed by a person is labelled, so the customer
+                         knows they're no longer talking to the bot. --}}
+                    <span x-show="m.role === 'agent'" x-cloak
+                          class="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Support team</span>
                     <div class="max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm"
-                         :class="m.role === 'user'
-                            ? 'rounded-br-sm bg-brand-600 text-white'
-                            : 'rounded-tl-sm bg-white text-ink-700 ring-1 ring-ink-900/5'"
+                         :class="{
+                            'rounded-br-sm bg-brand-600 text-white': m.role === 'user',
+                            'rounded-tl-sm bg-emerald-50 text-ink-800 ring-1 ring-emerald-600/15': m.role === 'agent',
+                            'rounded-tl-sm bg-white text-ink-700 ring-1 ring-ink-900/5': m.role === 'assistant',
+                         }"
                          x-text="m.content"></div>
                 </div>
             </template>
@@ -123,6 +130,9 @@
             draft: '',
             error: '',
             messages: [],
+            human: false,
+            lastId: 0,
+            poller: null,
             greeting: @json(config('assistant.greeting')),
             suggestions: [
                 'What plans do you have?',
@@ -132,9 +142,51 @@
 
             toggle() {
                 this.open = !this.open;
+
                 if (this.open) {
                     this.load();
+                    this.startPolling();
                     this.$nextTick(() => this.$refs.input?.focus());
+                } else {
+                    this.stopPolling();
+                }
+            },
+
+            // When a person takes the conversation over in the admin panel,
+            // their reply has to reach the customer somehow — polling while
+            // the panel is open is the cheapest way to do that on shared
+            // hosting, with no websocket server to run.
+            startPolling() {
+                if (this.poller) return;
+                this.poller = setInterval(() => this.pull(), 6000);
+            },
+
+            stopPolling() {
+                if (this.poller) {
+                    clearInterval(this.poller);
+                    this.poller = null;
+                }
+            },
+
+            async pull() {
+                if (this.sending) return;
+
+                try {
+                    const url = @json(route('chat.history')) + '?after=' + this.lastId;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    if (!res.headers.get('content-type')?.includes('application/json')) return;
+
+                    const data = await res.json();
+                    this.human = !!data.human;
+
+                    (data.messages || []).forEach((m) => {
+                        this.messages.push(m);
+                        if (m.id > this.lastId) this.lastId = m.id;
+                    });
+
+                    if ((data.messages || []).length) this.scroll();
+                } catch (e) {
+                    // Transient; the next tick tries again.
                 }
             },
 
@@ -145,6 +197,8 @@
                     const res = await fetch(@json(route('chat.history')), { headers: { 'Accept': 'application/json' } });
                     const data = await res.json();
                     this.messages = data.messages || [];
+                    this.human = !!data.human;
+                    this.lastId = this.messages.reduce((max, m) => Math.max(max, m.id || 0), 0);
                     if (data.greeting) this.greeting = data.greeting;
                     this.scroll();
                 } catch (e) {
@@ -177,8 +231,13 @@
 
                     if (!res.ok) {
                         this.error = data.error || data.message || 'Something went wrong. Please try again.';
+                    } else if (data.human) {
+                        // A person is answering — their reply arrives via pull().
+                        this.human = true;
+                        if (data.id > this.lastId) this.lastId = data.id;
                     } else {
                         this.messages.push({ role: 'assistant', content: data.reply });
+                        if (data.id > this.lastId) this.lastId = data.id;
                     }
                 } catch (e) {
                     this.error = 'Connection lost. Check your internet and try again.';

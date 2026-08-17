@@ -30,6 +30,11 @@ class SettingsServiceProvider extends ServiceProvider
         'trongrid_api_key' => 'crypto.trongrid_api_key',
 
         'assistant_enabled' => 'assistant.enabled',
+        'assistant_provider' => 'assistant.provider',
+        'assistant_openai_preset' => 'assistant.openai_preset',
+        'assistant_openai_base_url' => 'assistant.openai_base_url',
+        'assistant_openai_api_key' => 'assistant.openai_api_key',
+        'assistant_openai_model' => 'assistant.openai_model',
         'anthropic_api_key' => 'assistant.api_key',
         'assistant_model' => 'assistant.model',
         'assistant_max_tokens' => 'assistant.max_tokens',

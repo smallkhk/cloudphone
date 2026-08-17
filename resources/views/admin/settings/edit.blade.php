@@ -354,31 +354,112 @@
                             </span>
                         </label>
 
-                        <div>
-                            <label class="label" for="anthropic_api_key">Anthropic API key</label>
-                            <input id="anthropic_api_key" name="anthropic_api_key" type="password" class="input"
-                                   placeholder="{{ $stored('anthropic_api_key') ? '•••••••• stored — leave blank to keep' : 'sk-ant-…' }}"
-                                   autocomplete="new-password">
-                            <p class="hint">
-                                Create one at console.anthropic.com → API keys. Stored encrypted; never shown again.
-                            </p>
+                        {{-- Provider ------------------------------------------ --}}
+                        @php
+                            $presets = \App\Services\Chat\Providers\OpenAiCompatibleProvider::PRESETS;
+                            $currentProvider = old('assistant_provider', $settings['assistant_provider'] ?? config('assistant.provider'));
+                        @endphp
+
+                        <div x-data="{
+                                provider: '{{ $currentProvider }}',
+                                preset: '{{ old('assistant_openai_preset', $settings['assistant_openai_preset'] ?? config('assistant.openai_preset')) }}',
+                                presets: {{ Js::from(collect($presets)->map(fn ($p) => ['label' => $p[0], 'url' => $p[1], 'model' => $p[2], 'keys' => $p[3]])) }},
+                                apply() {
+                                    const p = this.presets[this.preset];
+                                    if (p && p.url) { this.$refs.baseUrl.value = p.url; this.$refs.model.value = p.model; }
+                                },
+                             }">
+                            <label class="label">Who answers</label>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                @foreach ([
+                                    'claude' => ['Claude (Anthropic)', 'Best quality. Paid per message, prompt caching supported.'],
+                                    'openai' => ['Another provider', 'Groq, Google Gemini, OpenRouter, DeepSeek… several have free tiers.'],
+                                ] as $value => [$label, $blurb])
+                                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors"
+                                           :class="provider === '{{ $value }}' ? 'border-brand-500 bg-brand-50' : 'border-ink-200 hover:bg-ink-50'">
+                                        <input type="radio" name="assistant_provider" value="{{ $value }}" x-model="provider"
+                                               class="mt-0.5 border-ink-300 text-brand-600 focus:ring-brand-500">
+                                        <span>
+                                            <span class="block text-sm font-medium text-ink-900">{{ $label }}</span>
+                                            <span class="block text-xs text-ink-500">{{ $blurb }}</span>
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+
+                            {{-- Claude fields --}}
+                            <div x-show="provider === 'claude'" x-cloak class="mt-5 space-y-5">
+                                <div>
+                                    <label class="label" for="anthropic_api_key">Anthropic API key</label>
+                                    <input id="anthropic_api_key" name="anthropic_api_key" type="password" class="input"
+                                           placeholder="{{ $stored('anthropic_api_key') ? '•••••••• stored — leave blank to keep' : 'sk-ant-…' }}"
+                                           autocomplete="new-password">
+                                    <p class="hint">Create one at console.anthropic.com → API keys. Stored encrypted; never shown again.</p>
+                                </div>
+
+                                <div>
+                                    <label class="label" for="assistant_model">Model</label>
+                                    <select id="assistant_model" name="assistant_model" class="input">
+                                        @foreach ([
+                                            'claude-opus-5' => 'Claude Opus 5 — smartest, most expensive',
+                                            'claude-sonnet-5' => 'Claude Sonnet 5 — balanced',
+                                            'claude-haiku-4-5' => 'Claude Haiku 4.5 — cheapest, fastest',
+                                        ] as $value => $label)
+                                            <option value="{{ $value }}" @selected(old('assistant_model', $settings['assistant_model'] ?? config('assistant.model')) === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="hint">Haiku is plenty for routine questions and costs a fraction as much.</p>
+                                </div>
+                            </div>
+
+                            {{-- OpenAI-compatible fields --}}
+                            <div x-show="provider === 'openai'" x-cloak class="mt-5 space-y-5">
+                                <div class="rounded-xl bg-ink-50 p-4 text-xs leading-relaxed text-ink-600 ring-1 ring-inset ring-ink-200">
+                                    Works with anything that speaks the OpenAI <code>/chat/completions</code> format.
+                                    Free tiers are rate-limited and may use your conversations for training —
+                                    check the provider's terms before pointing customer chats at one.
+                                </div>
+
+                                <div>
+                                    <label class="label" for="assistant_openai_preset">Provider</label>
+                                    <select id="assistant_openai_preset" name="assistant_openai_preset" class="input"
+                                            x-model="preset" @change="apply()">
+                                        @foreach ($presets as $key => $p)
+                                            <option value="{{ $key }}">{{ $p[0] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="hint">
+                                        Picking one fills in the endpoint and a sensible model below.
+                                        <template x-if="presets[preset] && presets[preset].keys">
+                                            <span>Get a key at <span class="font-mono" x-text="presets[preset].keys"></span>.</span>
+                                        </template>
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label class="label" for="assistant_openai_base_url">API endpoint</label>
+                                    <input id="assistant_openai_base_url" name="assistant_openai_base_url" x-ref="baseUrl" class="input font-mono text-xs"
+                                           value="{{ old('assistant_openai_base_url', $settings['assistant_openai_base_url'] ?? config('assistant.openai_base_url')) }}">
+                                    <p class="hint">Base URL only — <code>/chat/completions</code> is appended for you.</p>
+                                </div>
+
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div>
+                                        <label class="label" for="assistant_openai_model">Model</label>
+                                        <input id="assistant_openai_model" name="assistant_openai_model" x-ref="model" class="input font-mono text-xs"
+                                               value="{{ old('assistant_openai_model', $settings['assistant_openai_model'] ?? config('assistant.openai_model')) }}">
+                                    </div>
+                                    <div>
+                                        <label class="label" for="assistant_openai_api_key">API key</label>
+                                        <input id="assistant_openai_api_key" name="assistant_openai_api_key" type="password" class="input"
+                                               placeholder="{{ $stored('assistant_openai_api_key') ? '•••••••• stored — leave blank to keep' : 'Paste your key' }}"
+                                               autocomplete="new-password">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="grid gap-5 sm:grid-cols-2">
-                            <div>
-                                <label class="label" for="assistant_model">Model</label>
-                                <select id="assistant_model" name="assistant_model" class="input">
-                                    @foreach ([
-                                        'claude-opus-5' => 'Claude Opus 5 — smartest, most expensive',
-                                        'claude-sonnet-5' => 'Claude Sonnet 5 — balanced',
-                                        'claude-haiku-4-5' => 'Claude Haiku 4.5 — cheapest, fastest',
-                                    ] as $value => $label)
-                                        <option value="{{ $value }}" @selected(old('assistant_model', $settings['assistant_model'] ?? config('assistant.model')) === $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <p class="hint">Haiku is plenty for routine questions and costs a fraction as much.</p>
-                            </div>
-
                             <div>
                                 <label class="label" for="assistant_rate_limit_per_hour">Messages per visitor per hour</label>
                                 <input id="assistant_rate_limit_per_hour" name="assistant_rate_limit_per_hour" type="number" min="1" max="500" class="input"

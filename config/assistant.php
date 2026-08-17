@@ -8,9 +8,23 @@ return [
 
     'enabled' => env('ASSISTANT_ENABLED', false),
 
-    'api_key' => env('ANTHROPIC_API_KEY'),
+    /*
+    | Which backend answers. 'claude' uses Anthropic's own API; 'openai' talks
+    | to any OpenAI-compatible /chat/completions endpoint, which covers Groq,
+    | Google Gemini, OpenRouter, DeepSeek, Together and self-hosted runtimes —
+    | several of which have a free tier.
+    */
+    'provider' => env('ASSISTANT_PROVIDER', 'claude'),
 
+    // --- Claude ---
+    'api_key' => env('ANTHROPIC_API_KEY'),
     'model' => env('ANTHROPIC_MODEL', 'claude-opus-5'),
+
+    // --- OpenAI-compatible ---
+    'openai_preset' => env('ASSISTANT_OPENAI_PRESET', 'groq'),
+    'openai_base_url' => env('ASSISTANT_OPENAI_BASE_URL', 'https://api.groq.com/openai/v1'),
+    'openai_api_key' => env('ASSISTANT_OPENAI_API_KEY'),
+    'openai_model' => env('ASSISTANT_OPENAI_MODEL', 'llama-3.3-70b-versatile'),
 
     'max_tokens' => (int) env('ASSISTANT_MAX_TOKENS', 1200),
 

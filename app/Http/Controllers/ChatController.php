@@ -21,17 +21,31 @@ class ChatController extends Controller
 
     public function __construct(protected ChatAssistant $assistant) {}
 
-    /** Existing transcript, so the conversation survives a page reload. */
+    /**
+     * Existing transcript, so the conversation survives a page reload.
+     *
+     * Also polled while the widget is open, which is how a reply typed by a
+     * human in the admin panel reaches the customer. `after` keeps that cheap:
+     * only messages newer than the last one the browser has.
+     */
     public function history(Request $request): JsonResponse
     {
         $conversation = $this->conversation($request, create: false);
+        $after = (int) $request->query('after', 0);
+
+        $messages = $conversation
+            ? $conversation->messages()
+                ->whereNull('error')
+                ->when($after > 0, fn ($q) => $q->where('id', '>', $after))
+                ->orderBy('id')
+                ->get(['id', 'role', 'content'])
+            : collect();
 
         return response()->json([
-            'enabled' => $this->assistant->isEnabled(),
+            'enabled' => $this->assistant->isEnabled() || (bool) $conversation?->human_handling,
             'greeting' => (string) config('assistant.greeting'),
-            'messages' => $conversation
-                ? $conversation->messages()->whereNull('error')->orderBy('id')->get(['role', 'content'])
-                : [],
+            'human' => (bool) $conversation?->human_handling,
+            'messages' => $messages,
         ]);
     }
 
@@ -41,7 +55,11 @@ class ChatController extends Controller
             'message' => ['required', 'string', 'max:2000'],
         ]);
 
-        if (! $this->assistant->isEnabled()) {
+        $conversation = $this->conversation($request, create: false);
+        $human = (bool) $conversation?->human_handling;
+
+        // A person is answering this one, so the message just needs storing.
+        if (! $human && ! $this->assistant->isEnabled()) {
             return response()->json([
                 'error' => 'Live chat is not available right now. Please email us instead.',
             ], 503);
@@ -67,16 +85,30 @@ class ChatController extends Controller
             'content' => $data['message'],
         ]);
 
-        $conversation->forceFill(['last_message_at' => now()])->save();
+        $conversation->forceFill([
+            'last_message_at' => now(),
+            'message_count' => $conversation->messages()->count(),
+        ])->save();
+
+        if ($human) {
+            return response()->json([
+                'human' => true,
+                'id' => $userMessage->id,
+            ]);
+        }
 
         try {
             $reply = $this->assistant->reply($conversation, $userMessage);
         } catch (RuntimeException $e) {
+            // The customer is stuck, so flag it for a person to pick up.
+            $conversation->forceFill(['needs_human' => true])->save();
+
             return response()->json(['error' => $e->getMessage()], 502);
         }
 
         return response()->json([
             'reply' => $reply->content,
+            'id' => $reply->id,
         ]);
     }
 
