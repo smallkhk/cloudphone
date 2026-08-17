@@ -86,6 +86,24 @@ class StorefrontFlowTest extends TestCase
     }
 
     #[Test]
+    public function checkout_rejects_a_region_vmos_does_not_actually_sell_devices_in(): void
+    {
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create(['price' => 15.00]);
+
+        // The live "supported countries" list is broader than what VMOS's
+        // purchase flow accepts (e.g. Nigeria is SIM-regen-only) — checkout
+        // must only accept the confirmed purchase-region list.
+        $this->actingAs($user)->post('/orders', [
+            'sku_id' => $sku->id,
+            'quantity' => 1,
+            'country_code' => 'NG',
+        ])->assertSessionHasErrors('country_code');
+
+        $this->assertSame(0, Order::count());
+    }
+
+    #[Test]
     public function a_customer_can_add_their_own_proxy_at_checkout_for_free(): void
     {
         $user = User::factory()->create();

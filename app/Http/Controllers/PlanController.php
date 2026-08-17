@@ -65,7 +65,7 @@ class PlanController extends Controller
             // "Buy now" form below, so the customer doesn't have to re-pick
             // it per device — whatever's picked still gets passed straight
             // through to createOrder as countryCode.
-            'regionOptions' => $this->regionCatalog->options(),
+            'regionOptions' => $this->regionCatalog->purchaseOptions(),
             // Optional proxy add-on at checkout — bought alongside the device
             // (VMOS residential proxy) or supplied by the customer (their own).
             'proxyProducts' => $this->proxyCatalog->products(),

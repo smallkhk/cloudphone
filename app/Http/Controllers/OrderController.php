@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\Sku;
 use App\Services\Payments\CryptoPaymentService;
 use App\Services\Vmos\VmosProxyCatalog;
+use App\Services\Vmos\VmosRegionCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -27,15 +28,23 @@ class OrderController extends Controller
 
     public function store(Request $request, CryptoPaymentService $payments)
     {
+        // Normalise before validating, same convention as SIM regeneration —
+        // the "in:" list below is upper-case.
+        if ($request->filled('country_code')) {
+            $request->merge(['country_code' => strtoupper($request->string('country_code')->value())]);
+        }
+
         $validated = $request->validate([
             'sku_id' => ['required', 'integer', 'exists:skus,id'],
             'quantity' => ['required', 'integer', 'min:1', 'max:20'],
             'auto_renew' => ['sometimes', 'boolean'],
-            // A 2-letter VMOS country code the customer picked at checkout, or
-            // blank to let VMOS assign one. Not validated against the live
-            // region list here — VMOS itself is the authority on what's a
-            // valid code, and rejects a bad one clearly during provisioning.
-            'country_code' => ['nullable', 'string', 'size:2'],
+            // A VMOS country code the customer picked at checkout, or blank to
+            // let VMOS assign one. Restricted to the confirmed purchase-region
+            // list (matching VMOS's own console) rather than just any 2-letter
+            // code — the live "supported countries" list is broader than what
+            // VMOS's purchase flow actually accepts, so a code from that list
+            // could pass validation here and still fail at provisioning.
+            'country_code' => ['nullable', 'string', 'in:'.implode(',', array_keys(VmosRegionCatalog::PURCHASE_REGIONS))],
 
             // Proxy add-on — either a VMOS residential proxy bought alongside
             // the device, or the customer's own.

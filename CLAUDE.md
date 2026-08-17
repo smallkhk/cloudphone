@@ -112,6 +112,18 @@ first and it doesn't support filtering the catalogue by region
 takes `countryCode` as an independent parameter). Picking a region just
 pre-selects it on every device's "Buy now" form below.
 
+The checkout region list itself (`VmosRegionCatalog::purchaseOptions()` /
+`PURCHASE_REGIONS`) is a **fixed list, not live-pulled** — HK, PH, US, JP,
+KR, BR, DE, SG, ID, TW, confirmed from the owner's own VMOS console
+screenshot. The live `…/padApi/country` list (`options()`) is real but
+broader than what VMOS's purchase flow actually accepts (it's meant for SIM
+regeneration on an already-owned device, a separate feature that does
+support more countries) — using it for checkout showed the customer regions
+VMOS's own buy page doesn't offer, which is exactly what got reported. If
+VMOS ever exposes a real "regions available to buy in" endpoint, swap
+`PURCHASE_REGIONS` for that; until then, update the constant by hand if VMOS
+adds a region to their console.
+
 **Cloud Drive** (added, NOT yet tested against a live VMOS account): a new
 tab on the device control panel (`My cloud phones → Manage → Cloud Drive`).
 Storage capacity, file upload/list/delete (by URL, same pattern as APK
