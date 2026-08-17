@@ -30,6 +30,10 @@ class DeviceControlController extends Controller
         $apps = null;
         $detailsError = null;
 
+        $storage = null;
+        $files = null;
+        $storageGoods = null;
+
         if ($instance->pad_code) {
             try {
                 $details = $this->vmos->padInfo($instance->pad_code)['data'] ?? null;
@@ -45,6 +49,30 @@ class DeviceControlController extends Controller
                     return [];
                 }
             });
+
+            $storage = Cache::remember("device.{$instance->id}.storage", now()->addMinutes(2), function () use ($instance) {
+                try {
+                    return $this->vmos->storageInfo($instance->pad_code)['data'] ?? null;
+                } catch (Throwable) {
+                    return null;
+                }
+            });
+
+            $files = Cache::remember("device.{$instance->id}.files", now()->addMinutes(2), function () use ($instance) {
+                try {
+                    return $this->vmos->listFiles($instance->pad_code)['data'] ?? [];
+                } catch (Throwable) {
+                    return [];
+                }
+            });
+
+            if (Auth::user()?->is_admin) {
+                try {
+                    $storageGoods = $this->vmos->storageGoods()['data'] ?? [];
+                } catch (Throwable) {
+                    $storageGoods = [];
+                }
+            }
         }
 
         return view('instances.show', [
@@ -52,6 +80,9 @@ class DeviceControlController extends Controller
             'details' => $details,
             'detailsError' => $detailsError,
             'apps' => $apps,
+            'storage' => $storage,
+            'files' => $files,
+            'storageGoods' => $storageGoods,
             'countries' => $this->regions->options(),
         ]);
     }
@@ -256,6 +287,83 @@ class DeviceControlController extends Controller
         Cache::forget("device.{$instance->id}.apps");
 
         return back()->with('status', 'App list refreshed.');
+    }
+
+    // --- Cloud Drive -------------------------------------------------------
+
+    public function uploadDriveFile(Request $request, CloudInstance $instance)
+    {
+        $data = $request->validate([
+            'url' => ['required', 'url', 'max:2000'],
+            'file_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return $this->run($instance, 'File download started — it will appear in Cloud Drive shortly.', function () use ($instance, $data) {
+            $response = $this->vmos->uploadCloudFile($instance->pad_code, $data['url'], $data['file_name'] ?? null);
+            $this->recordTask($instance, 'upload_file', $response);
+            Cache::forget("device.{$instance->id}.files");
+            Cache::forget("device.{$instance->id}.storage");
+        });
+    }
+
+    public function deleteDriveFile(Request $request, CloudInstance $instance)
+    {
+        $data = $request->validate([
+            'file_ids' => ['required', 'array', 'min:1'],
+            'file_ids.*' => ['string'],
+        ]);
+
+        return $this->run($instance, 'File deleted.', function () use ($instance, $data) {
+            $this->vmos->deleteCloudFiles($data['file_ids']);
+            Cache::forget("device.{$instance->id}.files");
+            Cache::forget("device.{$instance->id}.storage");
+        });
+    }
+
+    public function createBackup(CloudInstance $instance)
+    {
+        return $this->run($instance, 'Backup started — this can take a while for a large disk.', function () use ($instance) {
+            $response = $this->vmos->createBackup([$instance->pad_code]);
+            $this->recordTask($instance, 'backup', $response);
+        });
+    }
+
+    public function backupProgress(CloudInstance $instance, InstanceTask $task)
+    {
+        $this->authorizeOwner($instance);
+        abort_unless($task->cloud_instance_id === $instance->id && $task->type === 'backup', 404);
+
+        $batchId = $task->result['batchId'] ?? $task->result['data']['batchId'] ?? null;
+
+        if (! $batchId) {
+            return back()->with('error', 'No batch ID recorded for this backup — check Admin → API diagnostics.');
+        }
+
+        try {
+            $progress = $this->vmos->backupProgress((string) $batchId)['data'] ?? [];
+            $task->update(['result' => array_merge($task->result ?? [], ['progress' => $progress])]);
+
+            return back()->with('status', 'Backup progress refreshed.');
+        } catch (Throwable $e) {
+            return back()->with('error', 'Could not check backup progress: '.$e->getMessage());
+        }
+    }
+
+    /** Admin-only — buying storage charges the VMOS account balance, same as buying a proxy. */
+    public function buyStorage(Request $request, CloudInstance $instance)
+    {
+        $this->authorizeOwner($instance);
+        abort_unless(Auth::user()?->is_admin, 403);
+
+        $data = $request->validate([
+            'good_id' => ['required', 'integer'],
+            'num' => ['required', 'integer', 'min:1', 'max:20'],
+        ]);
+
+        return $this->run($instance, 'Storage purchased — it may take a moment to reflect in the balance.', function () use ($instance, $data) {
+            $this->vmos->buyStorage((int) $data['good_id'], $instance->pad_code, (int) $data['num']);
+            Cache::forget("device.{$instance->id}.storage");
+        });
     }
 
     // --- ADB -------------------------------------------------------------

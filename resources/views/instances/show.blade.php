@@ -97,6 +97,7 @@
                             'identity' => 'Phone number & location',
                             'proxy' => 'Proxy',
                             'apps' => 'Apps',
+                            'drive' => 'Cloud Drive',
                             'advanced' => 'Advanced',
                         ] as $key => $label)
                             <button @click="tab = '{{ $key }}'"
@@ -392,6 +393,134 @@
                                                 </form>
                                             @endforeach
                                         </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Cloud Drive tab --}}
+                <div x-show="tab === 'drive'" x-cloak class="space-y-6">
+                    <div class="rounded-xl bg-ink-50 p-4 text-xs text-ink-500 ring-1 ring-inset ring-ink-200">
+                        VMOS doesn't publish full field names for Cloud Drive the way it does for the phone-plan
+                        endpoints — if capacity or a file looks wrong here, check <a href="{{ route('admin.diagnostics.index', ['probe' => 'storage_goods']) }}" class="font-medium text-brand-600 hover:underline">API diagnostics</a>
+                        against the raw response.
+                    </div>
+
+                    @php
+                        $used = $storage['used'] ?? $storage['usedSize'] ?? $storage['useSize'] ?? null;
+                        $total = $storage['total'] ?? $storage['totalSize'] ?? $storage['capacity'] ?? null;
+                    @endphp
+
+                    <div class="card p-6">
+                        <h3 class="text-base font-semibold text-ink-900">Storage</h3>
+                        @if ($used !== null && $total !== null)
+                            <p class="mt-2 text-sm text-ink-600">{{ $used }} / {{ $total }} used</p>
+                            <div class="mt-3 h-2 overflow-hidden rounded-full bg-ink-100">
+                                <div class="h-full bg-brand-600" style="width: {{ $total > 0 ? min(100, round($used / $total * 100)) : 0 }}%"></div>
+                            </div>
+                        @else
+                            <p class="mt-2 text-sm text-ink-500">Capacity not available right now.</p>
+                        @endif
+
+                        @if (auth()->user()->is_admin && ! empty($storageGoods))
+                            <form method="POST" action="{{ route('instances.drive.buy-storage', $instance) }}"
+                                  class="mt-5 flex flex-wrap items-end gap-3 border-t border-ink-100 pt-5"
+                                  onsubmit="return confirm('This charges your VMOS balance. Continue?')">
+                                @csrf
+                                <div class="flex-1">
+                                    <label class="label" for="good_id">Buy more storage (admin)</label>
+                                    <select id="good_id" name="good_id" class="input">
+                                        @foreach ($storageGoods as $good)
+                                            <option value="{{ $good['id'] ?? $good['goodId'] ?? '' }}">
+                                                {{ $good['name'] ?? $good['goodName'] ?? 'Storage package' }}
+                                                @if (isset($good['price'])) — ${{ number_format($good['price'] / 100, 2) }} @endif
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <input type="number" name="num" value="1" min="1" max="20" class="input w-20">
+                                <button class="btn-secondary">Buy</button>
+                            </form>
+                        @endif
+                    </div>
+
+                    <form method="POST" action="{{ route('instances.drive.upload', $instance) }}" class="card p-6">
+                        @csrf
+                        <h3 class="text-base font-semibold text-ink-900">Upload a file</h3>
+                        <p class="mt-1 text-sm text-ink-500">Paste a direct link — it's downloaded straight onto the device's cloud disk.</p>
+                        <div class="mt-5 space-y-3">
+                            <div>
+                                <label class="label" for="drive_url">File URL</label>
+                                <input id="drive_url" name="url" type="url" class="input" placeholder="https://example.com/file.pdf" required>
+                            </div>
+                            <div>
+                                <label class="label" for="file_name">File name (optional)</label>
+                                <input id="file_name" name="file_name" class="input" placeholder="document.pdf">
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end border-t border-ink-100 pt-5">
+                            <button class="btn-primary">Upload</button>
+                        </div>
+                    </form>
+
+                    <div class="card">
+                        <h3 class="px-5 py-4 text-base font-semibold text-ink-900">Files</h3>
+                        @php $fileList = collect($files ?? [])->flatMap(fn ($e) => $e['records'] ?? $e['files'] ?? (is_array($e) && (isset($e['fileId']) || isset($e['id'])) ? [$e] : [])); @endphp
+
+                        @if ($fileList->isEmpty())
+                            <p class="border-t border-ink-100 px-5 py-8 text-center text-sm text-ink-500">No files yet.</p>
+                        @else
+                            <ul class="divide-y divide-ink-100 border-t border-ink-100">
+                                @foreach ($fileList as $file)
+                                    @php $fileId = $file['fileId'] ?? $file['id'] ?? null; @endphp
+                                    @continue(! $fileId)
+                                    <li class="flex flex-wrap items-center gap-3 px-5 py-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-medium text-ink-900">{{ $file['fileName'] ?? $file['name'] ?? $fileId }}</p>
+                                            @if (isset($file['size']))
+                                                <p class="text-xs text-ink-500">{{ $file['size'] }}</p>
+                                            @endif
+                                        </div>
+                                        <form method="POST" action="{{ route('instances.drive.delete', $instance) }}"
+                                              onsubmit="return confirm('Delete this file?')">
+                                            @csrf @method('DELETE')
+                                            <input type="hidden" name="file_ids[]" value="{{ $fileId }}">
+                                            <button class="btn-ghost btn-sm text-red-600 hover:bg-red-50">Delete</button>
+                                        </form>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </div>
+
+                    <div class="card p-6">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-ink-900">Backups</h3>
+                            <form method="POST" action="{{ route('instances.drive.backup', $instance) }}">
+                                @csrf
+                                <button class="btn-secondary btn-sm">Back up now</button>
+                            </form>
+                        </div>
+
+                        @php $backupTasks = $instance->tasks->where('type', 'backup')->take(5); @endphp
+                        @if ($backupTasks->isEmpty())
+                            <p class="mt-3 text-sm text-ink-500">No backups yet.</p>
+                        @else
+                            <ul class="mt-4 space-y-2">
+                                @foreach ($backupTasks as $task)
+                                    <li class="flex items-center justify-between rounded-lg bg-ink-50 p-3 text-sm">
+                                        <span class="text-ink-600">
+                                            {{ $task->created_at->format('d M H:i') }}
+                                            @if ($progress = $task->result['progress'] ?? null)
+                                                — {{ is_array($progress) ? json_encode($progress) : $progress }}
+                                            @endif
+                                        </span>
+                                        <form method="POST" action="{{ route('instances.drive.backup-progress', [$instance, $task]) }}">
+                                            @csrf
+                                            <button class="btn-ghost btn-sm">Check progress</button>
+                                        </form>
                                     </li>
                                 @endforeach
                             </ul>

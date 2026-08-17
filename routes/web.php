@@ -64,6 +64,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/instances/{instance}/apps/refresh', [DeviceControlController::class, 'refreshApps'])->name('instances.apps.refresh');
     Route::post('/instances/{instance}/adb', [DeviceControlController::class, 'toggleAdb'])->name('instances.adb');
 
+    // Cloud Drive
+    Route::post('/instances/{instance}/drive/upload', [DeviceControlController::class, 'uploadDriveFile'])->name('instances.drive.upload');
+    Route::delete('/instances/{instance}/drive/file', [DeviceControlController::class, 'deleteDriveFile'])->name('instances.drive.delete');
+    Route::post('/instances/{instance}/drive/backup', [DeviceControlController::class, 'createBackup'])->name('instances.drive.backup');
+    Route::post('/instances/{instance}/drive/backup/{task}/progress', [DeviceControlController::class, 'backupProgress'])->name('instances.drive.backup-progress');
+    Route::post('/instances/{instance}/drive/storage', [DeviceControlController::class, 'buyStorage'])->name('instances.drive.buy-storage');
+
     Route::post('/email-accounts/{emailAccount}/refresh', [EmailAccountController::class, 'refresh'])->name('email-accounts.refresh');
     Route::post('/phone-numbers/{phoneNumber}/refresh', [PhoneNumberController::class, 'refresh'])->name('phone-numbers.refresh');
 });

@@ -34,6 +34,7 @@ class DiagnosticsController extends Controller
         'sms_services' => ['POST', '/vcpcloud/api/padApi/getSmsServiceList', [], 'UNCONFIRMED — phone-number registration services'],
         'sms_types' => ['POST', '/vcpcloud/api/padApi/getSmsTypeList', [], 'UNCONFIRMED — phone-number types & stock'],
         'my_sms' => ['POST', '/vcpcloud/api/padApi/getSmsOrder', ['current' => 1, 'size' => 20], 'UNCONFIRMED — phone numbers you own'],
+        'storage_goods' => ['GET', '/vcpcloud/api/padApi/getVcStorageGoods', [], 'UNCONFIRMED — Cloud Drive storage products'],
     ];
 
     public function index(Request $request, VmosClient $client)

@@ -499,4 +499,84 @@ class VmosCloudPhoneService
             'orderId' => $vmosOrderId,
         ]);
     }
+
+    // --- Cloud Drive (per-device storage, files, backups) ------------------
+    //
+    // VMOS's own console lists "Cloud Drive" as its own top-level product,
+    // separate from the phones themselves. The endpoints below are confirmed
+    // real (found in VMOS's own quick-reference index — uploadFile is even
+    // already pre-listed as an unsigned-body path in VmosClient, meaning a
+    // prior session already anticipated wrapping it), but VMOS's docs don't
+    // publish full parameter names for most of them the way they do for the
+    // phone-plan endpoints. Methods below follow the same naming conventions
+    // used elsewhere in this API (padCode for single-device ops, current/size
+    // pagination, goodId-style purchases) — check Admin → Diagnostics before
+    // relying on this for a real customer.
+
+    /** Storage expansion products available to buy. */
+    public function storageGoods(): array
+    {
+        return $this->client->get('/vcpcloud/api/padApi/getVcStorageGoods');
+    }
+
+    /** Remaining/total cloud-disk capacity for one device. */
+    public function storageInfo(string $padCode): array
+    {
+        return $this->client->get('/vcpcloud/api/padApi/getRenewStorageInfo', ['padCode' => $padCode]);
+    }
+
+    /** Buys extra cloud-disk storage for a device. */
+    public function buyStorage(int $goodId, string $padCode, int $num = 1): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/buyStorageGoods', [
+            'goodId' => $goodId,
+            'padCode' => $padCode,
+            'num' => $num,
+        ]);
+    }
+
+    /** Files a customer has stored on one device's cloud disk. */
+    public function listFiles(string $padCode, int $page = 1, int $size = 50): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/selectFiles', [
+            'padCode' => $padCode,
+            'current' => $page,
+            'size' => $size,
+        ]);
+    }
+
+    /**
+     * Uploads a file (from a URL, same pattern as uploadFileFromUrl for APKs)
+     * onto a device's cloud disk. Note: this endpoint's body is NOT part of
+     * the signature (see VmosClient::UNSIGNED_BODY_PATHS).
+     */
+    public function uploadCloudFile(string $padCode, string $url, ?string $fileName = null): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/uploadFile', array_filter([
+            'padCode' => $padCode,
+            'url' => $url,
+            'fileName' => $fileName,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** @param  string[]  $fileIds */
+    public function deleteCloudFiles(array $fileIds): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/deleteOssFiles', ['fileIds' => $fileIds]);
+    }
+
+    /** Kicks off an async backup of one or more devices' cloud disks. Returns a batchId to poll. */
+    public function createBackup(array $padCodes, ?string $description = null): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/addBackup', array_filter([
+            'padCodes' => $padCodes,
+            'description' => $description,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** Progress of a backup started with createBackup(). */
+    public function backupProgress(string $batchId): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/queryBackupBatch', ['batchId' => $batchId]);
+    }
 }

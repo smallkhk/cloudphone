@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CloudInstance;
+use App\Models\InstanceTask;
 use App\Models\Setting;
 use App\Models\Sku;
 use App\Models\User;
@@ -196,6 +197,86 @@ class DeviceControlTest extends TestCase
 
             Http::assertSent(fn ($r) => str_contains($r->url(), $endpoint) && $r['pkgName'] === 'com.example.app');
         }
+    }
+
+    // --- Cloud Drive -------------------------------------------------------
+
+    #[Test]
+    public function uploading_a_drive_file_pushes_the_url_to_vmos(): void
+    {
+        $this->fakeVmosOk();
+        $this->actingAs($this->owner)->post(route('instances.drive.upload', $this->device), [
+            'url' => 'https://example.com/report.pdf',
+            'file_name' => 'report.pdf',
+        ])->assertSessionHas('status');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'uploadFile')
+            && $r['url'] === 'https://example.com/report.pdf' && $r['fileName'] === 'report.pdf');
+    }
+
+    #[Test]
+    public function deleting_a_drive_file_is_owner_scoped(): void
+    {
+        $this->fakeVmosOk();
+        $stranger = User::factory()->create();
+
+        $this->actingAs($stranger)->delete(route('instances.drive.delete', $this->device), ['file_ids' => ['f1']])
+            ->assertForbidden();
+
+        $this->actingAs($this->owner)->delete(route('instances.drive.delete', $this->device), ['file_ids' => ['f1']])
+            ->assertSessionHas('status');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'deleteOssFiles') && $r['fileIds'] === ['f1']);
+    }
+
+    #[Test]
+    public function creating_a_backup_records_a_task(): void
+    {
+        Http::fake(['*/addBackup' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['batchId' => 'B1']])]);
+
+        $this->actingAs($this->owner)->post(route('instances.drive.backup', $this->device))
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseHas('instance_tasks', [
+            'cloud_instance_id' => $this->device->id,
+            'type' => 'backup',
+        ]);
+    }
+
+    #[Test]
+    public function checking_backup_progress_updates_the_task(): void
+    {
+        $task = $this->device->tasks()->create([
+            'type' => 'backup',
+            'status' => InstanceTask::STATUS_PENDING,
+            'result' => ['batchId' => 'B1'],
+        ]);
+
+        Http::fake(['*/queryBackupBatch' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['status' => 'done']])]);
+
+        $this->actingAs($this->owner)
+            ->post(route('instances.drive.backup-progress', [$this->device, $task]))
+            ->assertSessionHas('status');
+
+        $this->assertSame(['status' => 'done'], $task->fresh()->result['progress']);
+    }
+
+    #[Test]
+    public function only_an_admin_can_buy_storage(): void
+    {
+        $this->fakeVmosOk();
+
+        $this->actingAs($this->owner)
+            ->post(route('instances.drive.buy-storage', $this->device), ['good_id' => 1, 'num' => 1])
+            ->assertForbidden();
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin)
+            ->post(route('instances.drive.buy-storage', $this->device), ['good_id' => 1, 'num' => 1])
+            ->assertSessionHas('status');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'buyStorageGoods')
+            && $r['goodId'] === 1 && $r['padCode'] === 'AC55501');
     }
 
     #[Test]

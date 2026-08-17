@@ -104,9 +104,17 @@ Each cloud phone has its own control panel (**My cloud phones → Manage**):
 - **Language & timezone**
 - **Proxy** — apply a SOCKS5/HTTP proxy (with a test-before-apply button) or disable it
 - **Apps** — install by APK URL, then start / stop / uninstall installed apps
+- **Cloud Drive** — storage capacity, upload/list/delete files (by URL), and
+  whole-disk backups. Buying more storage is admin-only (charges the VMOS
+  balance, like buying a proxy).
 - **ADB** — enable remote debugging and get the `adb connect` command
 - **One-key new device** — wipe and regenerate a completely new hardware identity
 - **Factory reset**, restart, and live screenshot
+
+> **Cloud Drive field names are best-effort.** VMOS doesn't publish full
+> request/response details for these endpoints — check a real device's Cloud
+> Drive tab and **Admin → API diagnostics** (`storage_goods` probe) against
+> your account before relying on it.
 
 > The live screen connects to a *streaming* host, not the OpenAPI host. It
 > defaults to `https://openapi-hk.armcloud.net` and is set with

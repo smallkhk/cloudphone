@@ -104,6 +104,34 @@ Admin → Proxies to attach by hand (visible on both the admin and customer
 order pages). **Watch Admin → Orders for a few real vmos-mode purchases
 before treating the auto-match as reliable.**
 
+**Plans page filters** — Android version and Device model are button/pill
+rows now (`x-pill-filter` component), not dropdowns. There's also a Region
+pill row, but it does NOT filter which devices show — checked VMOS's API
+first and it doesn't support filtering the catalogue by region
+(`getCloudGoodList` only takes `androidVersion`/`goodIds`; `createOrder`
+takes `countryCode` as an independent parameter). Picking a region just
+pre-selects it on every device's "Buy now" form below.
+
+**Cloud Drive** (added, NOT yet tested against a live VMOS account): a new
+tab on the device control panel (`My cloud phones → Manage → Cloud Drive`).
+Storage capacity, file upload/list/delete (by URL, same pattern as APK
+install), and whole-disk backups are customer-facing; buying more storage is
+**admin-only** (charges the VMOS account balance, same as buying a proxy —
+see Admin → Proxies for the same pattern). VMOS's docs don't publish field
+names for these endpoints (`getVcStorageGoods`, `getRenewStorageInfo`,
+`selectFiles`, `uploadFile`, `deleteOssFiles`, `addBackup`,
+`queryBackupBatch`) the way they do for the phone-plan ones, so
+`VmosCloudPhoneService`'s Cloud Drive section and the view's field-name
+guesses (`used`/`usedSize`, `fileId`/`id`, etc.) are best-effort. **Check
+Admin → Diagnostics (`storage_goods` probe) and a real device's Cloud Drive
+tab against your VMOS account before relying on it.**
+
+Also investigated VMOS's "Automation + AI" console feature — the reseller
+API only exposes `asyncCmd` (run a shell/ADB command) plus result polling
+(`executeScriptInfo`, `padTaskDetail`), not a flow builder or any AI
+decision-making. Not built — the owner explicitly said skip it for now given
+what it actually is.
+
 ## Live deployment
 
 - **App directory:** `~/cloud` on the cPanel host.
