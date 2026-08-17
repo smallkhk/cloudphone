@@ -1,7 +1,38 @@
 # Working notes
 
-Facts about the live deployment that aren't obvious from the code. Keep this
-current — it's the first thing to read before giving deploy instructions.
+Facts about this project that aren't obvious from the code. Read this first —
+it exists so a new session doesn't have to re-derive any of it.
+
+## What this is
+
+A Laravel storefront reselling [VMOS Cloud](https://cloud.vmoscloud.com) cloud
+Android phones at the owner's own markup. Customers pay in USDT (TRC20),
+devices are provisioned automatically, and everything is administered from
+`/admin` — no SSH needed after the first deploy. Owner is a solo operator, not
+a developer: prefer instructions over jargon, and never assume a local dev
+machine (they work from a phone or the cPanel terminal).
+
+Branch: `claude/reseller-website-api-b4x019`. Full feature list is in README.md.
+
+## Current state
+
+Working in production: plan sync and pricing, crypto checkout, device
+provisioning, the per-device control panel (SIM/GPS/locale/proxy/apps/ADB),
+**live screen streaming** via the VMOS H5 SDK, admin panel, and **live chat**
+(Claude or any OpenAI-compatible provider, with human takeover).
+
+Not done yet:
+
+- **Email Verification Service** — VMOS sells pre-made email accounts for
+  service registrations (GitHub, TikTok…) at ~$0.01–0.03 with verification-code
+  retrieval, over five `…/padApi/*Email*` endpoints. Resellable exactly like
+  the phones; the owner is interested. Note VMOS has **no** virtual phone
+  number / SMS-receiving product — `simulateSendSms` only injects a fake SMS
+  into your own device.
+- No real customer has completed a crypto purchase, so
+  `TronUsdtVerifier` is untested against a live transaction.
+- `demo@example.com` / `password` was seeded as an **admin**. Confirm it's gone
+  from the live database — this repo is public.
 
 ## Live deployment
 
@@ -57,10 +88,3 @@ git pull origin claude/reseller-website-api-b4x019
 Built CSS/JS is committed under `public/build`, so **npm is never needed on the
 server**. Run `npm run build` locally and commit the result. When the bundle
 hash changes, tell the user to hard-refresh — otherwise they test stale JS.
-
-## Outstanding
-
-- No real customer has completed a crypto purchase yet; the TronGrid verifier
-  is untested against a live transaction.
-- `demo@example.com` / `password` was seeded as an **admin**. Confirm it is
-  gone from the live database — this repo is public.
