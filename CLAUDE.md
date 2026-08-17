@@ -144,6 +144,25 @@ API only exposes `asyncCmd` (run a shell/ADB command) plus result polling
 decision-making. Not built — the owner explicitly said skip it for now given
 what it actually is.
 
+Checked VMOS's separate "VMOS AI" console feature too (AI image/video
+generation, cutout, watermark remover, upscaling, its own points/credits
+system) — confirmed via the same doc sources this is **not exposed anywhere
+in the reseller OpenAPI** (no tag, no endpoint). Same category as VMOS Magic
+Box: a bundled consumer product, not something an API key can drive. Not
+built, and shouldn't be faked — if VMOS confirms a real reseller endpoint
+for it later, build against that.
+
+**SIM/carrier auto-applied from checkout region** — `SimProvisioner`
+(`app/Services/Provisioning/SimProvisioner.php`) calls `updateSim()` with the
+order's `country_code` the moment `SyncCloudInstances` discovers the
+device's padCode (same hook as the proxy auto-apply), so the customer's
+checkout region becomes their device's actual SIM/carrier without them
+having to open "Phone number & SIM" and pick it again. Guarded by an
+existing `update_sim` InstanceTask so it only ever runs once per device.
+This exists because VMOS's `createMoneyOrder countryCode` isn't confirmed to
+guarantee the SIM matches on its own — calling `updateSim()` explicitly
+makes it certain either way.
+
 ## Live deployment
 
 - **App directory:** `~/cloud` on the cPanel host.
