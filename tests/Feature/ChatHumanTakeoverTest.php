@@ -6,6 +6,7 @@ use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use App\Models\User;
 use App\Services\Chat\ChatAssistant;
+use App\Services\Chat\ChatTools;
 use App\Services\Chat\SiteKnowledge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -28,7 +29,7 @@ class ChatHumanTakeoverTest extends TestCase
     /** Replies with a fixed string and records that it was called. */
     protected function fakeAssistant(): void
     {
-        $this->instance(ChatAssistant::class, new class(app(SiteKnowledge::class)) extends ChatAssistant
+        $this->instance(ChatAssistant::class, new class(app(SiteKnowledge::class), app(ChatTools::class)) extends ChatAssistant
         {
             public static int $calls = 0;
 

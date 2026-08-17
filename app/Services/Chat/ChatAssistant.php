@@ -21,7 +21,7 @@ use Throwable;
  */
 class ChatAssistant
 {
-    public function __construct(protected SiteKnowledge $knowledge) {}
+    public function __construct(protected SiteKnowledge $knowledge, protected ChatTools $tools) {}
 
     /** Chat is only offered when it's switched on *and* a key is stored. */
     public function isEnabled(): bool
@@ -71,6 +71,13 @@ class ChatAssistant
 
         $history = $this->normaliseTurns($history);
 
+        // Anonymous visitors own no devices, so there's nothing for the tools
+        // to act on — omitting them entirely keeps the request smaller and
+        // stops a model from trying to call a tool that can only ever error.
+        $user = $conversation->user;
+        $tools = $user ? $this->tools->definitions() : [];
+        $toolExecutor = $user ? fn (string $name, array $args) => $this->tools->execute($user, $name, $args) : null;
+
         try {
             $result = $this->provider()->complete(
                 system: [
@@ -82,6 +89,8 @@ class ChatAssistant
                     ['type' => 'text', 'text' => $this->knowledge->visitorPrompt($conversation->user), 'cache' => false],
                 ],
                 messages: $history,
+                tools: $tools,
+                toolExecutor: $toolExecutor,
             );
         } catch (Throwable $e) {
             Log::error('Assistant reply failed', ['conversation' => $conversation->id, 'error' => $e->getMessage()]);

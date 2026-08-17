@@ -113,6 +113,77 @@ class ChatProviderTest extends TestCase
     }
 
     #[Test]
+    public function it_runs_a_tool_call_and_feeds_the_result_back_before_returning_final_text(): void
+    {
+        $this->useGroq();
+
+        $calls = 0;
+
+        Http::fake(function () use (&$calls) {
+            $calls++;
+
+            // First call: the model wants to call a tool. Second call: it has
+            // the tool result and gives a final answer.
+            return $calls === 1
+                ? Http::response([
+                    'choices' => [['message' => [
+                        'content' => null,
+                        'tool_calls' => [[
+                            'id' => 'call_1',
+                            'type' => 'function',
+                            'function' => ['name' => 'restart_cloud_phone', 'arguments' => '{"pad_code":"AC55501"}'],
+                        ]],
+                    ]]],
+                    'usage' => ['prompt_tokens' => 500, 'completion_tokens' => 15],
+                ])
+                : Http::response([
+                    'choices' => [['message' => ['content' => "I've restarted it for you."]]],
+                    'usage' => ['prompt_tokens' => 550, 'completion_tokens' => 8],
+                ]);
+        });
+
+        $executed = [];
+        $executor = function (string $name, array $args) use (&$executed) {
+            $executed[] = [$name, $args];
+
+            return 'Restart requested for AC55501.';
+        };
+
+        $result = (new OpenAiCompatibleProvider)->complete(
+            system: [['type' => 'text', 'text' => 'SITE', 'cache' => false]],
+            messages: [['role' => 'user', 'content' => 'restart my phone']],
+            tools: [['name' => 'restart_cloud_phone', 'description' => 'Restarts a device.', 'parameters' => ['type' => 'object', 'properties' => []]]],
+            toolExecutor: $executor,
+        );
+
+        $this->assertSame(2, $calls);
+        $this->assertSame([['restart_cloud_phone', ['pad_code' => 'AC55501']]], $executed);
+        $this->assertSame("I've restarted it for you.", $result['text']);
+        // Token usage accumulates across both turns of the loop.
+        $this->assertSame(1050, $result['input_tokens']);
+        $this->assertSame(23, $result['output_tokens']);
+
+        Http::assertSentCount(2);
+    }
+
+    #[Test]
+    public function no_tools_are_offered_or_called_for_an_anonymous_visitor(): void
+    {
+        $this->useGroq();
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => 'Sure, here is how.']]],
+                'usage' => ['prompt_tokens' => 400, 'completion_tokens' => 10],
+            ]),
+        ]);
+
+        $this->postJson(route('chat.store'), ['message' => 'restart my phone'])->assertOk();
+
+        Http::assertSent(fn ($request) => ! array_key_exists('tools', $request->data()));
+    }
+
+    #[Test]
     public function a_customer_gets_a_reply_through_the_free_provider(): void
     {
         $this->useGroq();

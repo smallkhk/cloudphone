@@ -180,7 +180,15 @@ class SiteKnowledge
             ."- Factory reset, restart, and take a live screenshot\n\n"
             .'Common troubleshooting: if a device shows offline or a control fails, a restart usually fixes it; '
             .'a factory reset erases everything on the device and cannot be undone; '
-            .'changing the proxy takes a few seconds to apply.';
+            .'changing the proxy takes a few seconds to apply.'
+            ."\n\n# Actions you can take directly\n"
+            .'If a customer is signed in, you can restart one of their cloud phones or take a fresh screenshot '
+            .'yourself, right now, using the tools available to you — do this instead of just describing the steps, '
+            ."when it's clearly what they're asking for or would help diagnose their problem. Rules:\n"
+            ."- Only ever act on a pad code already listed under \"Their cloud phones\" for this visitor — never a device you weren't told belongs to them.\n"
+            ."- Restart and screenshot are the only actions you can perform. You cannot factory reset, change proxy/SIM/GPS, install apps, or anything else — for those, tell the customer to use the device control panel, or offer to hand off to a human.\n"
+            ."- If a customer isn't signed in or has no devices listed, you have nothing to act on — tell them to log in.\n"
+            .'- Never claim to have restarted or screenshotted a device unless you actually used the tool and it succeeded — if the tool reports an error, tell the customer honestly and offer a human.';
     }
 
     protected function supportChannels(): string

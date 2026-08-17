@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Models\Sku;
 use App\Models\User;
 use App\Services\Chat\ChatAssistant;
+use App\Services\Chat\ChatTools;
 use App\Services\Chat\SiteKnowledge;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -31,7 +32,7 @@ class ChatAssistantTest extends TestCase
         {
             public function __construct(protected string $reply)
             {
-                parent::__construct(app(SiteKnowledge::class));
+                parent::__construct(app(SiteKnowledge::class), app(ChatTools::class));
             }
 
             public function isEnabled(): bool
@@ -124,7 +125,7 @@ class ChatAssistantTest extends TestCase
     {
         $this->enableAssistant();
 
-        $this->instance(ChatAssistant::class, new class(app(SiteKnowledge::class)) extends ChatAssistant
+        $this->instance(ChatAssistant::class, new class(app(SiteKnowledge::class), app(ChatTools::class)) extends ChatAssistant
         {
             public function isEnabled(): bool
             {
