@@ -16,6 +16,7 @@ class DeviceControlTest extends TestCase
     use RefreshDatabase;
 
     protected User $owner;
+
     protected CloudInstance $device;
 
     protected function setUp(): void
@@ -283,6 +284,35 @@ class DeviceControlTest extends TestCase
         $this->artisan('vmos:sync-skus')->assertSuccessful();
 
         $this->assertEquals(4.99, Sku::where('vmos_good_id', 502)->first()->vmos_cost_price);
+    }
+
+    #[Test]
+    public function sync_pulls_every_known_android_version_by_default(): void
+    {
+        // A real account was confirmed to return only 2 of 4 versions when no
+        // filter was sent — the fix is to request each version explicitly.
+        $this->withVmosCredentials();
+
+        Http::fake(function ($request) {
+            parse_str(parse_url($request->url(), PHP_URL_QUERY) ?? '', $query);
+            $version = $query['androidVersion'] ?? null;
+
+            if (! in_array($version, ['13', '14', '15', '16'], true)) {
+                return Http::response(['code' => 200, 'msg' => 'success', 'data' => ['configs' => []]]);
+            }
+
+            return Http::response(['code' => 200, 'msg' => 'success', 'data' => ['configs' => [[
+                'configId' => (int) $version, 'configName' => "Device Android {$version}", 'androidVersion' => $version,
+                'goodTimes' => [['id' => (int) "9{$version}", 'showContent' => '1 month', 'goodTime' => 43200, 'currentPrice' => 499]],
+            ]]]]);
+        });
+
+        $this->artisan('vmos:sync-skus')->assertSuccessful();
+
+        $this->assertSame(4, Sku::where('type', Sku::TYPE_CLOUD_PHONE)->distinct('android_version')->count('android_version'));
+        foreach (['13', '14', '15', '16'] as $version) {
+            $this->assertDatabaseHas('skus', ['android_version' => $version, 'name' => "Device Android {$version}"]);
+        }
     }
 
     #[Test]

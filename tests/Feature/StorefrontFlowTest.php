@@ -69,6 +69,33 @@ class StorefrontFlowTest extends TestCase
     }
 
     #[Test]
+    public function a_customer_can_pick_a_region_at_checkout(): void
+    {
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create(['price' => 15.00, 'default_country_code' => null]);
+
+        $this->actingAs($user)->post('/orders', [
+            'sku_id' => $sku->id,
+            'quantity' => 1,
+            'country_code' => 'jp',
+        ])->assertRedirect();
+
+        // Normalised to uppercase, same convention as SIM regeneration.
+        $this->assertSame('JP', Order::first()->country_code);
+    }
+
+    #[Test]
+    public function checkout_falls_back_to_the_skus_default_region_when_none_is_picked(): void
+    {
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create(['price' => 15.00, 'default_country_code' => 'US']);
+
+        $this->actingAs($user)->post('/orders', ['sku_id' => $sku->id, 'quantity' => 1])->assertRedirect();
+
+        $this->assertSame('US', Order::first()->country_code);
+    }
+
+    #[Test]
     public function checkout_fails_gracefully_when_no_wallet_is_configured(): void
     {
         config(['crypto.usdt_trc20_address' => null]);

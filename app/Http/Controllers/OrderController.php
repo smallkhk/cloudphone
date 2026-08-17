@@ -26,6 +26,11 @@ class OrderController extends Controller
             'sku_id' => ['required', 'integer', 'exists:skus,id'],
             'quantity' => ['required', 'integer', 'min:1', 'max:20'],
             'auto_renew' => ['sometimes', 'boolean'],
+            // A 2-letter VMOS country code the customer picked at checkout, or
+            // blank to let VMOS assign one. Not validated against the live
+            // region list here — VMOS itself is the authority on what's a
+            // valid code, and rejects a bad one clearly during provisioning.
+            'country_code' => ['nullable', 'string', 'size:2'],
         ]);
 
         $sku = Sku::available()->findOrFail($validated['sku_id']);
@@ -34,14 +39,14 @@ class OrderController extends Controller
         try {
             // The order and its payment quote must succeed together — otherwise a
             // misconfigured store leaves orphaned pending orders behind.
-            $order = DB::transaction(function () use ($sku, $quantity, $request, $payments) {
+            $order = DB::transaction(function () use ($sku, $quantity, $validated, $request, $payments) {
                 $order = Auth::user()->orders()->create([
                     'sku_id' => $sku->id,
                     'quantity' => $quantity,
                     'unit_price' => $sku->price,
                     'total_price' => round($sku->price * $quantity, 2),
                     'auto_renew' => $request->boolean('auto_renew', true),
-                    'country_code' => $sku->default_country_code,
+                    'country_code' => strtoupper($validated['country_code'] ?? '') ?: $sku->default_country_code,
                 ]);
 
                 $payments->createForOrder($order);

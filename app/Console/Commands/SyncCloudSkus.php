@@ -10,8 +10,17 @@ use Throwable;
 
 class SyncCloudSkus extends Command
 {
+    /**
+     * Confirmed from the VMOS console's own Buy/Renew page. Calling
+     * getCloudGoodList with no androidVersion filter was assumed to return
+     * the whole catalogue — it doesn't; on a real account it silently came
+     * back with only 2 of these 4 versions. So every sync now loops over
+     * this list explicitly instead of trusting an unfiltered call.
+     */
+    protected const KNOWN_ANDROID_VERSIONS = ['13', '14', '15', '16'];
+
     protected $signature = 'vmos:sync-skus
-        {--android-versions= : Comma-separated Android versions; omit to let VMOS return everything}';
+        {--android-versions= : Comma-separated Android versions; omit to sync every known version (13, 14, 15, 16)}';
 
     protected $description = 'Pull the VMOS SKU/package catalogue and upsert it into the local skus table';
 
@@ -23,10 +32,8 @@ class SyncCloudSkus extends Command
             return self::FAILURE;
         }
 
-        // An explicit list is opt-in; by default ask VMOS for the whole catalogue
-        // so nothing is missed just because we guessed the wrong version numbers.
         $option = (string) $this->option('android-versions');
-        $versions = filled($option) ? array_filter(explode(',', $option)) : [null];
+        $versions = filled($option) ? array_filter(explode(',', $option)) : self::KNOWN_ANDROID_VERSIONS;
 
         $seen = 0;
         $created = 0;

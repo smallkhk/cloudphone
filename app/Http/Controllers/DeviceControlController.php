@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CloudInstance;
 use App\Models\InstanceTask;
 use App\Services\Vmos\VmosCloudPhoneService;
+use App\Services\Vmos\VmosRegionCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -19,7 +20,7 @@ use Throwable;
  */
 class DeviceControlController extends Controller
 {
-    public function __construct(protected VmosCloudPhoneService $vmos) {}
+    public function __construct(protected VmosCloudPhoneService $vmos, protected VmosRegionCatalog $regions) {}
 
     public function show(CloudInstance $instance)
     {
@@ -51,7 +52,7 @@ class DeviceControlController extends Controller
             'details' => $details,
             'detailsError' => $detailsError,
             'apps' => $apps,
-            'countries' => $this->countryList(),
+            'countries' => $this->regions->options(),
         ]);
     }
 
@@ -319,27 +320,5 @@ class DeviceControlController extends Controller
             'status' => InstanceTask::STATUS_PENDING,
             'result' => is_array($entry) ? $entry : ['raw' => $entry],
         ]);
-    }
-
-    /** Country list for SIM generation, cached since it rarely changes. */
-    protected function countryList(): array
-    {
-        return Cache::remember('vmos.countries', now()->addDay(), function () {
-            try {
-                return collect($this->vmos->countries()['data'] ?? [])
-                    ->mapWithKeys(fn ($c) => [$c['code'] => $c['name']])
-                    ->sort()
-                    ->all();
-            } catch (Throwable) {
-                // Fall back to a common subset so the form still works offline.
-                return [
-                    'US' => 'United States', 'GB' => 'United Kingdom', 'HK' => 'Hong Kong',
-                    'SG' => 'Singapore', 'NG' => 'Nigeria', 'ZA' => 'South Africa',
-                    'IN' => 'India', 'PH' => 'Philippines', 'ID' => 'Indonesia',
-                    'BR' => 'Brazil', 'DE' => 'Germany', 'FR' => 'France',
-                    'AE' => 'United Arab Emirates', 'CA' => 'Canada', 'AU' => 'Australia',
-                ];
-            }
-        });
     }
 }

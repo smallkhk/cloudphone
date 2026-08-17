@@ -189,6 +189,17 @@
                                             <input type="hidden" name="sku_id" value="{{ $sku->id }}">
                                             <input type="hidden" name="quantity" value="1">
                                             <input type="hidden" name="auto_renew" value="1">
+
+                                            @if (! empty($regionOptions))
+                                                <label class="label text-xs" for="region-{{ $sku->id }}">Region</label>
+                                                <select id="region-{{ $sku->id }}" name="country_code" class="input mb-3 text-sm">
+                                                    <option value="">Let us choose</option>
+                                                    @foreach ($regionOptions as $code => $label)
+                                                        <option value="{{ $code }}">{{ $label }}</option>
+                                                    @endforeach
+                                                </select>
+                                            @endif
+
                                             <button class="btn-primary w-full">Buy now</button>
                                         </form>
                                     @else

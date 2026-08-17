@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sku;
+use App\Services\Vmos\VmosRegionCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -10,6 +11,8 @@ class PlanController extends Controller
 {
     /** Device families per page — the catalogue can run to hundreds of them. */
     protected const GROUPS_PER_PAGE = 12;
+
+    public function __construct(protected VmosRegionCatalog $regionCatalog) {}
 
     public function index(Request $request)
     {
@@ -55,6 +58,13 @@ class PlanController extends Controller
             'androidVersions' => $this->facet('android_version'),
             'models' => $this->facet('config_model'),
             'regions' => $this->facet('default_country_code'),
+            // Purchase-time region picker, separate from the "regions" browse
+            // filter above (which is only ever populated if an admin sets a
+            // per-plan default) — this is VMOS's live supported-country list,
+            // and lets the customer choose which region their new device is
+            // provisioned in, whatever's picked is passed straight through to
+            // createOrder as countryCode.
+            'regionOptions' => $this->regionCatalog->options(),
             'durations' => Sku::available()
                 ->cloudPhones()
                 ->select('duration_minutes', 'duration_label')
