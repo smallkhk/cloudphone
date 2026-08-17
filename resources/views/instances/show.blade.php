@@ -89,10 +89,11 @@
             </div>
 
             {{-- Controls --------------------------------------------------- --}}
-            <div class="space-y-6 lg:col-span-2" x-data="{ tab: 'identity' }">
+            <div class="space-y-6 lg:col-span-2" x-data="{ tab: 'screen' }">
                 <div class="card overflow-hidden p-1.5">
                     <div class="flex flex-wrap gap-1">
                         @foreach ([
+                            'screen' => 'Live screen',
                             'identity' => 'Phone number & location',
                             'proxy' => 'Proxy',
                             'apps' => 'Apps',
@@ -107,8 +108,87 @@
                     </div>
                 </div>
 
+                {{-- Live screen tab --}}
+                <div x-show="tab === 'screen'"
+                     x-data="liveScreen({ tokenUrl: '{{ route('instances.screen-token', $instance) }}', csrf: '{{ csrf_token() }}' })"
+                     x-init="$watch('tab', value => { if (value !== 'screen') disconnect() })"
+                     @resize.window.debounce.200ms="resize()"
+                     @beforeunload.window="destroy()"
+                     class="card overflow-hidden">
+
+                    <div class="flex flex-wrap items-center gap-3 border-b border-ink-100 p-4">
+                        <span class="flex items-center gap-2 text-sm font-medium text-ink-700">
+                            <span class="h-2 w-2 rounded-full"
+                                  :class="{ 'bg-emerald-500': state === 'live', 'bg-amber-400 animate-pulse': state === 'connecting', 'bg-ink-300': state === 'idle', 'bg-red-500': state === 'error' }"></span>
+                            <span x-text="statusLabel"></span>
+                        </span>
+
+                        <div class="ml-auto flex flex-wrap items-center gap-2">
+                            <template x-if="!isLive && state !== 'connecting'">
+                                <button @click="connect()" class="btn-primary btn-sm">Connect</button>
+                            </template>
+                            <template x-if="isLive">
+                                <div class="flex items-center gap-2">
+                                    <button @click="toggleSound()" class="btn-secondary btn-sm"
+                                            x-text="muted ? 'Unmute' : 'Mute'"></button>
+                                    <button @click="toggleFullscreen()" class="btn-secondary btn-sm">Fullscreen</button>
+                                    <button @click="disconnect()" class="btn-secondary btn-sm">Disconnect</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    {{-- Stage. 9:16 keeps the phone's aspect ratio; the SDK draws into #pad-stage. --}}
+                    <div x-ref="frame" class="relative bg-ink-950">
+                        <div class="mx-auto aspect-[9/16] w-full max-w-[22rem]">
+                            <div x-ref="stage" id="pad-stage" class="h-full w-full"></div>
+                        </div>
+
+                        {{-- Overlay: shown until the stream is live --}}
+                        <div x-show="!isLive" class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
+                            <template x-if="state === 'connecting'">
+                                <svg class="h-7 w-7 animate-spin text-brand-400" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                    <circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+                                    <path class="opacity-90" fill="currentColor" d="M12 2a10 10 0 0110 10h-3a7 7 0 00-7-7V2z" />
+                                </svg>
+                            </template>
+
+                            <template x-if="state === 'idle'">
+                                <div>
+                                    <svg class="mx-auto h-9 w-9 text-ink-600" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true">
+                                        <rect x="6" y="2" width="12" height="20" rx="2.5" />
+                                        <path stroke-linecap="round" d="M10.5 18.5h3" />
+                                    </svg>
+                                    <p class="mt-3 text-sm font-medium text-white">Take control of this phone</p>
+                                    <p class="mt-1 text-xs text-ink-400">Tap and swipe the screen just like a real device.</p>
+                                </div>
+                            </template>
+
+                            <p x-show="hint" x-text="hint" class="text-xs text-ink-400"></p>
+                            <p x-show="error" x-text="error" x-cloak
+                               class="max-w-sm rounded-xl bg-red-500/10 px-4 py-2.5 text-xs text-red-300 ring-1 ring-inset ring-red-400/20"></p>
+
+                            <button x-show="state === 'idle' || state === 'error'" @click="connect()" class="btn-primary btn-sm mt-1">
+                                <span x-text="state === 'error' ? 'Try again' : 'Connect'"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Hardware keys --}}
+                    <div x-show="isLive" x-cloak class="flex items-center justify-center gap-2 border-t border-ink-100 p-3">
+                        <button @click="pressBack()" class="btn-secondary btn-sm" title="Back">◁ Back</button>
+                        <button @click="pressHome()" class="btn-secondary btn-sm" title="Home">◯ Home</button>
+                        <button @click="pressRecents()" class="btn-secondary btn-sm" title="Recent apps">▢ Recents</button>
+                    </div>
+
+                    <p class="border-t border-ink-100 px-4 py-3 text-xs leading-relaxed text-ink-500">
+                        The screen streams straight from VMOS to your browser. Leaving this tab disconnects it —
+                        the phone keeps running either way.
+                    </p>
+                </div>
+
                 {{-- Identity tab --}}
-                <div x-show="tab === 'identity'" class="space-y-6">
+                <div x-show="tab === 'identity'" x-cloak class="space-y-6">
                     <form method="POST" action="{{ route('instances.sim', $instance) }}" class="card p-6">
                         @csrf
                         <h3 class="text-base font-semibold text-ink-900">New phone number &amp; SIM</h3>

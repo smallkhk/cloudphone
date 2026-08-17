@@ -47,6 +47,7 @@ Route::middleware('auth')->group(function () {
 
     // Per-device control panel
     Route::get('/instances/{instance}', [DeviceControlController::class, 'show'])->name('instances.show');
+    Route::post('/instances/{instance}/screen-token', [DeviceControlController::class, 'screenToken'])->name('instances.screen-token');
     Route::post('/instances/{instance}/sim', [DeviceControlController::class, 'updateSim'])->name('instances.sim');
     Route::post('/instances/{instance}/gps', [DeviceControlController::class, 'updateGps'])->name('instances.gps');
     Route::post('/instances/{instance}/locale', [DeviceControlController::class, 'updateLocale'])->name('instances.locale');

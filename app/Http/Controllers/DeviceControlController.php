@@ -19,9 +19,7 @@ use Throwable;
  */
 class DeviceControlController extends Controller
 {
-    public function __construct(protected VmosCloudPhoneService $vmos)
-    {
-    }
+    public function __construct(protected VmosCloudPhoneService $vmos) {}
 
     public function show(CloudInstance $instance)
     {
@@ -54,6 +52,42 @@ class DeviceControlController extends Controller
             'detailsError' => $detailsError,
             'apps' => $apps,
             'countries' => $this->countryList(),
+        ]);
+    }
+
+    /**
+     * Issues a live-screen session for this device.
+     *
+     * The token is minted server-side and scoped by VMOS to this one padCode,
+     * so the browser never sees the account's API keys — only a short-lived
+     * credential for a device the signed-in customer already owns.
+     */
+    public function screenToken(CloudInstance $instance)
+    {
+        $this->authorizeOwner($instance);
+
+        if (! $instance->pad_code) {
+            return response()->json(['error' => 'This device is still being provisioned.'], 409);
+        }
+
+        try {
+            $token = $this->vmos->stsToken($instance->pad_code)['data']['token'] ?? null;
+        } catch (Throwable $e) {
+            return response()->json(['error' => 'VMOS refused the session: '.$e->getMessage()], 502);
+        }
+
+        if (! $token) {
+            return response()->json(['error' => 'VMOS did not return a session token.'], 502);
+        }
+
+        return response()->json([
+            'token' => $token,
+            'padCode' => $instance->pad_code,
+            'baseUrl' => (string) config('vmos.sdk_base_url'),
+            // Identifies this viewer to the streaming service. Stable per
+            // customer, so reconnecting resumes rather than opening a second
+            // seat on the same device.
+            'userId' => 'user-'.Auth::id(),
         ]);
     }
 

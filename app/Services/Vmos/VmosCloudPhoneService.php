@@ -8,9 +8,7 @@ namespace App\Services\Vmos;
  */
 class VmosCloudPhoneService
 {
-    public function __construct(protected VmosClient $client)
-    {
-    }
+    public function __construct(protected VmosClient $client) {}
 
     /**
      * SKU / package list ("Product Billing" catalogue), optionally filtered by Android
@@ -63,6 +61,22 @@ class VmosCloudPhoneService
             'padCode' => $padCode,
             'equipmentIds' => $equipmentIds,
         ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * Short-lived token that lets a browser open a live, interactive session
+     * with one specific cloud phone through the Web H5 SDK. Scoped to a single
+     * padCode, so it can safely be handed to that device's owner.
+     */
+    public function stsToken(string $padCode): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/stsTokenByPadCode', ['padCode' => $padCode]);
+    }
+
+    /** Revokes a token issued by stsToken(). */
+    public function clearStsToken(string $token): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/clearStsToken', ['token' => $token]);
     }
 
     public function padInfo(string $padCode): array

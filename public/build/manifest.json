@@ -1,6 +1,12 @@
 {
+  "node_modules/armcloud-rtc/dist/index.es.js": {
+    "file": "assets/index.es-CoFhX7K4.js",
+    "name": "index.es",
+    "src": "node_modules/armcloud-rtc/dist/index.es.js",
+    "isDynamicEntry": true
+  },
   "resources/css/app.css": {
-    "file": "assets/app-DLPsIAcc.css",
+    "file": "assets/app-DGCDemPt.css",
     "name": "app",
     "names": [
       "app.css"
@@ -9,9 +15,12 @@
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-C7cb-IOs.js",
+    "file": "assets/app-tOCpf3SO.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "dynamicImports": [
+      "node_modules/armcloud-rtc/dist/index.es.js"
+    ]
   }
 }

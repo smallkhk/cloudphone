@@ -50,6 +50,12 @@ after the first deploy.
 
 Each cloud phone has its own control panel (**My cloud phones → Manage**):
 
+- **Live screen** — a real, interactive view of the phone in the browser: tap,
+  swipe, type, plus Back/Home/Recents and sound. Streamed by VMOS's Web H5 SDK
+  (`armcloud-rtc`); the session token is minted server-side by
+  `stsTokenByPadCode` and is scoped to that one device, so API keys never reach
+  the browser. The ~1.7MB player is a separate bundle loaded only when someone
+  actually opens the screen.
 - **Phone number & SIM** — generate a fresh number, IMEI, IMSI and carrier for any supported country
 - **GPS** — set the coordinates apps see
 - **Language & timezone**
@@ -58,6 +64,11 @@ Each cloud phone has its own control panel (**My cloud phones → Manage**):
 - **ADB** — enable remote debugging and get the `adb connect` command
 - **One-key new device** — wipe and regenerate a completely new hardware identity
 - **Factory reset**, restart, and live screenshot
+
+> The live screen connects to a *streaming* host, not the OpenAPI host. It
+> defaults to `https://openapi-hk.armcloud.net` and is set with
+> `VMOS_SDK_BASE_URL`. If everything else works but the screen won't connect,
+> that's the value to confirm with VMOS support — the region varies by account.
 
 ### A note on prices
 

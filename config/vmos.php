@@ -18,6 +18,12 @@ return [
     // hosts that advertise an IPv6 route they can't actually use.
     'force_ipv4' => (bool) env('VMOS_FORCE_IPV4', true),
 
+    // Signalling endpoint the Web H5 SDK connects to for the live screen. This
+    // is NOT the OpenAPI host — it's the streaming gateway, and the region can
+    // differ per account. If the live screen fails to connect while the rest of
+    // the API works, this is the value to check with VMOS support.
+    'sdk_base_url' => env('VMOS_SDK_BASE_URL', 'https://openapi-hk.armcloud.net'),
+
     // Public URL VMOS should call back on task/instance events (routes/api.php).
     'callback_url' => env('VMOS_CALLBACK_URL'),
 
