@@ -139,8 +139,28 @@ export default function liveScreen({ tokenUrl, csrf }) {
                     autoRecoveryTime: 300,
                 },
                 callbacks: {
+                    // The engine is not ready when the constructor returns —
+                    // joining the room has to wait for init to report code 0.
+                    // Calling start() before this fires does nothing at all,
+                    // silently, which is exactly how it looks: init succeeds
+                    // and then no frame ever arrives.
                     onInit: ({ code, msg } = {}) => {
                         this.note(`init: code=${code}${msg ? ` msg=${msg}` : ''}`);
+
+                        if (Number(code) !== 0) {
+                            this.fail(`The device refused the session${msg ? `: ${msg}` : ''} (init code ${code}).`);
+
+                            return;
+                        }
+
+                        this.note('joining the room…');
+
+                        try {
+                            this.engine.start();
+                        } catch (e) {
+                            this.note(`start threw: ${e?.message || e}`);
+                            this.fail(`Couldn't join the device: ${e?.message || 'unknown error'}`);
+                        }
                     },
                     onSocketCallback: ({ code, msg } = {}) => {
                         this.note(`signalling: code=${code}${msg ? ` msg=${msg}` : ''}`);
@@ -205,7 +225,8 @@ export default function liveScreen({ tokenUrl, csrf }) {
                 }
             }, CONNECT_TIMEOUT_MS);
 
-            this.engine.start();
+            // No start() here on purpose — onInit fires it once the engine is
+            // actually ready. See the callback above.
         },
 
         /** Records rejections thrown inside the SDK while we're connecting. */
