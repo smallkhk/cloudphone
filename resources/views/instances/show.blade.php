@@ -168,9 +168,22 @@
                             <p x-show="error" x-text="error" x-cloak
                                class="max-w-sm rounded-xl bg-red-500/10 px-4 py-2.5 text-xs text-red-300 ring-1 ring-inset ring-red-400/20"></p>
 
-                            <button x-show="state === 'idle' || state === 'error'" @click="connect()" class="btn-primary btn-sm mt-1">
-                                <span x-text="state === 'error' ? 'Try again' : 'Connect'"></span>
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <button x-show="state === 'idle' || state === 'error'" @click="connect()" class="btn-primary btn-sm mt-1">
+                                    <span x-text="state === 'error' ? 'Try again' : 'Connect'"></span>
+                                </button>
+                                <button x-show="log.length" @click="showLog = !showLog" x-cloak
+                                        class="mt-1 rounded-lg px-2.5 py-1.5 text-xs text-ink-400 hover:text-white">
+                                    <span x-text="showLog ? 'Hide details' : 'Details'"></span>
+                                </button>
+                            </div>
+
+                            {{-- Connection trail. A stalled handshake reports nothing
+                                 on screen, so this is what makes it diagnosable. --}}
+                            <div x-show="showLog" x-cloak class="w-full max-w-md">
+                                <pre class="max-h-40 overflow-auto rounded-xl bg-black/40 p-3 text-left font-mono text-[10px] leading-relaxed text-ink-300"><template x-for="line in log" :key="line"><span x-text="line + '\n'"></span></template></pre>
+                                <button @click="copyLog()" class="mt-2 text-xs text-ink-400 hover:text-white">Copy</button>
+                            </div>
                         </div>
                     </div>
 

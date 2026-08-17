@@ -6,6 +6,9 @@
  * against a token minted server-side and scoped to a single padCode — the
  * account's API keys never reach the browser.
  */
+/** Nothing has connected after this long, so stop pretending it might. */
+const CONNECT_TIMEOUT_MS = 45000;
+
 export default function liveScreen({ tokenUrl, csrf }) {
     return {
         engine: null,
@@ -14,6 +17,21 @@ export default function liveScreen({ tokenUrl, csrf }) {
         hint: '',
         muted: true,
         fullscreen: false,
+        watchdog: null,
+        // A readable trail of what the SDK reported, shown when a connection
+        // fails. Without it a stalled handshake is just a spinner forever.
+        log: [],
+        showLog: false,
+
+        note(message) {
+            const at = new Date().toLocaleTimeString();
+            this.log.push(`${at}  ${message}`);
+            if (this.log.length > 25) this.log.shift();
+        },
+
+        copyLog() {
+            navigator.clipboard?.writeText(this.log.join('\n'));
+        },
 
         get isLive() {
             return this.state === 'live';
@@ -33,7 +51,15 @@ export default function liveScreen({ tokenUrl, csrf }) {
 
             this.state = 'connecting';
             this.error = '';
+            this.log = [];
             this.hint = 'Asking VMOS for a session…';
+
+            // Streaming needs a secure page. On http:// the browser withholds
+            // parts of the WebRTC stack, and the handshake tends to stall with
+            // no error at all — worth saying up front rather than after 45s.
+            if (!window.isSecureContext) {
+                this.note('WARNING: page is not served over HTTPS — WebRTC is restricted on insecure origins.');
+            }
 
             let session;
             try {
@@ -52,25 +78,23 @@ export default function liveScreen({ tokenUrl, csrf }) {
 
                 if (!res.ok) throw new Error(session.error || 'Could not start a session.');
             } catch (e) {
-                this.state = 'error';
-                this.error = e.message || 'Could not reach the server.';
+                this.fail(e.message || 'Could not reach the server.');
                 return;
             }
 
+            this.note(`session issued for ${session.padCode} via ${session.baseUrl}`);
             this.hint = 'Loading the player…';
 
             let ArmcloudEngine;
             try {
                 ({ ArmcloudEngine } = await import('armcloud-rtc'));
             } catch (e) {
-                this.state = 'error';
-                this.error = 'The screen player failed to load. Refresh the page and try again.';
+                this.fail('The screen player failed to load. Refresh the page and try again.');
                 return;
             }
 
             if (!ArmcloudEngine.isSupported()) {
-                this.state = 'error';
-                this.error = 'This browser can\'t stream the screen. Try Chrome, Edge or Safari.';
+                this.fail('This browser can\'t stream the screen. Try Chrome, Edge or Safari.');
                 return;
             }
 
@@ -94,34 +118,91 @@ export default function liveScreen({ tokenUrl, csrf }) {
                     autoRecoveryTime: 300,
                 },
                 callbacks: {
+                    onInit: ({ code, msg } = {}) => {
+                        this.note(`init: code=${code}${msg ? ` msg=${msg}` : ''}`);
+                    },
+                    onSocketCallback: ({ code, msg } = {}) => {
+                        this.note(`signalling: code=${code}${msg ? ` msg=${msg}` : ''}`);
+                    },
+                    onConnectionStateChanged: ({ state, code, msg } = {}) => {
+                        this.note(`state=${state}${code ? ` code=${code}` : ''}${msg ? ` msg=${msg}` : ''}`);
+                    },
                     onConnectSuccess: () => {
+                        this.note('joined the room');
+                        this.hint = 'Waiting for the first frame…';
+                    },
+                    // The room is joined before any video arrives, so this —
+                    // not onConnectSuccess — is the moment there's a picture.
+                    onRenderedFirstFrame: () => {
+                        this.note('first frame rendered');
+                        this.clearWatchdog();
                         this.state = 'live';
                         this.hint = '';
                         this.resize();
                     },
                     onConnectFail: ({ code, msg } = {}) => {
-                        this.state = 'error';
-                        this.error = `Couldn't connect to the device${msg ? `: ${msg}` : ''}${code ? ` (code ${code})` : ''}.`;
+                        this.note(`connect failed: code=${code}${msg ? ` msg=${msg}` : ''}`);
+                        this.fail(`Couldn't connect to the device${msg ? `: ${msg}` : ''}${code ? ` (code ${code})` : ''}.`);
                     },
-                    onErrorMessage: ({ msg } = {}) => {
+                    onErrorMessage: ({ code, msg } = {}) => {
+                        this.note(`error: code=${code}${msg ? ` msg=${msg}` : ''}`);
                         if (msg) this.error = msg;
+                    },
+                    onVideoError: (e) => this.note(`video error: ${e?.msg || 'unknown'}`),
+                    onAudioError: (e) => this.note(`audio error: ${e?.msg || 'unknown'}`),
+                    // The browser refused to autoplay; a click is needed.
+                    onAutoplayFailed: () => {
+                        this.note('autoplay blocked');
+                        this.hint = 'Click the screen to start playback.';
                     },
                     // Fires when the phone is idle long enough that VMOS drops
                     // the stream to save bandwidth — not a failure.
                     onAutoRecoveryTime: () => {
+                        this.note('dropped after inactivity');
+                        this.clearWatchdog();
                         this.state = 'idle';
                         this.hint = 'Disconnected after a period of inactivity.';
                     },
                     onUserLeave: () => {
+                        this.note('session ended');
+                        this.clearWatchdog();
                         this.state = 'idle';
                     },
                 },
             });
 
+            // Nothing above is guaranteed to fire. A stalled handshake reports
+            // nothing at all, which is exactly the case worth catching.
+            this.watchdog = setTimeout(() => {
+                if (this.state !== 'live') {
+                    this.fail(
+                        window.isSecureContext
+                            ? 'The device didn\'t start streaming. This is usually the streaming region (VMOS_SDK_BASE_URL) or a network blocking WebRTC.'
+                            : 'The device didn\'t start streaming. This page isn\'t using HTTPS, which browsers require for video streaming — enable SSL and try again.'
+                    );
+                }
+            }, CONNECT_TIMEOUT_MS);
+
             this.engine.start();
         },
 
+        fail(message) {
+            this.clearWatchdog();
+            this.state = 'error';
+            this.hint = '';
+            this.error = message;
+        },
+
+        clearWatchdog() {
+            if (this.watchdog) {
+                clearTimeout(this.watchdog);
+                this.watchdog = null;
+            }
+        },
+
         disconnect() {
+            this.clearWatchdog();
+
             try {
                 this.engine?.stop();
             } catch (e) {
