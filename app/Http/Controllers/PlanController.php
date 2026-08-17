@@ -16,6 +16,8 @@ class PlanController extends Controller
         $search = $request->string('q')->trim()->value();
         $android = $request->string('android')->trim()->value();
         $duration = $request->string('duration')->trim()->value();
+        $model = $request->string('model')->trim()->value();
+        $region = $request->string('region')->trim()->value();
 
         // Paginate device families rather than individual plans: a customer
         // wants to pick a phone first and a duration second, and rendering
@@ -46,7 +48,11 @@ class PlanController extends Controller
             'search' => $search,
             'android' => $android,
             'duration' => $duration,
+            'model' => $model,
+            'region' => $region,
             'androidVersions' => $this->facet('android_version'),
+            'models' => $this->facet('config_model'),
+            'regions' => $this->facet('default_country_code'),
             'durations' => Sku::available()
                 ->cloudPhones()
                 ->select('duration_minutes', 'duration_label')
@@ -70,7 +76,9 @@ class PlanController extends Controller
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('config_model', 'like', "%{$search}%")))
             ->when($request->filled('android'), fn ($q) => $q->where('android_version', $request->string('android')->value()))
-            ->when($request->filled('duration'), fn ($q) => $q->where('duration_minutes', (int) $request->string('duration')->value()));
+            ->when($request->filled('duration'), fn ($q) => $q->where('duration_minutes', (int) $request->string('duration')->value()))
+            ->when($request->filled('model'), fn ($q) => $q->where('config_model', $request->string('model')->value()))
+            ->when($request->filled('region'), fn ($q) => $q->where('default_country_code', $request->string('region')->value()));
     }
 
     /** @return array<int, string> */

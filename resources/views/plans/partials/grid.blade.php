@@ -55,6 +55,20 @@
             @endforeach
         </select>
 
+        <select name="model" class="input w-auto" onchange="this.form.submit()">
+            <option value="">Any model</option>
+            @foreach ($models as $m)
+                <option value="{{ $m }}" @selected($model === (string) $m)>{{ $m }}</option>
+            @endforeach
+        </select>
+
+        <select name="region" class="input w-auto" onchange="this.form.submit()">
+            <option value="">Any region</option>
+            @foreach ($regions as $r)
+                <option value="{{ $r }}" @selected($region === (string) $r)>{{ $r }}</option>
+            @endforeach
+        </select>
+
         <select name="duration" class="input w-auto" onchange="this.form.submit()">
             <option value="">Any duration</option>
             @foreach ($durations as $d)
@@ -66,7 +80,7 @@
 
         <button class="btn-primary">Search</button>
 
-        @if ($search || $android || $duration)
+        @if ($search || $android || $duration || $model || $region)
             <a href="{{ route('plans.index') }}" class="btn-ghost btn-sm">Clear</a>
         @endif
     </form>
@@ -80,7 +94,7 @@
     @else
         <p class="mt-6 text-sm text-ink-500">
             {{ number_format($groups->total()) }} {{ Str::plural('device', $groups->total()) }} available
-            @if ($search || $android || $duration) for this search @endif
+            @if ($search || $android || $duration || $model || $region) for this search @endif
             · showing {{ $groups->firstItem() }}–{{ $groups->lastItem() }}
         </p>
 

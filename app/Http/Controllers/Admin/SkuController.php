@@ -36,8 +36,12 @@ class SkuController extends Controller
             'search' => $request->string('q')->trim()->value(),
             'android' => $request->string('android')->trim()->value(),
             'duration' => $request->string('duration')->trim()->value(),
+            'model' => $request->string('model')->trim()->value(),
+            'region' => $request->string('region')->trim()->value(),
             'status' => $request->string('status')->trim()->value(),
             'androidVersions' => $this->androidVersions(),
+            'models' => $this->models(),
+            'regions' => $this->regions(),
             'durations' => $this->durations(),
             'stats' => [
                 'total' => Sku::where('type', $type)->count(),
@@ -65,6 +69,8 @@ class SkuController extends Controller
                 ->orWhere('config_model', 'like', "%{$search}%")
                 ->orWhere('duration_label', 'like', "%{$search}%")))
             ->when($request->filled('android'), fn ($q) => $q->where('android_version', $request->string('android')->value()))
+            ->when($request->filled('model'), fn ($q) => $q->where('config_model', $request->string('model')->value()))
+            ->when($request->filled('region'), fn ($q) => $q->where('default_country_code', $request->string('region')->value()))
             ->when($request->filled('duration'), fn ($q) => $q->where('duration_minutes', (int) $request->string('duration')->value()))
             ->when($request->string('status')->value() === 'live', fn ($q) => $q->where('active', true))
             ->when($request->string('status')->value() === 'hidden', fn ($q) => $q->where('active', false))
@@ -81,6 +87,32 @@ class SkuController extends Controller
             ->distinct()
             ->orderBy('android_version')
             ->pluck('android_version')
+            ->all();
+    }
+
+    /** @return array<int, string> */
+    protected function models(): array
+    {
+        return Sku::query()
+            ->cloudPhones()
+            ->whereNotNull('config_model')
+            ->where('config_model', '!=', '')
+            ->distinct()
+            ->orderBy('config_model')
+            ->pluck('config_model')
+            ->all();
+    }
+
+    /** @return array<int, string> */
+    protected function regions(): array
+    {
+        return Sku::query()
+            ->cloudPhones()
+            ->whereNotNull('default_country_code')
+            ->where('default_country_code', '!=', '')
+            ->distinct()
+            ->orderBy('default_country_code')
+            ->pluck('default_country_code')
             ->all();
     }
 
