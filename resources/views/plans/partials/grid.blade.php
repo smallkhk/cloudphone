@@ -38,8 +38,23 @@
         @endauth
     </div>
 @else
+    {{-- Device type — VMOS's own "Standard" vs "High-end Real Machine" split --}}
+    <div class="mb-4 flex gap-2 border-b border-ink-200">
+        @foreach ([
+            ['', 'All devices'],
+            ['standard', 'Standard'],
+            ['high_end', 'High-end Real Machine'],
+        ] as [$value, $label])
+            <a href="{{ route('plans.index', array_filter(['tier' => $value ?: null, 'q' => $search, 'android' => $android, 'model' => $model, 'region' => $region, 'duration' => $duration])) }}"
+               class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $tier === $value ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
+                {{ $label }}
+            </a>
+        @endforeach
+    </div>
+
     {{-- Search & filters --}}
     <form method="GET" action="{{ route('plans.index') }}" class="card flex flex-wrap items-center gap-2 p-4">
+        <input type="hidden" name="tier" value="{{ $tier }}">
         <div class="relative min-w-[14rem] flex-1">
             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
@@ -81,7 +96,7 @@
         <button class="btn-primary">Search</button>
 
         @if ($search || $android || $duration || $model || $region)
-            <a href="{{ route('plans.index') }}" class="btn-ghost btn-sm">Clear</a>
+            <a href="{{ route('plans.index', array_filter(['tier' => $tier ?: null])) }}" class="btn-ghost btn-sm">Clear</a>
         @endif
     </form>
 
@@ -119,7 +134,12 @@
                         </span>
 
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate text-base font-bold tracking-tight text-ink-900">{{ $group->name }}</span>
+                            <span class="flex items-center gap-2">
+                                <span class="truncate text-base font-bold tracking-tight text-ink-900">{{ $group->name }}</span>
+                                <span class="{{ $first->deviceTier() === 'standard' ? 'badge-gray' : 'badge-blue' }} flex-none">
+                                    {{ $first->deviceTier() === 'standard' ? 'Standard' : 'High-end Real Machine' }}
+                                </span>
+                            </span>
                             <span class="mt-0.5 block text-sm text-ink-500">
                                 Android {{ $first->android_version }}
                                 @if ($first->config_model) · {{ $first->config_model }} @endif

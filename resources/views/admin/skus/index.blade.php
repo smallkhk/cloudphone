@@ -35,6 +35,21 @@
         </a>
     </div>
 
+    @if ($type === 'cloud_phone')
+        <div class="mt-4 flex gap-2">
+            @foreach ([
+                ['', 'All devices'],
+                ['standard', 'Standard'],
+                ['high_end', 'High-end Real Machine'],
+            ] as [$value, $label])
+                <a href="{{ route('admin.skus.index', array_filter(['tier' => $value ?: null])) }}"
+                   class="rounded-full px-3 py-1.5 text-xs font-medium {{ $tier === $value ? 'bg-brand-600 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200' }}">
+                    {{ $label }}
+                </a>
+            @endforeach
+        </div>
+    @endif
+
     @if ($type === 'phone_number')
         <div class="mt-6 flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20">
             <svg class="h-5 w-5 flex-none text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -65,6 +80,7 @@
         <input type="hidden" name="android" value="{{ $android }}">
         <input type="hidden" name="model" value="{{ $model }}">
         <input type="hidden" name="region" value="{{ $region }}">
+        <input type="hidden" name="tier" value="{{ $tier }}">
         <input type="hidden" name="duration" value="{{ $duration }}">
         <input type="hidden" name="status" value="{{ $status }}">
 
@@ -94,6 +110,7 @@
         {{-- Search & filters --}}
         <form method="GET" class="flex flex-wrap items-center gap-2 p-5">
             <input type="hidden" name="type" value="{{ $type }}">
+            <input type="hidden" name="tier" value="{{ $tier }}">
             <div class="relative min-w-[14rem] flex-1">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
@@ -143,7 +160,7 @@
             <button class="btn-secondary">Search</button>
 
             @if ($search || $android || $duration || $status || $model || $region)
-                <a href="{{ route('admin.skus.index', ['type' => $type]) }}" class="btn-ghost btn-sm">Clear</a>
+                <a href="{{ route('admin.skus.index', array_filter(['type' => $type, 'tier' => $tier ?: null])) }}" class="btn-ghost btn-sm">Clear</a>
             @endif
         </form>
 
@@ -160,6 +177,7 @@
                         <input type="hidden" name="android" value="{{ $android }}">
                         <input type="hidden" name="model" value="{{ $model }}">
                         <input type="hidden" name="region" value="{{ $region }}">
+                        <input type="hidden" name="tier" value="{{ $tier }}">
                         <input type="hidden" name="duration" value="{{ $duration }}">
                         <input type="hidden" name="status" value="{{ $status }}">
                         <button class="btn-secondary btn-sm"
@@ -198,7 +216,8 @@
                                 <p class="text-sm font-medium text-ink-900">{{ $sku->name }}</p>
                                 <p class="text-xs text-ink-500">
                                     @if ($sku->type === 'cloud_phone')
-                                        Android {{ $sku->android_version }}
+                                        <span class="{{ $sku->deviceTier() === 'standard' ? 'badge-gray' : 'badge-blue' }}">{{ $sku->deviceTier() === 'standard' ? 'Standard' : 'High-end' }}</span>
+                                        · Android {{ $sku->android_version }}
                                     @elseif ($sku->type === 'phone_number')
                                         {{ $sku->default_country_code ?: $sku->config_model }}
                                     @else
@@ -236,7 +255,7 @@
                             <td colspan="7" class="py-14 text-center">
                                 @if ($search || $android || $duration || $status || $model || $region)
                                     <p class="text-sm text-ink-500">No plans match that search.</p>
-                                    <a href="{{ route('admin.skus.index', ['type' => $type]) }}" class="btn-secondary btn-sm mt-4">Clear filters</a>
+                                    <a href="{{ route('admin.skus.index', array_filter(['type' => $type, 'tier' => $tier ?: null])) }}" class="btn-secondary btn-sm mt-4">Clear filters</a>
                                 @else
                                     <p class="text-sm text-ink-500">No plans synced yet.</p>
                                     <p class="mt-1 text-xs text-ink-400">Add your VMOS credentials in Settings, then hit “Sync from VMOS”.</p>

@@ -30,6 +30,10 @@ class Sku extends Model
     // See CLAUDE.md: the underlying VMOS endpoints are unconfirmed.
     public const TYPE_PHONE_NUMBER = 'phone_number';
 
+    public const TIER_STANDARD = 'standard';
+
+    public const TIER_HIGH_END = 'high_end';
+
     protected function casts(): array
     {
         return [
@@ -75,5 +79,35 @@ class Sku extends Model
     public function isPhoneNumber(): bool
     {
         return $this->type === self::TYPE_PHONE_NUMBER;
+    }
+
+    /**
+     * VMOS's getCloudGoodList doesn't expose a device-tier field, so this
+     * mirrors the owner's own rule from the VMOS console: config_model names
+     * starting "V0…" (V03/V04/V06/V08…) are the virtual "Standard" line;
+     * every other model name (Samsung Galaxy A53, Pixel 8, …) is a real
+     * physical device — VMOS's "High-end Real Machine" line. If VMOS adds a
+     * model outside that naming (e.g. a V1x), this rule needs revisiting.
+     */
+    public function deviceTier(): string
+    {
+        return self::isStandardModel($this->config_model) ? self::TIER_STANDARD : self::TIER_HIGH_END;
+    }
+
+    public static function isStandardModel(?string $configModel): bool
+    {
+        return $configModel !== null && str_starts_with(strtoupper($configModel), 'V0');
+    }
+
+    public function scopeStandardTier($query)
+    {
+        return $query->whereRaw('UPPER(config_model) LIKE ?', ['V0%']);
+    }
+
+    public function scopeHighEndTier($query)
+    {
+        return $query->where(fn ($q) => $q
+            ->whereNull('config_model')
+            ->orWhereRaw('UPPER(config_model) NOT LIKE ?', ['V0%']));
     }
 }

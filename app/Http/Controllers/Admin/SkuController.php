@@ -38,6 +38,7 @@ class SkuController extends Controller
             'duration' => $request->string('duration')->trim()->value(),
             'model' => $request->string('model')->trim()->value(),
             'region' => $request->string('region')->trim()->value(),
+            'tier' => $request->string('tier')->trim()->value(),
             'status' => $request->string('status')->trim()->value(),
             'androidVersions' => $this->androidVersions(),
             'models' => $this->models(),
@@ -72,6 +73,8 @@ class SkuController extends Controller
             ->when($request->filled('model'), fn ($q) => $q->where('config_model', $request->string('model')->value()))
             ->when($request->filled('region'), fn ($q) => $q->where('default_country_code', $request->string('region')->value()))
             ->when($request->filled('duration'), fn ($q) => $q->where('duration_minutes', (int) $request->string('duration')->value()))
+            ->when($request->string('tier')->value() === Sku::TIER_STANDARD, fn ($q) => $q->standardTier())
+            ->when($request->string('tier')->value() === Sku::TIER_HIGH_END, fn ($q) => $q->highEndTier())
             ->when($request->string('status')->value() === 'live', fn ($q) => $q->where('active', true))
             ->when($request->string('status')->value() === 'hidden', fn ($q) => $q->where('active', false))
             ->when($request->string('status')->value() === 'unpriced', fn ($q) => $q->where(fn ($w) => $w->whereNull('price')->orWhere('price', 0)));
