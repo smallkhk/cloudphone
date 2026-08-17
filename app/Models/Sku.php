@@ -83,31 +83,31 @@ class Sku extends Model
 
     /**
      * VMOS's getCloudGoodList doesn't expose a device-tier field, so this
-     * mirrors the owner's own rule from the VMOS console: config_model names
+     * mirrors the owner's own rule from the VMOS console: device names
      * starting "V0…" (V03/V04/V06/V08…) are the virtual "Standard" line;
-     * every other model name (Samsung Galaxy A53, Pixel 8, …) is a real
-     * physical device — VMOS's "High-end Real Machine" line. If VMOS adds a
+     * every other device name (Samsung Galaxy A53, Pixel 8, …) is a real
+     * physical device — VMOS's "High-end Real Machine" line. The V0x code is
+     * the device's `name` (configName — what's shown as the card title), NOT
+     * `config_model`, which holds something else entirely. If VMOS adds a
      * model outside that naming (e.g. a V1x), this rule needs revisiting.
      */
     public function deviceTier(): string
     {
-        return self::isStandardModel($this->config_model) ? self::TIER_STANDARD : self::TIER_HIGH_END;
+        return self::isStandardModel($this->name) ? self::TIER_STANDARD : self::TIER_HIGH_END;
     }
 
-    public static function isStandardModel(?string $configModel): bool
+    public static function isStandardModel(?string $name): bool
     {
-        return $configModel !== null && str_starts_with(strtoupper($configModel), 'V0');
+        return $name !== null && str_starts_with(strtoupper(trim($name)), 'V0');
     }
 
     public function scopeStandardTier($query)
     {
-        return $query->whereRaw('UPPER(config_model) LIKE ?', ['V0%']);
+        return $query->whereRaw('UPPER(name) LIKE ?', ['V0%']);
     }
 
     public function scopeHighEndTier($query)
     {
-        return $query->where(fn ($q) => $q
-            ->whereNull('config_model')
-            ->orWhereRaw('UPPER(config_model) NOT LIKE ?', ['V0%']));
+        return $query->whereRaw('UPPER(name) NOT LIKE ?', ['V0%']);
     }
 }
