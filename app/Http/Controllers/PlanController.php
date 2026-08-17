@@ -20,7 +20,6 @@ class PlanController extends Controller
         $android = $request->string('android')->trim()->value();
         $duration = $request->string('duration')->trim()->value();
         $model = $request->string('model')->trim()->value();
-        $region = $request->string('region')->trim()->value();
         $tier = $request->string('tier')->trim()->value();
 
         // Paginate device families rather than individual plans: a customer
@@ -53,16 +52,13 @@ class PlanController extends Controller
             'android' => $android,
             'duration' => $duration,
             'model' => $model,
-            'region' => $region,
             'tier' => $tier,
             'androidVersions' => $this->facet('android_version'),
             'models' => $this->facet('config_model'),
-            'regions' => $this->facet('default_country_code'),
-            // Purchase-time region picker, separate from the "regions" browse
-            // filter above (which is only ever populated if an admin sets a
-            // per-plan default) — this is VMOS's live supported-country list,
-            // and lets the customer choose which region their new device is
-            // provisioned in, whatever's picked is passed straight through to
+            // Region isn't a property of a plan — any device/duration can be
+            // bought in any region — so it's not a browse filter. It's a
+            // purchase-time choice: VMOS's live supported-country list, shown
+            // on each "Buy now" form and passed straight through to
             // createOrder as countryCode.
             'regionOptions' => $this->regionCatalog->options(),
             'durations' => Sku::available()
@@ -90,7 +86,6 @@ class PlanController extends Controller
             ->when($request->filled('android'), fn ($q) => $q->where('android_version', $request->string('android')->value()))
             ->when($request->filled('duration'), fn ($q) => $q->where('duration_minutes', (int) $request->string('duration')->value()))
             ->when($request->filled('model'), fn ($q) => $q->where('config_model', $request->string('model')->value()))
-            ->when($request->filled('region'), fn ($q) => $q->where('default_country_code', $request->string('region')->value()))
             ->when($request->string('tier')->value() === Sku::TIER_STANDARD, fn ($q) => $q->standardTier())
             ->when($request->string('tier')->value() === Sku::TIER_HIGH_END, fn ($q) => $q->highEndTier());
     }

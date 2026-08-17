@@ -79,7 +79,6 @@
         <input type="hidden" name="q" value="{{ $search }}">
         <input type="hidden" name="android" value="{{ $android }}">
         <input type="hidden" name="model" value="{{ $model }}">
-        <input type="hidden" name="region" value="{{ $region }}">
         <input type="hidden" name="tier" value="{{ $tier }}">
         <input type="hidden" name="duration" value="{{ $duration }}">
         <input type="hidden" name="status" value="{{ $status }}">
@@ -133,13 +132,6 @@
                     @endforeach
                 </select>
 
-                <select name="region" class="input w-auto">
-                    <option value="">Any region</option>
-                    @foreach ($regions as $r)
-                        <option value="{{ $r }}" @selected($region === (string) $r)>{{ $r }}</option>
-                    @endforeach
-                </select>
-
                 <select name="duration" class="input w-auto">
                     <option value="">Any duration</option>
                     @foreach ($durations as $d)
@@ -159,13 +151,13 @@
 
             <button class="btn-secondary">Search</button>
 
-            @if ($search || $android || $duration || $status || $model || $region)
+            @if ($search || $android || $duration || $status || $model)
                 <a href="{{ route('admin.skus.index', array_filter(['type' => $type, 'tier' => $tier ?: null])) }}" class="btn-ghost btn-sm">Clear</a>
             @endif
         </form>
 
         {{-- Show/hide everything currently matching --}}
-        @if ($search || $android || $duration || $status || $model || $region)
+        @if ($search || $android || $duration || $status || $model)
             <div class="flex flex-wrap items-center gap-2 border-t border-ink-100 bg-ink-50/60 px-5 py-3 text-sm text-ink-600">
                 <span>Apply to all {{ number_format($stats['matching']) }} matching plan(s):</span>
                 @foreach ([['1', 'Show on storefront'], ['0', 'Hide from storefront']] as [$value, $label])
@@ -176,8 +168,7 @@
                         <input type="hidden" name="q" value="{{ $search }}">
                         <input type="hidden" name="android" value="{{ $android }}">
                         <input type="hidden" name="model" value="{{ $model }}">
-                        <input type="hidden" name="region" value="{{ $region }}">
-                        <input type="hidden" name="tier" value="{{ $tier }}">
+                                                <input type="hidden" name="tier" value="{{ $tier }}">
                         <input type="hidden" name="duration" value="{{ $duration }}">
                         <input type="hidden" name="status" value="{{ $status }}">
                         <button class="btn-secondary btn-sm"
@@ -253,7 +244,7 @@
                     @empty
                         <tr>
                             <td colspan="7" class="py-14 text-center">
-                                @if ($search || $android || $duration || $status || $model || $region)
+                                @if ($search || $android || $duration || $status || $model)
                                     <p class="text-sm text-ink-500">No plans match that search.</p>
                                     <a href="{{ route('admin.skus.index', array_filter(['type' => $type, 'tier' => $tier ?: null])) }}" class="btn-secondary btn-sm mt-4">Clear filters</a>
                                 @else

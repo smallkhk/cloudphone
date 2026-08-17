@@ -37,12 +37,10 @@ class SkuController extends Controller
             'android' => $request->string('android')->trim()->value(),
             'duration' => $request->string('duration')->trim()->value(),
             'model' => $request->string('model')->trim()->value(),
-            'region' => $request->string('region')->trim()->value(),
             'tier' => $request->string('tier')->trim()->value(),
             'status' => $request->string('status')->trim()->value(),
             'androidVersions' => $this->androidVersions(),
             'models' => $this->models(),
-            'regions' => $this->regions(),
             'durations' => $this->durations(),
             'stats' => [
                 'total' => Sku::where('type', $type)->count(),
@@ -71,7 +69,6 @@ class SkuController extends Controller
                 ->orWhere('duration_label', 'like', "%{$search}%")))
             ->when($request->filled('android'), fn ($q) => $q->where('android_version', $request->string('android')->value()))
             ->when($request->filled('model'), fn ($q) => $q->where('config_model', $request->string('model')->value()))
-            ->when($request->filled('region'), fn ($q) => $q->where('default_country_code', $request->string('region')->value()))
             ->when($request->filled('duration'), fn ($q) => $q->where('duration_minutes', (int) $request->string('duration')->value()))
             ->when($request->string('tier')->value() === Sku::TIER_STANDARD, fn ($q) => $q->standardTier())
             ->when($request->string('tier')->value() === Sku::TIER_HIGH_END, fn ($q) => $q->highEndTier())
@@ -103,19 +100,6 @@ class SkuController extends Controller
             ->distinct()
             ->orderBy('config_model')
             ->pluck('config_model')
-            ->all();
-    }
-
-    /** @return array<int, string> */
-    protected function regions(): array
-    {
-        return Sku::query()
-            ->cloudPhones()
-            ->whereNotNull('default_country_code')
-            ->where('default_country_code', '!=', '')
-            ->distinct()
-            ->orderBy('default_country_code')
-            ->pluck('default_country_code')
             ->all();
     }
 

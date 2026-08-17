@@ -45,7 +45,7 @@
             ['standard', 'Standard'],
             ['high_end', 'High-end Real Machine'],
         ] as [$value, $label])
-            <a href="{{ route('plans.index', array_filter(['tier' => $value ?: null, 'q' => $search, 'android' => $android, 'model' => $model, 'region' => $region, 'duration' => $duration])) }}"
+            <a href="{{ route('plans.index', array_filter(['tier' => $value ?: null, 'q' => $search, 'android' => $android, 'model' => $model, 'duration' => $duration])) }}"
                class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $tier === $value ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
                 {{ $label }}
             </a>
@@ -77,13 +77,6 @@
             @endforeach
         </select>
 
-        <select name="region" class="input w-auto" onchange="this.form.submit()">
-            <option value="">Any region</option>
-            @foreach ($regions as $r)
-                <option value="{{ $r }}" @selected($region === (string) $r)>{{ $r }}</option>
-            @endforeach
-        </select>
-
         <select name="duration" class="input w-auto" onchange="this.form.submit()">
             <option value="">Any duration</option>
             @foreach ($durations as $d)
@@ -95,7 +88,7 @@
 
         <button class="btn-primary">Search</button>
 
-        @if ($search || $android || $duration || $model || $region)
+        @if ($search || $android || $duration || $model)
             <a href="{{ route('plans.index', array_filter(['tier' => $tier ?: null])) }}" class="btn-ghost btn-sm">Clear</a>
         @endif
     </form>
@@ -109,7 +102,7 @@
     @else
         <p class="mt-6 text-sm text-ink-500">
             {{ number_format($groups->total()) }} {{ Str::plural('device', $groups->total()) }} available
-            @if ($search || $android || $duration || $model || $region) for this search @endif
+            @if ($search || $android || $duration || $model) for this search @endif
             · showing {{ $groups->firstItem() }}–{{ $groups->lastItem() }}
         </p>
 
