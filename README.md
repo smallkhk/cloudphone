@@ -25,22 +25,28 @@ workers required — a single cron entry drives everything).
 6. Customers manage their cloud phones (restart / reset / screenshot) from
    **My Cloud Phones**.
 
-### Email verification accounts
+### Email & phone verification (VMOS "Captcha Service")
 
-The same checkout pipeline also sells pre-made **email accounts** for service
-registrations (GitHub, TikTok, …), with verification-code retrieval — VMOS's
-`…/padApi/*Email*` endpoints. From **Email accounts** a customer buys one or
-more accounts; once paid, `EmailAccountProvisioner` buys them from VMOS
-(`createEmailOrder`) and the address/password appear on the order. A **Check
-for code** button polls `getEmailOrder` for the latest verification code.
+The same checkout pipeline also sells VMOS's **Captcha Service** bundle:
+pre-made **email accounts** and temporary **phone numbers** for service
+registrations (GitHub, TikTok, …), each with verification-code retrieval.
+From **Email accounts** / **Phone numbers** a customer buys one; once paid,
+`EmailAccountProvisioner` / `PhoneNumberProvisioner` buy it from VMOS and the
+address or number appears on the order. A **Check for code** button polls
+VMOS for the latest verification code.
 
-Sync the catalogue with `php artisan vmos:sync-email-skus` (also runs hourly),
-and set prices under **Admin → Plans & pricing → Email accounts**.
+Sync the catalogues with `php artisan vmos:sync-email-skus` /
+`vmos:sync-sms-skus` (both hourly), and set prices under **Admin → Plans &
+pricing → Email accounts / Phone numbers**.
 
-> **No virtual phone numbers.** VMOS does not sell an SMS-receiving / virtual
-> phone number product — `simulateSendSms` only injects a fake SMS into a
-> device you already own, it can't receive a real one. Only email accounts are
-> offered here.
+> **Phone numbers are unverified.** VMOS's published API docs only document
+> the email side of Captcha Service — the SMS/phone-number endpoints used
+> here (`getSmsServiceList`, `getSmsTypeList`, `createSmsOrder`, `getSmsOrder`,
+> `getSmsCode`) are a best-effort guess mirroring the confirmed email
+> endpoints' naming, not something VMOS documents. New phone-number SKUs sync
+> in **hidden** for exactly this reason — check **Admin → API diagnostics**
+> (the `sms_*` probes) against your real VMOS account and confirm a real
+> purchase works before making one live to customers.
 
 ## Admin panel
 

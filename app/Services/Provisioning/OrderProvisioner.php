@@ -15,6 +15,7 @@ class OrderProvisioner
     public function __construct(
         protected CloudPhoneProvisioner $cloudPhones,
         protected EmailAccountProvisioner $emailAccounts,
+        protected PhoneNumberProvisioner $phoneNumbers,
     ) {
     }
 
@@ -24,6 +25,7 @@ class OrderProvisioner
 
         match ($order->sku?->type) {
             Sku::TYPE_EMAIL_ACCOUNT => $this->emailAccounts->provision($order),
+            Sku::TYPE_PHONE_NUMBER => $this->phoneNumbers->provision($order),
             default => $this->cloudPhones->provision($order),
         };
     }

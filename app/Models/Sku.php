@@ -25,6 +25,11 @@ class Sku extends Model
     // duration_minutes are unused (0 / '') for this type — see SyncEmailSkus.
     public const TYPE_EMAIL_ACCOUNT = 'email_account';
 
+    // A temporary phone number for SMS verification codes — VMOS's "Captcha
+    // Service" (SMS half). Same unused-column convention as TYPE_EMAIL_ACCOUNT.
+    // See CLAUDE.md: the underlying VMOS endpoints are unconfirmed.
+    public const TYPE_PHONE_NUMBER = 'phone_number';
+
     protected function casts(): array
     {
         return [
@@ -57,8 +62,18 @@ class Sku extends Model
         return $query->where('type', self::TYPE_EMAIL_ACCOUNT);
     }
 
+    public function scopePhoneNumbers($query)
+    {
+        return $query->where('type', self::TYPE_PHONE_NUMBER);
+    }
+
     public function isEmailAccount(): bool
     {
         return $this->type === self::TYPE_EMAIL_ACCOUNT;
+    }
+
+    public function isPhoneNumber(): bool
+    {
+        return $this->type === self::TYPE_PHONE_NUMBER;
     }
 }

@@ -385,17 +385,15 @@ class VmosCloudPhoneService
     // --- Email verification accounts --------------------------------------
     //
     // VMOS sells pre-made email accounts for service-registration flows
-    // (GitHub, TikTok, …) with verification-code retrieval. There is NO
-    // virtual phone number / SMS-receiving product — simulateSendSms only
-    // injects a fake SMS into a device you already own, it does not provision
-    // a real inbound number.
+    // (GitHub, TikTok, …) with verification-code retrieval.
     //
-    // The VMOS OpenAPI docs list these four paths but don't publish full
-    // request/response field names the way they do for the phone-plan
-    // endpoints. Parameter names below follow the same conventions used
-    // elsewhere in this API (goodId/goodNum-style purchase, current/size-style
-    // pagination) but are NOT confirmed against a live account. Check
-    // Admin → Diagnostics after adding credentials, before relying on this.
+    // Endpoints confirmed against VMOS's published OpenAPI spec (tag "Email
+    // Verification Service") — five paths, matching CLAUDE.md. Full
+    // request/response field names still aren't published the way they are
+    // for the phone-plan endpoints, so parameter names follow the same
+    // conventions used elsewhere in this API (goodId/goodNum-style purchase,
+    // current/size-style pagination) but are NOT confirmed against a live
+    // account. Check Admin → Diagnostics after adding credentials.
 
     /** Registration services email accounts are sold for (e.g. GitHub, TikTok). */
     public function emailServiceList(): array
@@ -420,11 +418,7 @@ class VmosCloudPhoneService
         ]);
     }
 
-    /**
-     * Email accounts already purchased on this account, including whatever
-     * verification code VMOS currently has on file for them. Call again to
-     * poll for a fresh code after triggering a "send code" on the target site.
-     */
+    /** Email accounts already purchased on this account. */
     public function emailOrderList(?string $vmosOrderId = null, int $page = 1, int $size = 50): array
     {
         return $this->client->post('/vcpcloud/api/padApi/getEmailOrder', array_filter([
@@ -432,5 +426,77 @@ class VmosCloudPhoneService
             'current' => $page,
             'size' => $size,
         ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * The verification code itself for a purchased email account. A separate
+     * call from emailOrderList() in VMOS's spec — call this to poll for a
+     * fresh code after triggering a "send code" on the target site.
+     */
+    public function emailCode(string $vmosOrderId): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getEmailCode', [
+            'orderId' => $vmosOrderId,
+        ]);
+    }
+
+    // --- SMS / phone verification numbers ----------------------------------
+    //
+    // VMOS's own console sells this bundled with the email service under
+    // "Captcha Service" — a temporary phone number that receives a real SMS
+    // verification code for app/service registrations. It is a genuine,
+    // separately-billed product (confirmed from the VMOS console UI), NOT the
+    // same thing as simulateSendSms (which only injects a fake SMS into a
+    // device you already own).
+    //
+    // UNLIKE the email endpoints above, these paths do NOT appear anywhere in
+    // VMOS's published OpenAPI docs, llms.txt quick reference, or raw spec tag
+    // list as of this writing — only "Email Verification Service" is
+    // documented as a tag. The method/path names below are a best-effort
+    // mirror of the email endpoints' naming (VMOS is consistent about this
+    // elsewhere in the API), but are UNCONFIRMED. Do not enable real customer
+    // checkout for phone-number SKUs until these are verified to return real
+    // data in Admin → Diagnostics — a wrong guess here could take a
+    // customer's payment without delivering a working number.
+
+    /** Registration services phone numbers are sold for. Mirrors emailServiceList(). */
+    public function smsServiceList(): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getSmsServiceList');
+    }
+
+    /** Purchasable phone-number types (by country) and remaining stock. Mirrors emailTypeList(). */
+    public function smsTypeList(?int $serviceId = null): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getSmsTypeList', array_filter([
+            'serviceId' => $serviceId,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** Buys one or more temporary phone numbers of a given type. Mirrors createEmailOrder(). */
+    public function createSmsOrder(int $smsTypeId, int $num = 1): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/createSmsOrder', [
+            'smsTypeId' => $smsTypeId,
+            'num' => $num,
+        ]);
+    }
+
+    /** Phone numbers already purchased on this account. Mirrors emailOrderList(). */
+    public function smsOrderList(?string $vmosOrderId = null, int $page = 1, int $size = 50): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getSmsOrder', array_filter([
+            'orderId' => $vmosOrderId,
+            'current' => $page,
+            'size' => $size,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** The SMS verification code for a purchased number. Mirrors emailCode(). */
+    public function smsCode(string $vmosOrderId): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/getSmsCode', [
+            'orderId' => $vmosOrderId,
+        ]);
     }
 }

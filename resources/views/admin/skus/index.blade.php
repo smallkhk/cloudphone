@@ -3,7 +3,11 @@
         {{-- Plain "&" here: the component escapes it, so "&amp;" would double-escape. --}}
         <x-page-header title="Plans & pricing" subtitle="Your selling price versus what VMOS charges you.">
             <x-slot name="actions">
-                <form method="POST" action="{{ $type === 'email_account' ? route('admin.skus.sync-email') : route('admin.skus.sync') }}">
+                <form method="POST" action="{{ match ($type) {
+                        'email_account' => route('admin.skus.sync-email'),
+                        'phone_number' => route('admin.skus.sync-sms'),
+                        default => route('admin.skus.sync'),
+                    } }}">
                     @csrf
                     <button class="btn-secondary">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -25,7 +29,26 @@
            class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'email_account' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
             Email accounts
         </a>
+        <a href="{{ route('admin.skus.index', ['type' => 'phone_number']) }}"
+           class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'phone_number' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
+            Phone numbers
+        </a>
     </div>
+
+    @if ($type === 'phone_number')
+        <div class="mt-6 flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20">
+            <svg class="h-5 w-5 flex-none text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.71-3L13.71 4a2 2 0 00-3.42 0L3.36 16a2 2 0 001.71 3z" />
+            </svg>
+            <span class="flex-1">
+                <strong>Unverified endpoint.</strong> VMOS's phone-number ("Captcha Service") API isn't in their
+                published docs — this was built by mirroring the email service's naming. Synced SKUs come in
+                <strong>hidden</strong> on purpose. Hit Sync, then check <a href="{{ route('admin.diagnostics.index') }}" class="underline">API diagnostics</a>
+                for the <code>sms_services</code>/<code>sms_types</code> probes before making anything live —
+                a wrong guess here could take a customer's payment without delivering a working number.
+            </span>
+        </div>
+    @endif
 
     <div class="mt-6 grid gap-4 sm:grid-cols-3">
         <x-stat-card label="Plans in catalogue" :value="number_format($stats['total'])" />
@@ -156,10 +179,12 @@
                             <td>
                                 <p class="text-sm font-medium text-ink-900">{{ $sku->name }}</p>
                                 <p class="text-xs text-ink-500">
-                                    @if ($sku->type === 'email_account')
-                                        {{ $sku->config_model }}
-                                    @else
+                                    @if ($sku->type === 'cloud_phone')
                                         Android {{ $sku->android_version }}
+                                    @elseif ($sku->type === 'phone_number')
+                                        {{ $sku->default_country_code ?: $sku->config_model }}
+                                    @else
+                                        {{ $sku->config_model }}
                                     @endif
                                     @if ($sku->sell_out) · <span class="text-red-600">Sold out at VMOS</span> @endif
                                 </p>

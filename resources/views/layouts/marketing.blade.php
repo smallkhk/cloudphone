@@ -17,6 +17,7 @@
             <a href="{{ route('home') }}#use-cases" class="btn-ghost">Use cases</a>
             <a href="{{ route('plans.index') }}" class="btn-ghost">Pricing</a>
             <a href="{{ route('email-accounts.index') }}" class="btn-ghost">Email accounts</a>
+            <a href="{{ route('phone-numbers.index') }}" class="btn-ghost">Phone numbers</a>
             <a href="{{ route('home') }}#faq" class="btn-ghost">FAQ</a>
         </div>
 
@@ -46,6 +47,7 @@
             <a href="{{ route('home') }}#use-cases" @click="open=false" class="btn-ghost justify-start">Use cases</a>
             <a href="{{ route('plans.index') }}" class="btn-ghost justify-start">Pricing</a>
             <a href="{{ route('email-accounts.index') }}" class="btn-ghost justify-start">Email accounts</a>
+            <a href="{{ route('phone-numbers.index') }}" class="btn-ghost justify-start">Phone numbers</a>
             <a href="{{ route('home') }}#faq" @click="open=false" class="btn-ghost justify-start">FAQ</a>
             <div class="mt-3 flex flex-col gap-2 border-t border-ink-100 pt-3">
                 @auth

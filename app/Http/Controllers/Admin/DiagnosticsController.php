@@ -31,6 +31,9 @@ class DiagnosticsController extends Controller
         'email_services' => ['POST', '/vcpcloud/api/padApi/getEmailServiceList', [], 'Email registration services (GitHub, TikTok…)'],
         'email_types' => ['POST', '/vcpcloud/api/padApi/getEmailTypeList', [], 'Email account types & stock'],
         'my_emails' => ['POST', '/vcpcloud/api/padApi/getEmailOrder', ['current' => 1, 'size' => 20], 'Email accounts you own'],
+        'sms_services' => ['POST', '/vcpcloud/api/padApi/getSmsServiceList', [], 'UNCONFIRMED — phone-number registration services'],
+        'sms_types' => ['POST', '/vcpcloud/api/padApi/getSmsTypeList', [], 'UNCONFIRMED — phone-number types & stock'],
+        'my_sms' => ['POST', '/vcpcloud/api/padApi/getSmsOrder', ['current' => 1, 'size' => 20], 'UNCONFIRMED — phone numbers you own'],
     ];
 
     public function index(Request $request, VmosClient $client)

@@ -79,4 +79,9 @@ class Order extends Model
     {
         return $this->hasMany(EmailAccount::class);
     }
+
+    public function phoneNumbers(): HasMany
+    {
+        return $this->hasMany(PhoneNumber::class);
+    }
 }

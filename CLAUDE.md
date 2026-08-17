@@ -21,34 +21,53 @@ provisioning, the per-device control panel (SIM/GPS/locale/proxy/apps/ADB),
 **live screen streaming** via the VMOS H5 SDK, admin panel, and **live chat**
 (Claude or any OpenAI-compatible provider, with human takeover).
 
-**Email verification accounts** (added, NOT yet tested against a live VMOS
-account): reuses the existing Sku/Order/CryptoPayment/OrderController pipeline
-rather than a parallel one — `Sku.type` is now `cloud_phone` or
-`email_account`, and `OrderProvisioner` dispatches a paid order to
-`CloudPhoneProvisioner` or the new `EmailAccountProvisioner` based on that.
-Storefront: `/email-accounts` (`EmailAccountController`). Admin: **Plans &
-pricing** now has an *Email accounts* tab (same page, `?type=email_account`).
-Sync with `php artisan vmos:sync-email-skus` (hourly, like the phone SKUs).
+**Email verification accounts** and **phone verification numbers** (added,
+NOT yet tested against a live VMOS account): both reuse the existing
+Sku/Order/CryptoPayment/OrderController pipeline rather than a parallel one —
+`Sku.type` is `cloud_phone`, `email_account`, or `phone_number`, and
+`OrderProvisioner` dispatches a paid order to `CloudPhoneProvisioner`,
+`EmailAccountProvisioner`, or `PhoneNumberProvisioner` based on that.
+Storefronts: `/email-accounts`, `/phone-numbers`. Admin: **Plans & pricing**
+has *Email accounts* and *Phone numbers* tabs (`?type=email_account` /
+`?type=phone_number`). Sync with `vmos:sync-email-skus` /
+`vmos:sync-sms-skus` (both hourly).
 
-Important caveats before relying on this:
+VMOS sells both under one bundle in their own console, branded **"Captcha
+Service"** — a temporary email OR phone number that receives a real
+verification code for app/service registrations. A previous version of this
+note said VMOS had no phone-number product; that was wrong (confirmed
+straight from the VMOS console UI) and led to a real "you fucked up the
+site" moment with the owner — don't repeat it. Verify claims like this
+against the actual product/console, not just the reseller API docs, before
+writing them down here as fact.
 
-- The VMOS OpenAPI docs list the four endpoints used here
-  (`getEmailServiceList`, `getEmailTypeList`, `createEmailOrder`,
-  `getEmailOrder`) but — unlike the phone-plan endpoints — don't publish full
-  request/response field names. `VmosCloudPhoneService`'s email methods and
-  `EmailAccountProvisioner`'s parsing of the purchase response are best-effort,
-  matching naming conventions used elsewhere in the API. **Check Admin →
-  Diagnostics (the three new `email_*` probes) against a real account before
-  trusting a live purchase**, and compare the raw JSON there to what
-  `EmailAccountProvisioner`/`EmailAccountController::refresh` expect
-  (`app/Services/Provisioning/EmailAccountProvisioner.php`,
-  `app/Http/Controllers/EmailAccountController.php`). Every raw entry is kept
-  in `email_accounts.raw_payload` regardless, so a wrong field-name guess is
-  fixable without re-buying.
-- VMOS has **no** virtual phone number / SMS-receiving product —
-  `simulateSendSms` only injects a fake SMS into a device you already own.
-  Don't add a "phone verification" feature backed by VMOS; there's nothing to
-  back it with. The storefront copy on `/email-accounts` says this explicitly.
+Important caveats before relying on either:
+
+- **Email** (higher confidence): the VMOS OpenAPI spec's "Email Verification
+  Service" tag documents five real endpoints — `getEmailServiceList`,
+  `getEmailTypeList`, `createEmailOrder`, `getEmailOrder`, `getEmailCode` —
+  confirmed to exist, but VMOS still doesn't publish full request/response
+  field names for them (unlike the phone-plan endpoints). `VmosCloudPhoneService`'s
+  email methods and `EmailAccountProvisioner`'s parsing are best-effort.
+  **Check Admin → Diagnostics (`email_services`/`email_types`/`my_emails`
+  probes) against a real account before trusting a live purchase.**
+- **Phone numbers** (low confidence — do not enable for real customers
+  without checking this first): unlike email, there is NO tag or endpoint
+  for this in VMOS's published OpenAPI docs, llms.txt quick reference, or raw
+  spec tag list — the "Captcha Service" SMS side is sold through VMOS's own
+  console but isn't (yet?) exposed to resellers as far as the docs show.
+  `VmosCloudPhoneService`'s `sms*`/`getSms*` methods are a guess, mirroring
+  the confirmed email endpoint names 1:1 (`getSmsServiceList`,
+  `getSmsTypeList`, `createSmsOrder`, `getSmsOrder`, `getSmsCode`). Because of
+  this, `vmos:sync-sms-skus` seeds new phone-number SKUs **hidden**
+  (`active=false`) — nothing reaches a real customer until an admin
+  confirms real data comes back in Admin → Diagnostics (`sms_services`/
+  `sms_types`/`my_sms` probes) and deliberately flips a SKU live. If VMOS
+  support can confirm the real endpoint names/paths, update
+  `VmosCloudPhoneService`'s SMS section and this note together.
+- Either way, every raw purchase-response entry is kept in
+  `email_accounts.raw_payload` / `phone_numbers.raw_payload`, so a wrong
+  field-name guess is fixable without re-buying.
 - No real customer has completed a crypto purchase, so
   `TronUsdtVerifier` is untested against a live transaction.
 - `demo@example.com` / `password` was seeded as an **admin**. Confirm it's gone

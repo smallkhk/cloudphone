@@ -31,7 +31,7 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
-        $order->load(['user', 'sku', 'payments', 'cloudInstances', 'emailAccounts']);
+        $order->load(['user', 'sku', 'payments', 'cloudInstances', 'emailAccounts', 'phoneNumbers']);
 
         return view('admin.orders.show', compact('order'));
     }

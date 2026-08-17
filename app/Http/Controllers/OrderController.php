@@ -64,7 +64,7 @@ class OrderController extends Controller
     {
         abort_unless($order->user_id === Auth::id(), 403);
 
-        $order->load(['sku', 'payments' => fn ($q) => $q->latest('id'), 'cloudInstances', 'emailAccounts']);
+        $order->load(['sku', 'payments' => fn ($q) => $q->latest('id'), 'cloudInstances', 'emailAccounts', 'phoneNumbers']);
 
         return view('orders.show', [
             'order' => $order,

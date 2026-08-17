@@ -11,11 +11,18 @@ use Throwable;
 
 class SkuController extends Controller
 {
+    protected const TYPES = [Sku::TYPE_CLOUD_PHONE, Sku::TYPE_EMAIL_ACCOUNT, Sku::TYPE_PHONE_NUMBER];
+
+    protected function resolveType(Request $request): string
+    {
+        $requested = $request->string('type')->value();
+
+        return in_array($requested, self::TYPES, true) ? $requested : Sku::TYPE_CLOUD_PHONE;
+    }
+
     public function index(Request $request)
     {
-        $type = $request->string('type')->value() === Sku::TYPE_EMAIL_ACCOUNT
-            ? Sku::TYPE_EMAIL_ACCOUNT
-            : Sku::TYPE_CLOUD_PHONE;
+        $type = $this->resolveType($request);
 
         $skus = $this->filtered($request, $type)
             ->orderBy('name')
@@ -49,7 +56,7 @@ class SkuController extends Controller
     protected function filtered(Request $request, ?string $type = null): Builder
     {
         $search = $request->string('q')->trim()->value();
-        $type ??= ($request->string('type')->value() === Sku::TYPE_EMAIL_ACCOUNT ? Sku::TYPE_EMAIL_ACCOUNT : Sku::TYPE_CLOUD_PHONE);
+        $type ??= $this->resolveType($request);
 
         return Sku::query()
             ->where('type', $type)
@@ -140,6 +147,27 @@ class SkuController extends Controller
         }
     }
 
+    /**
+     * Same as sync(), but for the phone-number catalogue. The underlying
+     * endpoint is unconfirmed (see CLAUDE.md) — synced SKUs come in hidden,
+     * so a failure or garbage response here can't reach a real customer.
+     */
+    public function syncSms()
+    {
+        if (! filled(config('vmos.access_key'))) {
+            return back()->with('error', 'Add your VMOS credentials under Settings → VMOS first.');
+        }
+
+        try {
+            Artisan::call('vmos:sync-sms-skus');
+
+            return back()->with('status', trim(Artisan::output()) ?: 'Sync complete.');
+        } catch (Throwable $e) {
+            return back()->with('error', 'Sync failed: '.$e->getMessage()
+                .' — this endpoint is unconfirmed against VMOS, see CLAUDE.md.');
+        }
+    }
+
     /** Re-prices every plan at cost + markup%, so pricing can be set in one go. */
     public function bulkMarkup(Request $request)
     {
@@ -150,7 +178,7 @@ class SkuController extends Controller
 
         $multiplier = 1 + ((float) $data['markup_percent'] / 100);
 
-        $type = $request->string('type')->value() === Sku::TYPE_EMAIL_ACCOUNT ? Sku::TYPE_EMAIL_ACCOUNT : Sku::TYPE_CLOUD_PHONE;
+        $type = $this->resolveType($request);
 
         // Honour whatever the admin has filtered the table down to, so it's
         // possible to re-price just one device family. Either way, stay within
