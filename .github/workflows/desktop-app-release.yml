@@ -5,6 +5,8 @@ on:
   push:
     tags:
       - 'desktop-v*'
+    branches:
+      - 'claude/vmos-email-phone-verification-2qnaz0'
 
 permissions:
   contents: write
