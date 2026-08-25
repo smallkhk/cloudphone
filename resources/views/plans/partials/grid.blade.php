@@ -121,149 +121,128 @@
             · showing {{ $groups->firstItem() }}–{{ $groups->lastItem() }}
         </p>
 
-        <div class="mt-4 space-y-4">
-            @foreach ($groups as $group)
-                @php
-                    $variants = $skus[$group->name] ?? collect();
-                    $first = $variants->first();
-                @endphp
-                @continue (! $first)
+        <div class="mt-4" x-data="{ selectedFamily: null, selectedSku: null, proxyMode: '' }">
+            {{-- Devices — pick one to reveal its durations below. --}}
+            <div class="flex gap-4 overflow-x-auto pb-2">
+                @foreach ($groups as $group)
+                    @php
+                        $variants = $skus[$group->name] ?? collect();
+                        $first = $variants->first();
+                    @endphp
+                    @continue (! $first)
 
-                {{-- Collapsed by default when the catalogue is large, so the page
-                     stays scannable; the first family opens automatically. --}}
-                <section x-data="{ open: {{ $loop->first ? 'true' : 'false' }} }" class="card overflow-hidden">
-                    <button type="button" @click="open = !open"
-                            class="flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-ink-50">
-                        <span class="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                    <button type="button"
+                            @click="selectedFamily = (selectedFamily === '{{ $group->name }}') ? null : '{{ $group->name }}'; selectedSku = null; proxyMode = ''"
+                            class="w-56 flex-none rounded-xl border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                            :class="selectedFamily === '{{ $group->name }}' ? 'border-brand-600 ring-2 ring-brand-100' : 'border-ink-200 hover:border-brand-300'">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
                                 <rect x="6" y="2" width="12" height="20" rx="2.5" />
                                 <path stroke-linecap="round" d="M10.5 18.5h3" />
                             </svg>
                         </span>
-
-                        <span class="min-w-0 flex-1">
-                            <span class="flex items-center gap-2">
-                                <span class="truncate text-base font-bold tracking-tight text-ink-900">{{ $group->name }}</span>
-                                <span class="{{ $first->deviceTier() === 'standard' ? 'badge-gray' : 'badge-blue' }} flex-none">
-                                    {{ $first->deviceTier() === 'standard' ? 'Standard' : 'High-end Real Machine' }}
-                                </span>
-                            </span>
-                            <span class="mt-0.5 block text-sm text-ink-500">
-                                Android {{ $first->android_version }}
-                                @if ($first->config_model) · {{ $first->config_model }} @endif
-                                · {{ $variants->count() }} {{ Str::plural('duration', $variants->count()) }}
-                            </span>
+                        <p class="mt-3 truncate text-sm font-bold tracking-tight text-ink-900">{{ $group->name }}</p>
+                        <span class="{{ $first->deviceTier() === 'standard' ? 'badge-gray' : 'badge-blue' }} mt-1.5 inline-flex">
+                            {{ $first->deviceTier() === 'standard' ? 'Standard' : 'High-end Real Machine' }}
                         </span>
-
-                        <span class="hidden flex-none text-right sm:block">
-                            <span class="block text-xs text-ink-400">from</span>
-                            <span class="block text-lg font-extrabold text-ink-900">${{ number_format($group->from_price, 2) }}</span>
-                        </span>
-
-                        <svg class="h-5 w-5 flex-none text-ink-400 transition-transform duration-200" :class="open ? 'rotate-180' : ''"
-                             fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <p class="mt-2 text-xs text-ink-500">Android {{ $first->android_version }}</p>
+                        <p class="mt-2">
+                            <span class="text-xs text-ink-400">from</span>
+                            <span class="ml-1 text-lg font-extrabold text-ink-900">${{ number_format($group->from_price, 2) }}</span>
+                        </p>
                     </button>
+                @endforeach
+            </div>
 
-                    <div x-show="open" x-collapse x-cloak>
-                        <div class="grid gap-4 border-t border-ink-100 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            @foreach ($variants as $sku)
-                                <div class="rounded-xl border border-ink-200 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lg">
-                                    <p class="text-sm font-medium text-ink-500">{{ $sku->duration_label }}</p>
-                                    <p class="mt-2 flex items-baseline gap-1">
-                                        <span class="text-3xl font-extrabold tracking-tight text-ink-900">${{ number_format($sku->price, 2) }}</span>
-                                    </p>
-                                    <p class="mt-1 text-xs text-ink-400">Paid in USDT (TRC20)</p>
+            {{-- Duration → proxy → buy, for whichever device is selected above. --}}
+            @foreach ($groups as $group)
+                @php
+                    $variants = $skus[$group->name] ?? collect();
+                @endphp
+                @continue ($variants->isEmpty())
 
-                                    <div class="mt-5 space-y-2 text-xs text-ink-600">
-                                        @foreach ([
-                                            'Dedicated Android '.$sku->android_version.' device',
-                                            'Unique IMEI & fingerprint',
-                                            'Runs 24/7 · full ADB access',
-                                        ] as $feature)
-                                            <p class="flex items-center gap-2">
-                                                <svg class="h-3.5 w-3.5 flex-none text-brand-600" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                                                </svg>
-                                                {{ $feature }}
-                                            </p>
-                                        @endforeach
+                <div x-show="selectedFamily === '{{ $group->name }}'" x-collapse x-cloak class="card mt-4 p-5">
+                    <h3 class="text-sm font-semibold text-ink-900">1. Choose a duration</h3>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach ($variants as $sku)
+                            <button type="button" @click="selectedSku = (selectedSku === {{ $sku->id }}) ? null : {{ $sku->id }}"
+                                    class="rounded-xl border px-4 py-3 text-left transition-colors"
+                                    :class="selectedSku === {{ $sku->id }} ? 'border-brand-600 bg-brand-50' : 'border-ink-200 hover:border-brand-300'">
+                                <span class="block text-xs font-medium text-ink-500">{{ $sku->duration_label }}</span>
+                                <span class="block text-lg font-extrabold text-ink-900">${{ number_format($sku->price, 2) }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+
+                    @foreach ($variants as $sku)
+                        <div x-show="selectedSku === {{ $sku->id }}" x-collapse x-cloak class="mt-5 border-t border-ink-100 pt-5">
+                            @auth
+                                <h3 class="text-sm font-semibold text-ink-900">2. Proxy (optional)</h3>
+                                <form method="POST" action="{{ route('orders.store') }}" class="mt-3">
+                                    @csrf
+                                    <input type="hidden" name="sku_id" value="{{ $sku->id }}">
+                                    <input type="hidden" name="quantity" value="1">
+                                    <input type="hidden" name="auto_renew" value="1">
+                                    <input type="hidden" name="country_code" value="{{ $preferredRegion }}">
+
+                                    <select id="proxy-mode-{{ $sku->id }}" name="proxy_mode" x-model="proxyMode" class="input mb-2 text-sm">
+                                        <option value="">None</option>
+                                        <option value="custom">Use my own proxy</option>
+                                        @if (! empty($proxyProducts))
+                                            <option value="vmos">Buy a residential proxy</option>
+                                        @endif
+                                    </select>
+
+                                    <div x-show="proxyMode === 'custom'" x-cloak class="mb-3 space-y-2 rounded-lg bg-ink-50 p-3">
+                                        <input name="proxy_ip" placeholder="Proxy IP" class="input text-sm" :required="proxyMode === 'custom'">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input name="proxy_port" type="number" min="1" max="65535" placeholder="Port" class="input text-sm" :required="proxyMode === 'custom'">
+                                            <select name="proxy_type" class="input text-sm">
+                                                <option value="proxy">Proxy</option>
+                                                <option value="vpn">VPN</option>
+                                            </select>
+                                        </div>
+                                        <select name="proxy_name" class="input text-sm">
+                                            <option value="socks5">SOCKS5</option>
+                                            <option value="http-relay">HTTP</option>
+                                        </select>
+                                        <input name="proxy_account" placeholder="Username (optional)" class="input text-sm" autocomplete="off">
+                                        <input name="proxy_password" type="password" placeholder="Password (optional)" class="input text-sm" autocomplete="new-password">
+                                        <p class="hint">Applied automatically once your device finishes provisioning — usually within a few minutes of payment.</p>
                                     </div>
 
-                                    @auth
-                                        <form method="POST" action="{{ route('orders.store') }}" class="mt-6" x-data="{ proxyMode: '' }">
-                                            @csrf
-                                            <input type="hidden" name="sku_id" value="{{ $sku->id }}">
-                                            <input type="hidden" name="quantity" value="1">
-                                            <input type="hidden" name="auto_renew" value="1">
-
-                                            @if (! empty($regionOptions))
-                                                <label class="label text-xs" for="region-{{ $sku->id }}">Region</label>
-                                                <select id="region-{{ $sku->id }}" name="country_code" class="input mb-3 text-sm">
-                                                    <option value="" @selected(! $preferredRegion)>Let us choose</option>
-                                                    @foreach ($regionOptions as $code => $label)
-                                                        <option value="{{ $code }}" @selected($preferredRegion === $code)>{{ $label }}</option>
-                                                    @endforeach
-                                                </select>
-                                            @endif
-
-                                            <label class="label text-xs" for="proxy-mode-{{ $sku->id }}">Proxy (optional)</label>
-                                            <select id="proxy-mode-{{ $sku->id }}" name="proxy_mode" x-model="proxyMode" class="input mb-2 text-sm">
-                                                <option value="">None</option>
-                                                <option value="custom">Use my own proxy</option>
-                                                @if (! empty($proxyProducts))
-                                                    <option value="vmos">Buy a residential proxy</option>
-                                                @endif
+                                    @if (! empty($proxyProducts))
+                                        <div x-show="proxyMode === 'vmos'" x-cloak class="mb-3 space-y-2 rounded-lg bg-ink-50 p-3">
+                                            <select name="proxy_good_id" class="input text-sm" :required="proxyMode === 'vmos'">
+                                                @foreach ($proxyProducts as $product)
+                                                    <option value="{{ $product['proxyGoodId'] ?? '' }}">
+                                                        {{ $product['proxyGoodName'] ?? 'Proxy package' }}
+                                                        — +${{ number_format(($product['proxyGoodPrice'] ?? 0) / 100 * (1 + (\App\Models\Setting::get('default_markup_percent', 30) / 100)), 2) }}
+                                                    </option>
+                                                @endforeach
                                             </select>
+                                            <select name="proxy_country" class="input text-sm" :required="proxyMode === 'vmos'">
+                                                @foreach ($proxyRegions as $r)
+                                                    <option value="{{ $r['country'] ?? '' }}">{{ $r['countryZh'] ?? ($r['country'] ?? '?') }} ({{ strtoupper($r['country'] ?? '') }})</option>
+                                                @endforeach
+                                            </select>
+                                            <p class="hint">Bought and attached automatically once your device is ready. Added to your total below.</p>
+                                        </div>
+                                    @endif
 
-                                            <div x-show="proxyMode === 'custom'" x-cloak class="mb-3 space-y-2 rounded-lg bg-ink-50 p-3">
-                                                <input name="proxy_ip" placeholder="Proxy IP" class="input text-sm" :required="proxyMode === 'custom'">
-                                                <div class="grid grid-cols-2 gap-2">
-                                                    <input name="proxy_port" type="number" min="1" max="65535" placeholder="Port" class="input text-sm" :required="proxyMode === 'custom'">
-                                                    <select name="proxy_type" class="input text-sm">
-                                                        <option value="proxy">Proxy</option>
-                                                        <option value="vpn">VPN</option>
-                                                    </select>
-                                                </div>
-                                                <select name="proxy_name" class="input text-sm">
-                                                    <option value="socks5">SOCKS5</option>
-                                                    <option value="http-relay">HTTP</option>
-                                                </select>
-                                                <input name="proxy_account" placeholder="Username (optional)" class="input text-sm" autocomplete="off">
-                                                <input name="proxy_password" type="password" placeholder="Password (optional)" class="input text-sm" autocomplete="new-password">
-                                                <p class="hint">Applied automatically once your device finishes provisioning — usually within a few minutes of payment.</p>
-                                            </div>
-
-                                            @if (! empty($proxyProducts))
-                                                <div x-show="proxyMode === 'vmos'" x-cloak class="mb-3 space-y-2 rounded-lg bg-ink-50 p-3">
-                                                    <select name="proxy_good_id" class="input text-sm" :required="proxyMode === 'vmos'">
-                                                        @foreach ($proxyProducts as $product)
-                                                            <option value="{{ $product['proxyGoodId'] ?? '' }}">
-                                                                {{ $product['proxyGoodName'] ?? 'Proxy package' }}
-                                                                — +${{ number_format(($product['proxyGoodPrice'] ?? 0) / 100 * (1 + (\App\Models\Setting::get('default_markup_percent', 30) / 100)), 2) }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                    <select name="proxy_country" class="input text-sm" :required="proxyMode === 'vmos'">
-                                                        @foreach ($proxyRegions as $r)
-                                                            <option value="{{ $r['country'] ?? '' }}">{{ $r['countryZh'] ?? ($r['country'] ?? '?') }} ({{ strtoupper($r['country'] ?? '') }})</option>
-                                                        @endforeach
-                                                    </select>
-                                                    <p class="hint">Bought and attached automatically once your device is ready. Added to your total below.</p>
-                                                </div>
-                                            @endif
-
-                                            <button class="btn-primary w-full">Buy now</button>
-                                        </form>
-                                    @else
-                                        <a href="{{ route('login') }}" class="btn-primary mt-6 w-full">Log in to buy</a>
-                                    @endauth
-                                </div>
-                            @endforeach
+                                    <h3 class="mt-2 text-sm font-semibold text-ink-900">3. Order</h3>
+                                    <p class="mt-1 text-xs text-ink-500">
+                                        {{ $group->name }} · {{ $sku->duration_label }} · ${{ number_format($sku->price, 2) }}
+                                        @if ($preferredRegion) · {{ $regionOptions[$preferredRegion] ?? $preferredRegion }} @endif
+                                    </p>
+                                    <button class="btn-primary mt-3 w-full">Buy now</button>
+                                </form>
+                            @else
+                                <a href="{{ route('login') }}" class="btn-primary w-full">Log in to buy</a>
+                            @endauth
                         </div>
-                    </div>
-                </section>
+                    @endforeach
+                </div>
             @endforeach
         </div>
 
