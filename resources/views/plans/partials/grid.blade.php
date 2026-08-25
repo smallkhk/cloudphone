@@ -123,7 +123,7 @@
 
         <div class="mt-4" x-data="{ selectedFamily: null, selectedSku: null, proxyMode: '' }">
             {{-- Devices — pick one to reveal its durations below. --}}
-            <div class="flex gap-4 overflow-x-auto pb-2">
+            <div class="flex flex-wrap gap-2">
                 @foreach ($groups as $group)
                     @php
                         $variants = $skus[$group->name] ?? collect();
@@ -133,23 +133,9 @@
 
                     <button type="button"
                             @click="selectedFamily = (selectedFamily === '{{ $group->name }}') ? null : '{{ $group->name }}'; selectedSku = null; proxyMode = ''"
-                            class="w-56 flex-none rounded-xl border p-5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-                            :class="selectedFamily === '{{ $group->name }}' ? 'border-brand-600 ring-2 ring-brand-100' : 'border-ink-200 hover:border-brand-300'">
-                        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
-                                <rect x="6" y="2" width="12" height="20" rx="2.5" />
-                                <path stroke-linecap="round" d="M10.5 18.5h3" />
-                            </svg>
-                        </span>
-                        <p class="mt-3 truncate text-sm font-bold tracking-tight text-ink-900">{{ $group->name }}</p>
-                        <span class="{{ $first->deviceTier() === 'standard' ? 'badge-gray' : 'badge-blue' }} mt-1.5 inline-flex">
-                            {{ $first->deviceTier() === 'standard' ? 'Standard' : 'High-end Real Machine' }}
-                        </span>
-                        <p class="mt-2 text-xs text-ink-500">Android {{ $first->android_version }}</p>
-                        <p class="mt-2">
-                            <span class="text-xs text-ink-400">from</span>
-                            <span class="ml-1 text-lg font-extrabold text-ink-900">${{ number_format($group->from_price, 2) }}</span>
-                        </p>
+                            class="rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors"
+                            :class="selectedFamily === '{{ $group->name }}' ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-ink-200 text-ink-700 hover:border-brand-300'">
+                        {{ $group->name }}
                     </button>
                 @endforeach
             </div>
