@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Modova</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #0b1220, #1a2440);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .card {
+    width: 320px;
+    padding: 32px 28px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+  }
+  .logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #4f5bd5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    font-weight: 700;
+    color: white;
+    font-size: 20px;
+  }
+  h1 {
+    color: white;
+    font-size: 18px;
+    margin: 0 0 6px;
+  }
+  p.sub {
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    margin: 0 0 22px;
+  }
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.08);
+    color: white;
+    font-size: 15px;
+    letter-spacing: 1px;
+    outline: none;
+    text-transform: uppercase;
+  }
+  input::placeholder { color: rgba(255,255,255,0.35); text-transform: none; letter-spacing: normal; }
+  input:focus { border-color: #6d78ea; }
+  button {
+    width: 100%;
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: none;
+    background: #4f5bd5;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  button:hover:not(:disabled) { background: #5c67e0; }
+  .error {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #ff9d9d;
+    min-height: 16px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">M</div>
+    <h1>Enter your access code</h1>
+    <p class="sub">Ask the site admin for your code if you don't have one.</p>
+    <form id="form">
+      <input id="code" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autofocus autocomplete="off" spellcheck="false">
+      <button id="submit" type="submit">Unlock</button>
+      <div class="error" id="error"></div>
+    </form>
+  </div>
+  <script src="lock.js"></script>
+</body>
+</html>
