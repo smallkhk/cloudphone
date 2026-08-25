@@ -114,7 +114,7 @@
 
         <div class="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between">
             <p>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</p>
-            <p>Cloud phones powered by VMOS Cloud infrastructure.</p>
+            <p>Cloud phones powered by {{ config('app.name') }}'s own cloud infrastructure.</p>
         </div>
     </div>
 </footer>

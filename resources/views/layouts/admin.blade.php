@@ -52,6 +52,7 @@
                     ['admin.proxies.index', 'Proxies', 'M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20 15 15 0 010-20z', null],
                     ['admin.settings.edit', 'Settings', 'M10.3 4.3a2 2 0 013.4 0l.5.9a2 2 0 002 1l1-.1a2 2 0 011.8 3l-.5.9a2 2 0 000 2.2l.5.9a2 2 0 01-1.8 3l-1-.1a2 2 0 00-2 1l-.5.9a2 2 0 01-3.4 0l-.5-.9a2 2 0 00-2-1l-1 .1a2 2 0 01-1.8-3l.5-.9a2 2 0 000-2.2l-.5-.9a2 2 0 011.8-3l1 .1a2 2 0 002-1l.5-.9zM15 12a3 3 0 11-6 0 3 3 0 016 0z', null],
                     ['admin.diagnostics.index', 'API diagnostics', 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', null],
+                    ['admin.access-keys.index', 'Access codes', 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z', null],
                 ];
             @endphp
 

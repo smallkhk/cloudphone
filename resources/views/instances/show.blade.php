@@ -25,12 +25,12 @@
 
     @unless ($ready)
         <div class="card p-8 text-center">
-            <p class="text-sm text-ink-600">This device is still being provisioned. Controls appear once VMOS assigns it.</p>
+            <p class="text-sm text-ink-600">This device is still being provisioned. Controls appear once it's ready.</p>
         </div>
     @else
         @if ($detailsError)
             <div class="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20">
-                Couldn't load live device info from VMOS: {{ $detailsError }}
+                {{ $detailsError }}
             </div>
         @endif
 
@@ -196,7 +196,7 @@
                     </div>
 
                     <p class="border-t border-ink-100 px-4 py-3 text-xs leading-relaxed text-ink-500">
-                        The screen streams straight from VMOS to your browser. Leaving this tab disconnects it —
+                        The screen streams straight from the cloud to your browser. Leaving this tab disconnects it —
                         the phone keeps running either way.
                     </p>
                 </div>
@@ -402,11 +402,13 @@
 
                 {{-- Cloud Drive tab --}}
                 <div x-show="tab === 'drive'" x-cloak class="space-y-6">
-                    <div class="rounded-xl bg-ink-50 p-4 text-xs text-ink-500 ring-1 ring-inset ring-ink-200">
-                        VMOS doesn't publish full field names for Cloud Drive the way it does for the phone-plan
-                        endpoints — if capacity or a file looks wrong here, check <a href="{{ route('admin.diagnostics.index', ['probe' => 'storage_goods']) }}" class="font-medium text-brand-600 hover:underline">API diagnostics</a>
-                        against the raw response.
-                    </div>
+                    @if (auth()->user()->is_admin)
+                        <div class="rounded-xl bg-ink-50 p-4 text-xs text-ink-500 ring-1 ring-inset ring-ink-200">
+                            Field names for Cloud Drive aren't fully confirmed yet — if capacity or a file looks
+                            wrong here, check <a href="{{ route('admin.diagnostics.index', ['probe' => 'storage_goods']) }}" class="font-medium text-brand-600 hover:underline">API diagnostics</a>
+                            against the raw response.
+                        </div>
+                    @endif
 
                     @php
                         $used = $storage['used'] ?? $storage['usedSize'] ?? $storage['useSize'] ?? null;

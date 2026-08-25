@@ -62,6 +62,7 @@ class AdminPanelTest extends TestCase
             route('admin.settings.edit', 'payments'),
             route('admin.settings.edit', 'vmos'),
             route('admin.settings.edit', 'mail'),
+            route('admin.access-keys.index'),
         ] as $url) {
             $this->actingAs($admin)->get($url)->assertOk();
         }

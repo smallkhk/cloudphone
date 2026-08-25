@@ -168,7 +168,7 @@
                     <h2 class="text-base font-semibold text-ink-900">Proxy</h2>
                     <div class="mt-3 flex items-center justify-between">
                         <p class="text-sm text-ink-600">
-                            {{ $order->proxy_mode === 'vmos' ? 'VMOS residential proxy' : 'Your own proxy' }}
+                            {{ $order->proxy_mode === 'vmos' ? 'Residential proxy' : 'Your own proxy' }}
                         </p>
                         <span class="{{ match ($order->proxy_status) {
                             'attached' => 'badge-green',

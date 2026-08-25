@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AccessKeyController as AdminAccessKeyController;
 use App\Http\Controllers\Admin\ChatController as AdminChatController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
@@ -124,6 +125,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // API diagnostics
     Route::get('/diagnostics', [AdminDiagnosticsController::class, 'index'])->name('diagnostics.index');
+
+    // Desktop app access codes
+    Route::get('/access-keys', [AdminAccessKeyController::class, 'index'])->name('access-keys.index');
+    Route::post('/access-keys', [AdminAccessKeyController::class, 'store'])->name('access-keys.store');
+    Route::patch('/access-keys/{accessKey}/toggle', [AdminAccessKeyController::class, 'toggle'])->name('access-keys.toggle');
+    Route::delete('/access-keys/{accessKey}', [AdminAccessKeyController::class, 'destroy'])->name('access-keys.destroy');
 
     // Settings
     Route::get('/settings/{tab?}', [AdminSettingsController::class, 'edit'])->name('settings.edit');

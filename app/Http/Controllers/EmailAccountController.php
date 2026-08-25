@@ -6,6 +6,7 @@ use App\Models\EmailAccount;
 use App\Models\Sku;
 use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class EmailAccountController extends Controller
@@ -46,12 +47,14 @@ class EmailAccountController extends Controller
                     'code_fetched_at' => now(),
                 ]);
 
-                return back()->with('status', $code ? "New code: {$code}" : 'No verification code from VMOS yet — try again in a moment.');
+                return back()->with('status', $code ? "New code: {$code}" : 'No verification code yet — try again in a moment.');
             }
 
-            return back()->with('error', 'VMOS did not return this email account. It may have expired.');
+            return back()->with('error', 'This email account could not be found. It may have expired.');
         } catch (Throwable $e) {
-            return back()->with('error', 'Could not reach VMOS: '.$e->getMessage());
+            Log::warning('email_accounts.refresh_failed', ['email_account_id' => $emailAccount->id, 'error' => $e->getMessage()]);
+
+            return back()->with('error', 'Could not reach the provisioning service right now. Please try again.');
         }
     }
 }

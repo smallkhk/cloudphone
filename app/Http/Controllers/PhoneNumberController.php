@@ -6,6 +6,7 @@ use App\Models\PhoneNumber;
 use App\Models\Sku;
 use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class PhoneNumberController extends Controller
@@ -42,9 +43,11 @@ class PhoneNumberController extends Controller
                 return back()->with('status', "New code: {$code}");
             }
 
-            return back()->with('error', 'No verification code from VMOS yet — try again in a moment.');
+            return back()->with('error', 'No verification code yet — try again in a moment.');
         } catch (Throwable $e) {
-            return back()->with('error', 'Could not reach VMOS: '.$e->getMessage());
+            Log::warning('phone_numbers.refresh_failed', ['phone_number_id' => $phoneNumber->id, 'error' => $e->getMessage()]);
+
+            return back()->with('error', 'Could not reach the provisioning service right now. Please try again.');
         }
     }
 }

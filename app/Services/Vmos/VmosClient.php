@@ -156,8 +156,8 @@ class VmosClient
         }
 
         throw new VmosApiException(
-            "Could not open a connection to VMOS ({$this->baseUrl}) after ".self::MAX_ATTEMPTS.' attempts. '
-            .'This is your server failing to reach VMOS, not a rejected request — check outbound HTTPS from the host, '
+            "Could not open a connection to the cloud phone provider ({$this->baseUrl}) after ".self::MAX_ATTEMPTS.' attempts. '
+            .'This is your server failing to reach the provider, not a rejected request — check outbound HTTPS from the host, '
             .'then try again. Original error: '.$lastError?->getMessage(),
             0,
             [],
@@ -218,7 +218,7 @@ class VmosClient
         if (! is_array($data)) {
             Log::error('vmos.invalid_response', ['path' => $path, 'status' => $status, 'body' => $body]);
 
-            throw new VmosApiException("VMOS API returned a non-JSON response for {$path} (HTTP {$status})");
+            throw new VmosApiException("The cloud phone provider returned a non-JSON response for {$path} (HTTP {$status})");
         }
 
         $code = $data['code'] ?? null;
@@ -226,7 +226,7 @@ class VmosClient
         if ($code !== 200) {
             Log::warning('vmos.api_error', ['path' => $path, 'code' => $code, 'msg' => $data['msg'] ?? null]);
 
-            throw new VmosApiException($data['msg'] ?? "VMOS API error on {$path}", (int) ($code ?? 0), $data);
+            throw new VmosApiException($data['msg'] ?? "Cloud phone provider error on {$path}", (int) ($code ?? 0), $data);
         }
 
         return $data;

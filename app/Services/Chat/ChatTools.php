@@ -111,7 +111,7 @@ class ChatTools
             $url = $response['data'][0]['url'] ?? null;
 
             if (! $url) {
-                return 'Error: VMOS did not return a screenshot right now — the device may be offline or still provisioning.';
+                return 'Error: did not get a screenshot back right now — the device may be offline or still provisioning.';
             }
 
             $instance->update(['screenshot_url' => $url]);

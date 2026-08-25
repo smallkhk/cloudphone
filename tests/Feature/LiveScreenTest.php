@@ -113,7 +113,7 @@ class LiveScreenTest extends TestCase
         $this->actingAs($this->owner)
             ->postJson(route('instances.screen-token', $this->device))
             ->assertStatus(502)
-            ->assertJsonPath('error', 'VMOS refused the session: System is busy');
+            ->assertJsonPath('error', 'Could not start the live screen session. Please try again.');
     }
 
     #[Test]

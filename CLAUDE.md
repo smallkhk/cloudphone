@@ -14,6 +14,53 @@ machine (they work from a phone or the cPanel terminal).
 
 Branch: `claude/reseller-website-api-b4x019`. Full feature list is in README.md.
 
+## Branding — "Modova", never "VMOS", to customers or in errors
+
+The site is white-labeled as **Modova** (brand name driven by `APP_NAME` in
+`.env`, with `Setting::get('site_name')` as an admin-editable override — set
+both on the live server; `.env` isn't touched by `git pull`). "VMOS" must
+never appear in the public site, the customer dashboard, or in ANY error
+message shown to a user (customer or admin) — a real incident happened where
+a raw `"...from VMOS: Instance not found"` error leaked the vendor name.
+`VmosApiException`'s own message text was reworded to say "the cloud phone
+provider" instead of "VMOS" so this can't leak from one central place again,
+and every controller that used to prepend `'VMOS ...: '.$e->getMessage()`
+either uses generic wording now or drops the raw exception text entirely
+(logging it instead) — customer-facing catches in particular never echo
+`$e->getMessage()` raw, since that string ultimately comes from VMOS's own
+API and isn't under our control. The live chat system prompt
+(`SiteKnowledge::rules()`) also explicitly tells the model never to name the
+underlying provider even if a customer asks directly.
+
+**Admin panel is the one exception** — Settings, Diagnostics, and the Proxies
+page still say "VMOS" on purpose, since the admin genuinely needs to know
+that's the real upstream service to go get API credentials from their
+console. Internal class/service names (`VmosCloudPhoneService`, `VmosClient`,
+`Vmos*` folders, `proxy_mode = 'vmos'`, log entries, code comments) are also
+untouched — none of that is user-facing. If a new customer-facing error path
+gets added later, keep following the same rule: never echo a raw upstream
+exception message to a non-admin.
+
+## Desktop app access codes (not yet used by anything)
+
+Added for a **desktop app the owner is building separately** — this repo
+doesn't contain it, only the two things it will call. The website itself has
+**no lock**; it stays reachable at its normal URL for browser visitors. The
+lock is meant to live entirely in the desktop app, which is expected to
+prompt for a code on launch and only navigate to the site once it checks out
+— keeping the actual URL out of the app's visible UI is the desktop app's
+job, not something this repo can enforce.
+
+- Admin → **Access codes** (`/admin/access-keys`) generates/revokes/deletes
+  codes (`App\Models\AccessKey`, format `XXXX-XXXX-XXXX-XXXX`, unambiguous
+  charset). Optional label and expiry; reusable (not one-time) until revoked
+  or expired.
+- `POST /api/access-keys/verify` (unauthenticated, rate-limited
+  `throttle:20,1`) is what the desktop app is expected to call with
+  `{"code": "..."}`. Returns `{"valid": true}` (200) or `{"valid": false}`
+  (401). Records `used_count`/`last_used_at` on every successful check —
+  purely informational, doesn't limit reuse.
+
 ## Current state
 
 Working in production: plan sync and pricing, crypto checkout, device

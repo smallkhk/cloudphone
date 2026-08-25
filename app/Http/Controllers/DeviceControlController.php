@@ -9,6 +9,7 @@ use App\Services\Vmos\VmosRegionCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -38,7 +39,8 @@ class DeviceControlController extends Controller
             try {
                 $details = $this->vmos->padInfo($instance->pad_code)['data'] ?? null;
             } catch (Throwable $e) {
-                $detailsError = $e->getMessage();
+                Log::warning('device_control.details_failed', ['instance_id' => $instance->id, 'error' => $e->getMessage()]);
+                $detailsError = 'Live device info is unavailable right now. Try refreshing in a moment.';
             }
 
             // Installed apps are slow to fetch, so cache briefly per device.
@@ -105,11 +107,13 @@ class DeviceControlController extends Controller
         try {
             $token = $this->vmos->stsToken($instance->pad_code)['data']['token'] ?? null;
         } catch (Throwable $e) {
-            return response()->json(['error' => 'VMOS refused the session: '.$e->getMessage()], 502);
+            Log::warning('device_control.screen_token_failed', ['instance_id' => $instance->id, 'error' => $e->getMessage()]);
+
+            return response()->json(['error' => 'Could not start the live screen session. Please try again.'], 502);
         }
 
         if (! $token) {
-            return response()->json(['error' => 'VMOS did not return a session token.'], 502);
+            return response()->json(['error' => 'Did not get a session token back. Please try again.'], 502);
         }
 
         return response()->json([
@@ -412,7 +416,7 @@ class DeviceControlController extends Controller
         try {
             $action();
         } catch (Throwable $e) {
-            return back()->with('error', 'VMOS rejected that request: '.$e->getMessage());
+            return back()->with('error', 'That request was rejected: '.$e->getMessage());
         }
 
         return back()->with('status', $successMessage);

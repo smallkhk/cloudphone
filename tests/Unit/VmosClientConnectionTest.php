@@ -31,7 +31,7 @@ class VmosClientConnectionTest extends TestCase
             $this->client()->get('/vcpcloud/api/padApi/userPadList');
             $this->fail('Expected a VmosApiException.');
         } catch (VmosApiException $e) {
-            $this->assertStringContainsString('Could not open a connection to VMOS', $e->getMessage());
+            $this->assertStringContainsString('Could not open a connection to the cloud phone provider', $e->getMessage());
             // The underlying cURL message is kept for the log/admin screen.
             $this->assertStringContainsString('Connection timed out', $e->getMessage());
         }
