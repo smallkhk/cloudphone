@@ -121,7 +121,37 @@
             · showing {{ $groups->firstItem() }}–{{ $groups->lastItem() }}
         </p>
 
-        <div class="mt-4" x-data="{ selectedFamily: null, selectedSku: null, proxyMode: '' }">
+        <div class="mt-4" x-data="{
+                selectedFamily: null, selectedSku: null, proxyMode: '',
+                proxyTesting: false, proxyTestResult: null,
+                async testProxy(form) {
+                    this.proxyTesting = true;
+                    this.proxyTestResult = null;
+                    try {
+                        const res = await fetch('{{ route('proxy.test') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            },
+                            body: JSON.stringify({
+                                ip: form.querySelector('[name=proxy_ip]').value,
+                                port: form.querySelector('[name=proxy_port]').value,
+                                account: form.querySelector('[name=proxy_account]').value,
+                                password: form.querySelector('[name=proxy_password]').value,
+                                proxy_name: form.querySelector('[name=proxy_name]').value,
+                            }),
+                        });
+                        const data = await res.json();
+                        this.proxyTestResult = { ok: res.ok && data.ok, message: data.message || 'Proxy check failed.' };
+                    } catch (e) {
+                        this.proxyTestResult = { ok: false, message: 'Could not reach the server. Try again.' };
+                    } finally {
+                        this.proxyTesting = false;
+                    }
+                },
+            }">
             {{-- Devices — pick one to reveal its durations below. --}}
             <div class="flex flex-wrap gap-2">
                 @foreach ($groups as $group)
@@ -151,7 +181,7 @@
                     <h3 class="text-sm font-semibold text-ink-900">1. Choose a duration</h3>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($variants as $sku)
-                            <button type="button" @click="selectedSku = (selectedSku === {{ $sku->id }}) ? null : {{ $sku->id }}"
+                            <button type="button" @click="selectedSku = (selectedSku === {{ $sku->id }}) ? null : {{ $sku->id }}; proxyTestResult = null"
                                     class="rounded-xl border px-4 py-3 text-left transition-colors"
                                     :class="selectedSku === {{ $sku->id }} ? 'border-brand-600 bg-brand-50' : 'border-ink-200 hover:border-brand-300'">
                                 <span class="block text-xs font-medium text-ink-500">{{ $sku->duration_label }}</span>
@@ -171,7 +201,7 @@
                                     <input type="hidden" name="auto_renew" value="1">
                                     <input type="hidden" name="country_code" value="{{ $preferredRegion }}">
 
-                                    <select id="proxy-mode-{{ $sku->id }}" name="proxy_mode" x-model="proxyMode" class="input mb-2 text-sm">
+                                    <select id="proxy-mode-{{ $sku->id }}" name="proxy_mode" x-model="proxyMode" @change="proxyTestResult = null" class="input mb-2 text-sm">
                                         <option value="">None</option>
                                         <option value="custom">Use my own proxy</option>
                                         @if (! empty($proxyProducts))
@@ -194,6 +224,16 @@
                                         </select>
                                         <input name="proxy_account" placeholder="Username (optional)" class="input text-sm" autocomplete="off">
                                         <input name="proxy_password" type="password" placeholder="Password (optional)" class="input text-sm" autocomplete="new-password">
+
+                                        <button type="button" class="btn-secondary btn-sm" :disabled="proxyTesting"
+                                                @click="testProxy($el.closest('form'))">
+                                            <span x-show="!proxyTesting">Test proxy</span>
+                                            <span x-show="proxyTesting" x-cloak>Testing…</span>
+                                        </button>
+                                        <p x-show="proxyTestResult" x-cloak x-text="proxyTestResult && proxyTestResult.message"
+                                           :class="proxyTestResult && proxyTestResult.ok ? 'text-green-700' : 'text-red-600'"
+                                           class="text-xs"></p>
+
                                         <p class="hint">Applied automatically once your device finishes provisioning — usually within a few minutes of payment.</p>
                                     </div>
 
