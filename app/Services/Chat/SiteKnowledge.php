@@ -153,11 +153,13 @@ class SiteKnowledge
         }
 
         return "# How buying works\n"
-            ."1. The customer creates an account and picks a plan on the Plans page.\n"
-            ."2. Clicking \"Buy now\" creates an order and shows a USDT (TRC20 / Tron network) payment address and the exact amount.\n"
-            ."3. They send that exact amount of USDT from their own wallet or exchange, then paste the transaction hash (TXID) into the order page.\n"
-            ."4. The site checks the transaction on the Tron blockchain automatically, usually within a minute or two.\n"
-            ."5. Once confirmed, the cloud phone is created automatically and appears under \"My cloud phones\".\n\n"
+            ."1. The customer creates an account, then on the Plans page picks a device (name pill), then a duration, then optionally a proxy — in that order.\n"
+            ."2. They can also pick a preferred region (a pill filter above the device list) — this doesn't change which devices are shown, it just pre-fills the region on the order.\n"
+            ."3. Proxy is optional at checkout: either their own IP/port (free — they can click \"Test proxy\" right there to confirm it's reachable before paying) or a residential proxy bought through us (priced with our markup, added to the total).\n"
+            ."4. Clicking \"Buy now\" creates an order and shows a USDT (TRC20 / Tron network) payment address and the exact amount (device + proxy add-on if any).\n"
+            ."5. They send that exact amount of USDT from their own wallet or exchange, then paste the transaction hash (TXID) into the order page.\n"
+            ."6. The site checks the transaction on the Tron blockchain automatically, usually within a minute or two.\n"
+            ."7. Once confirmed, the cloud phone is created automatically — with the chosen region's SIM/carrier and any proxy already applied — and appears under \"My cloud phones\".\n\n"
             ."Important payment facts:\n"
             ."- We accept USDT on the TRC20 (Tron) network only. Sending USDT on ERC20, BEP20 or any other network will lose the funds.\n"
             ."- The payment window is {$window} minutes; after that the quote expires and they should start a new order.\n"
