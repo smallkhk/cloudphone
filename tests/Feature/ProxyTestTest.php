@@ -15,9 +15,8 @@ class ProxyTestTest extends TestCase
     #[Test]
     public function a_signed_in_customer_can_test_a_proxy_before_buying(): void
     {
-        Http::fake(['*/checkIP' => Http::response([
-            'code' => 200, 'msg' => 'success',
-            'data' => ['city' => 'Los Angeles', 'country' => 'US'],
+        Http::fake(['ip-api.com/*' => Http::response([
+            'status' => 'success', 'city' => 'Los Angeles', 'country' => 'US', 'query' => '10.0.0.5',
         ])]);
 
         $this->actingAs(User::factory()->create())
@@ -38,7 +37,7 @@ class ProxyTestTest extends TestCase
     #[Test]
     public function an_unreachable_proxy_reports_failure_without_leaking_upstream_text(): void
     {
-        Http::fake(['*/checkIP' => Http::response(['code' => 500, 'msg' => 'timeout after 5s'], 500)]);
+        Http::fake(['ip-api.com/*' => Http::response(['status' => 'fail', 'message' => 'invalid query'])]);
 
         $this->actingAs(User::factory()->create())
             ->postJson('/proxy/test', ['ip' => '10.0.0.5', 'port' => 1080, 'proxy_name' => 'socks5'])

@@ -61,6 +61,20 @@ job, not something this repo can enforce.
   (401). Records `used_count`/`last_used_at` on every successful check —
   purely informational, doesn't limit reuse.
 
+## Proxy testing doesn't use VMOS
+
+`App\Services\ProxyChecker` (used by both the checkout "Test proxy" button and
+the device panel's) makes a real request *through* the customer's proxy to
+`ip-api.com`, from our own server — not VMOS's `checkIP` endpoint. This is
+deliberate: the owner found VMOS's own checkIP reporting the wrong exit
+location for a proxy that geolocated correctly everywhere else, including on
+VMOS's own website's proxy tool — so this stopped trusting VMOS's checker
+entirely rather than working around one bad case. This only affects
+*verifying* a proxy works; *applying* one to a device still has to go through
+VMOS's `setCustomProxy`, since VMOS is what actually hosts and controls the
+device's network stack — no proxy checker, ours or anyone else's, can change
+that part.
+
 ## Current state
 
 Working in production: plan sync and pricing, crypto checkout, device
