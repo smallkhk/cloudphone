@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\CloudInstance;
 use App\Models\InstanceTask;
-use App\Services\ProxyChecker;
 use App\Services\Vmos\VmosCloudPhoneService;
 use App\Services\Vmos\VmosRegionCatalog;
 use Illuminate\Http\Request;
@@ -22,11 +21,7 @@ use Throwable;
  */
 class DeviceControlController extends Controller
 {
-    public function __construct(
-        protected VmosCloudPhoneService $vmos,
-        protected VmosRegionCatalog $regions,
-        protected ProxyChecker $proxyChecker,
-    ) {}
+    public function __construct(protected VmosCloudPhoneService $vmos, protected VmosRegionCatalog $regions) {}
 
     public function show(CloudInstance $instance)
     {
@@ -232,11 +227,12 @@ class DeviceControlController extends Controller
         ]);
 
         try {
-            $result = $this->proxyChecker->check(
+            $response = $this->vmos->checkProxyIp(
                 $data['ip'], (int) $data['port'], $data['account'] ?? null, $data['password'] ?? null, $data['proxy_name']
             );
 
-            $where = collect([$result['city'], $result['country']])->filter()->implode(', ');
+            $info = $response['data'] ?? [];
+            $where = collect([$info['city'] ?? null, $info['country'] ?? null])->filter()->implode(', ');
 
             return back()->with('status', 'Proxy is reachable'.($where ? " — appears to be in {$where}." : '.'));
         } catch (Throwable $e) {

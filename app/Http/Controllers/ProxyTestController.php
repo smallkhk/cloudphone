@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\ProxyChecker;
+use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -10,13 +10,13 @@ use Throwable;
 
 /**
  * Lets a customer check their own proxy is reachable before buying a device
- * with it — this runs independently of VMOS (see ProxyChecker), so it works
+ * with it — VMOS's checkIP endpoint doesn't need a padCode, so this can run
  * standalone at checkout rather than only after a device already exists (see
  * DeviceControlController::testProxy for the equivalent on an owned device).
  */
 class ProxyTestController extends Controller
 {
-    public function test(Request $request, ProxyChecker $checker)
+    public function test(Request $request, VmosCloudPhoneService $vmos)
     {
         $data = $request->validate([
             'ip' => ['required', 'string', 'max:255'],
@@ -27,11 +27,12 @@ class ProxyTestController extends Controller
         ]);
 
         try {
-            $result = $checker->check(
+            $response = $vmos->checkProxyIp(
                 $data['ip'], (int) $data['port'], $data['account'] ?? null, $data['password'] ?? null, $data['proxy_name']
             );
 
-            $where = collect([$result['city'], $result['country']])->filter()->implode(', ');
+            $info = $response['data'] ?? [];
+            $where = collect([$info['city'] ?? null, $info['country'] ?? null])->filter()->implode(', ');
 
             return response()->json([
                 'ok' => true,

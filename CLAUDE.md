@@ -61,19 +61,29 @@ job, not something this repo can enforce.
   (401). Records `used_count`/`last_used_at` on every successful check —
   purely informational, doesn't limit reuse.
 
-## Proxy testing doesn't use VMOS
+## Proxy testing goes through VMOS's checkIP after all
 
-`App\Services\ProxyChecker` (used by both the checkout "Test proxy" button and
-the device panel's) makes a real request *through* the customer's proxy to
-`ip-api.com`, from our own server — not VMOS's `checkIP` endpoint. This is
-deliberate: the owner found VMOS's own checkIP reporting the wrong exit
-location for a proxy that geolocated correctly everywhere else, including on
-VMOS's own website's proxy tool — so this stopped trusting VMOS's checker
-entirely rather than working around one bad case. This only affects
-*verifying* a proxy works; *applying* one to a device still has to go through
-VMOS's `setCustomProxy`, since VMOS is what actually hosts and controls the
-device's network stack — no proxy checker, ours or anyone else's, can change
-that part.
+Both "Test proxy" buttons (checkout and the device panel) call VMOS's
+`checkIP` endpoint. This was briefly replaced with a self-hosted checker
+(`App\Services\ProxyChecker`, since removed) that connected through the
+proxy directly from our own server to a geolocation API — built because the
+owner found VMOS's checkIP reporting the wrong exit location for a proxy
+that geolocated correctly on another platform. That replacement made things
+*worse*: our cPanel host got flat-out "Connection refused" from a proxy that
+both VMOS's own console and another tester could reach, most likely because
+the proxy provider IP-allowlists which servers may connect and our host's
+IP was never on it. Since the cloud phone that will actually *use* the
+proxy is hosted on VMOS's own network, VMOS's reachability result is a
+better predictor of "will this work once applied" than a check from our own
+unrelated web host — so we went back to VMOS for reachability, and just
+accepted the risk that its location field is occasionally wrong. If VMOS's
+location reporting causes a real problem again, the fix is a geolocation
+lookup layered *on top of* a successful VMOS reachability check (not
+instead of it), not a full replacement.
+
+Applying a proxy to a device still has to go through VMOS's `setCustomProxy`
+either way, since VMOS is what actually hosts and controls the device's
+network stack — no proxy checker, ours or anyone else's, changes that part.
 
 ## Current state
 
