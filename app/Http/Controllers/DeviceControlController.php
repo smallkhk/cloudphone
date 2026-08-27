@@ -236,7 +236,14 @@ class DeviceControlController extends Controller
 
             return back()->with('status', 'Proxy is reachable'.($where ? " — appears to be in {$where}." : '.'));
         } catch (Throwable $e) {
-            return back()->with('error', 'Proxy check failed: '.$e->getMessage());
+            Log::warning('device_control.proxy_test_failed', [
+                'instance_id' => $instance->id,
+                'ip' => $data['ip'],
+                'port' => $data['port'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Proxy check failed. Double-check the details and try again.');
         }
     }
 

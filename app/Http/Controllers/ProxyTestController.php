@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -37,6 +39,14 @@ class ProxyTestController extends Controller
                 'message' => 'Proxy is reachable'.($where ? " — appears to be in {$where}." : '.'),
             ]);
         } catch (Throwable $e) {
+            Log::warning('proxy_test.failed', [
+                'user_id' => Auth::id(),
+                'ip' => $data['ip'],
+                'port' => $data['port'],
+                'proxy_name' => $data['proxy_name'],
+                'error' => $e->getMessage(),
+            ]);
+
             return response()->json(['ok' => false, 'message' => 'Proxy check failed. Double-check the details and try again.'], 422);
         }
     }
