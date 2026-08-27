@@ -41,6 +41,26 @@ class PlanBrowsingTest extends TestCase
     }
 
     #[Test]
+    public function the_same_duration_offered_on_two_android_versions_only_shows_once(): void
+    {
+        // Same device name, same duration/price, sold under two Android
+        // versions — without an Android filter picked this used to render
+        // as two identical-looking duration buttons.
+        $this->makeSku('Galaxy S21+ 5G', ['android_version' => '13', 'duration_label' => '1 day', 'duration_minutes' => 1440, 'price' => 1.30]);
+        $this->makeSku('Galaxy S21+ 5G', ['android_version' => '14', 'duration_label' => '1 day', 'duration_minutes' => 1440, 'price' => 1.30]);
+
+        $response = $this->get(route('plans.index'));
+
+        $response->assertOk();
+        // The price only ever renders on the per-duration button, so counting
+        // it (rather than the duration label, which also appears once in the
+        // unrelated "Any duration" search dropdown) proves there's only one
+        // button instead of two.
+        $body = $response->getContent();
+        $this->assertSame(1, substr_count($body, '$1.30'));
+    }
+
+    #[Test]
     public function it_filters_devices_by_search_term(): void
     {
         $this->makeSku('Galaxy S23');

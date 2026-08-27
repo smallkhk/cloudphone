@@ -44,8 +44,15 @@ class PlanController extends Controller
         $skus = $this->filtered($request)
             ->whereIn('name', $names)
             ->orderBy('duration_minutes')
+            ->orderBy('price')
             ->get()
-            ->groupBy('name');
+            ->groupBy('name')
+            // The same device name can exist under more than one Android
+            // version (e.g. offered on both 13 and 14) with identical
+            // durations and prices — without an Android filter picked, that
+            // would otherwise show every duration twice. Collapse to one
+            // button per duration, keeping the cheapest underlying SKU.
+            ->map(fn ($variants) => $variants->unique('duration_minutes')->values());
 
         return view('plans.index', [
             'groups' => $groups,
