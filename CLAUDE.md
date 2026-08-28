@@ -85,12 +85,67 @@ Applying a proxy to a device still has to go through VMOS's `setCustomProxy`
 either way, since VMOS is what actually hosts and controls the device's
 network stack — no proxy checker, ours or anyone else's, changes that part.
 
+## Wallet balance + BEP20 deposits (added, NOT yet tested against a live transaction)
+
+Customers can hold a USD balance (`users.balance`, decimal — the *only* place
+it's ever written is `App\Services\Wallet\WalletService::credit()`/`debit()`,
+which locks the user row and writes a `wallet_transactions` ledger entry in
+the same DB transaction; balance is deliberately absent from `User`'s
+`$fillable` so it can never be mass-assigned from a request). Two ways
+balance moves:
+
+- **Deposits** — Admin → Settings → Payments now has a second network,
+  USDT (BEP20 / BNB Smart Chain), alongside the original TRC20. A customer
+  tops up from `/wallet` the same way they'd pay for an order: get a quote
+  (`WalletDepositService`, mirrors `CryptoPaymentService`), send USDT, paste
+  the tx hash, and `wallet:verify-deposits` (scheduled every minute,
+  mirrors `crypto:verify-payments`) confirms it on-chain and credits the
+  balance. BEP20 verification is a new `BscUsdtVerifier` (mirrors
+  `TronUsdtVerifier`) using BscScan's free `tokentx` API — needs a
+  `bscscan_api_key` set under Settings → Payments or nothing verifies.
+- **Checkout** — the "3. Order" step on `/plans` shows a "Pay from wallet
+  balance" checkbox when the signed-in customer has any balance. Picking it
+  skips the crypto quote entirely: `OrderController::store` debits the
+  balance and marks the order paid inside the same DB transaction the order
+  is created in (so a race that leaves the balance short rolls the whole
+  order back, not just the debit), then provisions immediately — no
+  cron round-trip needed since there's no on-chain confirmation to wait for.
+  If provisioning itself then fails, the order stays `paid`/unprovisioned
+  exactly like a manually-marked-paid order does — same recovery path,
+  Admin → Orders → "Provision now" — nothing new invented for that case.
+- Regular per-order crypto payment also gained a network choice (TRC20 vs
+  BEP20) at checkout, once BEP20 is configured — reuses the same
+  `CryptoPaymentService`/`VerifyCryptoPayments` path, just dispatching to
+  `BscUsdtVerifier` instead of `TronUsdtVerifier` by `payment.network`.
+- Admin → a user's page has a manual credit/debit form (refunds, goodwill,
+  correcting a support mistake) — goes through the same `WalletService`, so
+  it's ledgered identically to a real deposit or purchase.
+
+Confidence: the BscScan API itself is well-documented and stable (unlike
+several VMOS endpoints elsewhere in this file), and the whole flow —
+deposit quote → tx hash → cron verification → balance credit → spend at
+checkout — has full test coverage with faked HTTP responses. What's *not*
+tested is a real on-chain transaction on either network, same caveat
+`TronUsdtVerifier` has always carried. Try a real TRC20 and BEP20 deposit
+with a small amount before relying on this for real customer funds.
+
+## `auto_renew` already works — VMOS does it, not this app
+
+The `auto_renew` checkbox at checkout is passed straight through to VMOS's
+`createMoneyOrder` as `autoRenew`, so VMOS bills *their own account balance*
+automatically when a device is due for renewal — this app doesn't run a
+renewal job and doesn't need to. The only real risk is the VMOS account
+balance itself running dry, which is already visible in Admin → Diagnostics
+and Admin → Proxies' "Account balance" line. If a customer's device expires
+unexpectedly, check that first, not this app's cron.
+
 ## Current state
 
-Working in production: plan sync and pricing, crypto checkout, device
-provisioning, the per-device control panel (SIM/GPS/locale/proxy/apps/ADB),
-**live screen streaming** via the VMOS H5 SDK, admin panel, and **live chat**
-(Claude or any OpenAI-compatible provider, with human takeover).
+Working in production: plan sync and pricing, crypto checkout, wallet
+balance/BEP20 deposits, device provisioning, the per-device control panel
+(SIM/GPS/locale/proxy/apps/ADB), **live screen streaming** via the VMOS H5
+SDK, admin panel, and **live chat** (Claude or any OpenAI-compatible
+provider, with human takeover).
 
 **Email verification accounts** and **phone verification numbers** (added,
 NOT yet tested against a live VMOS account): both reuse the existing

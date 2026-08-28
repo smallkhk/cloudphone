@@ -50,6 +50,12 @@
                 My orders
             </x-side-nav-link>
 
+            <x-side-nav-link :href="route('wallet.index')" :active="request()->routeIs('wallet.*')"
+                             icon="M3 6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6zM3 10h18M16 15h2"
+                             :badge="auth()->user()?->balance > 0 ? '$'.number_format(auth()->user()->balance, 2) : null">
+                Wallet
+            </x-side-nav-link>
+
             <x-side-nav-link :href="route('email-accounts.index')" :active="request()->routeIs('email-accounts.*')"
                              icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
                 Email accounts

@@ -18,6 +18,7 @@ class CryptoPaymentService
     {
         $address = match ($network) {
             'TRC20' => config('crypto.usdt_trc20_address'),
+            'BEP20' => config('crypto.usdt_bep20_address'),
             default => throw new RuntimeException("Unsupported crypto network: {$network}"),
         };
 

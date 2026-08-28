@@ -52,6 +52,35 @@
                 </dl>
             </div>
 
+            <div class="card mt-4 p-6">
+                <h2 class="text-base font-semibold text-ink-900">Wallet balance</h2>
+                <p class="mt-1 text-2xl font-extrabold text-ink-900">${{ number_format($user->balance, 2) }}</p>
+
+                <form method="POST" action="{{ route('admin.users.adjust-balance', $user) }}" class="mt-4 space-y-2" x-data="{ direction: 'credit' }">
+                    @csrf
+                    <div class="flex gap-2">
+                        <select name="direction" x-model="direction" class="input text-sm">
+                            <option value="credit">Credit</option>
+                            <option value="debit">Debit</option>
+                        </select>
+                        <input name="amount" type="number" step="0.01" min="0.01" class="input text-sm" placeholder="Amount" required>
+                    </div>
+                    <input name="note" class="input text-sm" placeholder="Reason (shown in their balance history)" required maxlength="255">
+                    <button class="btn-secondary btn-sm w-full">Apply adjustment</button>
+                </form>
+
+                @if ($user->walletTransactions->isNotEmpty())
+                    <div class="mt-4 space-y-2 border-t border-ink-100 pt-4">
+                        @foreach ($user->walletTransactions->take(5) as $tx)
+                            <div class="flex justify-between text-xs">
+                                <span class="text-ink-500">{{ $tx->description }}</span>
+                                <span class="font-medium {{ $tx->amount >= 0 ? 'text-emerald-600' : 'text-red-600' }}">{{ $tx->amount >= 0 ? '+' : '' }}{{ number_format($tx->amount, 2) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
             <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="card mt-4 border-l-4 border-l-red-400 p-6"
                   onsubmit="return confirm('Delete this user? Their devices return to stock. This cannot be undone.')">
                 @csrf @method('DELETE')

@@ -6,14 +6,19 @@ use App\Exceptions\PaymentsNotConfiguredException;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Models\Sku;
+use App\Models\WalletTransaction;
 use App\Services\Payments\CryptoPaymentService;
+use App\Services\Provisioning\OrderProvisioner;
 use App\Services\Vmos\VmosProxyCatalog;
 use App\Services\Vmos\VmosRegionCatalog;
+use App\Services\Wallet\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Throwable;
 
 class OrderController extends Controller
 {
@@ -26,7 +31,7 @@ class OrderController extends Controller
         return view('orders.index', compact('orders'));
     }
 
-    public function store(Request $request, CryptoPaymentService $payments)
+    public function store(Request $request, CryptoPaymentService $payments, WalletService $wallet, OrderProvisioner $provisioner)
     {
         // Normalise before validating, same convention as SIM regeneration —
         // the "in:" list below is upper-case.
@@ -38,6 +43,8 @@ class OrderController extends Controller
             'sku_id' => ['required', 'integer', 'exists:skus,id'],
             'quantity' => ['required', 'integer', 'min:1', 'max:20'],
             'auto_renew' => ['sometimes', 'boolean'],
+            'pay_with_balance' => ['sometimes', 'boolean'],
+            'payment_network' => ['nullable', 'in:TRC20,BEP20'],
             // A VMOS country code the customer picked at checkout, or blank to
             // let VMOS assign one. Restricted to the confirmed purchase-region
             // list (matching VMOS's own console) rather than just any 2-letter
@@ -62,11 +69,14 @@ class OrderController extends Controller
         $sku = Sku::available()->findOrFail($validated['sku_id']);
         $quantity = $validated['quantity'];
         $proxy = $this->resolveProxy($validated);
+        $payWithBalance = $request->boolean('pay_with_balance');
+        $network = $validated['payment_network'] ?? 'TRC20';
 
         try {
-            // The order and its payment quote must succeed together — otherwise a
-            // misconfigured store leaves orphaned pending orders behind.
-            $order = DB::transaction(function () use ($sku, $quantity, $validated, $proxy, $request, $payments) {
+            // The order and its payment (or balance debit) must succeed together
+            // — otherwise a misconfigured store or a race on the balance leaves
+            // orphaned pending orders behind.
+            $order = DB::transaction(function () use ($sku, $quantity, $validated, $proxy, $request, $payments, $wallet, $payWithBalance, $network) {
                 $order = Auth::user()->orders()->create([
                     'sku_id' => $sku->id,
                     'quantity' => $quantity,
@@ -80,7 +90,15 @@ class OrderController extends Controller
                     'proxy_cost_price' => $proxy['cost_price'],
                 ]);
 
-                $payments->createForOrder($order);
+                if ($payWithBalance) {
+                    $wallet->debit(
+                        Auth::user(), (float) $order->total_price, WalletTransaction::TYPE_PURCHASE,
+                        "Order {$order->reference}", order: $order,
+                    );
+                    $order->update(['status' => Order::STATUS_PAID, 'paid_at' => now()]);
+                } else {
+                    $payments->createForOrder($order, $network);
+                }
 
                 return $order;
             });
@@ -90,10 +108,27 @@ class OrderController extends Controller
             return back()->with('error', Auth::user()->is_admin
                 ? $e->getMessage()
                 : 'Checkout is temporarily unavailable. Please contact support — we\'ve been notified.');
+        } catch (RuntimeException $e) {
+            // Balance changed (e.g. another tab) between page load and submit.
+            return back()->with('error', 'Not enough wallet balance to cover this order. Please top up or pay with crypto instead.');
+        }
+
+        if ($order->status === Order::STATUS_PAID) {
+            try {
+                $provisioner->provision($order->fresh());
+            } catch (Throwable $e) {
+                // Payment already succeeded (balance was debited) — don't fail the
+                // checkout response over a provisioning hiccup. Same recovery path
+                // as any other paid-but-stuck order: Admin → Orders → Provision now.
+                Log::error('checkout.balance_payment_provision_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            }
+
+            return redirect()->route('orders.show', $order)
+                ->with('status', 'Paid from your wallet balance — your order is being provisioned now.');
         }
 
         return redirect()->route('orders.show', $order)
-            ->with('status', 'Order created — send the exact USDT (TRC20) amount shown below to complete your purchase.');
+            ->with('status', "Order created — send the exact USDT ({$network}) amount shown below to complete your purchase.");
     }
 
     /**

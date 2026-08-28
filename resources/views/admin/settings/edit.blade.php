@@ -147,6 +147,25 @@
                                    placeholder="{{ $stored('trongrid_api_key') ? 'Leave blank to keep current key' : 'Optional' }}" autocomplete="off">
                             <p class="hint">Optional — raises the rate limit for on-chain checks. Free at trongrid.io.</p>
                         </div>
+
+                        <div class="border-t border-ink-100 pt-5">
+                            <label class="label" for="crypto_usdt_bep20_address">USDT (BEP20 / BNB Smart Chain) receiving address</label>
+                            <input id="crypto_usdt_bep20_address" name="crypto_usdt_bep20_address" class="input font-mono"
+                                   placeholder="0x..." value="{{ old('crypto_usdt_bep20_address', $settings['crypto_usdt_bep20_address'] ?? '') }}">
+                            <p class="hint">Optional second network — leave blank to only offer TRC20.</p>
+                        </div>
+
+                        <div>
+                            <label class="label" for="bscscan_api_key">
+                                BscScan API key
+                                @if ($stored('bscscan_api_key'))
+                                    <span class="badge-green ml-1">Stored</span>
+                                @endif
+                            </label>
+                            <input id="bscscan_api_key" name="bscscan_api_key" type="password" class="input"
+                                   placeholder="{{ $stored('bscscan_api_key') ? 'Leave blank to keep current key' : 'Required for BEP20 deposits' }}" autocomplete="off">
+                            <p class="hint">Required to verify BEP20 payments on-chain. Free at bscscan.com/apis.</p>
+                        </div>
                     </div>
 
                     <div class="mt-7 flex justify-end border-t border-ink-100 pt-5">

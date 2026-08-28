@@ -265,6 +265,40 @@ class AdminPanelTest extends TestCase
     }
 
     #[Test]
+    public function an_admin_can_credit_and_debit_a_users_wallet_balance(): void
+    {
+        $admin = $this->admin();
+        $customer = User::factory()->create(['balance' => 10]);
+
+        $this->actingAs($admin)->post(route('admin.users.adjust-balance', $customer), [
+            'direction' => 'credit', 'amount' => 20, 'note' => 'Goodwill credit',
+        ])->assertRedirect();
+
+        $this->assertEquals(30, $customer->fresh()->balance);
+
+        $this->actingAs($admin)->post(route('admin.users.adjust-balance', $customer), [
+            'direction' => 'debit', 'amount' => 5, 'note' => 'Correcting a duplicate credit',
+        ])->assertRedirect();
+
+        $this->assertEquals(25, $customer->fresh()->balance);
+        $this->assertDatabaseHas('wallet_transactions', ['user_id' => $customer->id, 'type' => 'adjustment', 'amount' => 20]);
+        $this->assertDatabaseHas('wallet_transactions', ['user_id' => $customer->id, 'type' => 'adjustment', 'amount' => -5]);
+    }
+
+    #[Test]
+    public function debiting_more_than_a_users_balance_is_rejected(): void
+    {
+        $admin = $this->admin();
+        $customer = User::factory()->create(['balance' => 5]);
+
+        $this->actingAs($admin)->post(route('admin.users.adjust-balance', $customer), [
+            'direction' => 'debit', 'amount' => 50, 'note' => 'Oops',
+        ])->assertSessionHas('error');
+
+        $this->assertEquals(5, $customer->fresh()->balance);
+    }
+
+    #[Test]
     public function the_last_admin_cannot_be_demoted_or_deleted(): void
     {
         $admin = $this->admin();

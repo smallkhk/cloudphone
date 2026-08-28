@@ -68,6 +68,21 @@ device. Progress shows on the order page: pending → (bought →) attached.
 > Admin → Proxies rather than risk attaching the wrong one. The customer's
 > own proxy path has no such issue — it's applied directly, every time.
 
+### Wallet balance
+
+Customers can also hold a USD balance (**Wallet** in the account menu),
+topped up with USDT the same way as an order — pick a network (TRC20, or
+BEP20/BNB Smart Chain if you've configured a second receiving address under
+**Admin → Settings → Payments**), send the exact amount, paste the tx hash.
+`php artisan wallet:verify-deposits` (every minute, same cron entry) confirms
+it on-chain and credits the balance. At checkout, a customer with any balance
+gets a "Pay from wallet balance" option that skips the crypto quote entirely
+— useful for renewals, since there's no on-chain wait. Admins can also
+credit/debit a user's balance by hand from their admin user page (refunds,
+goodwill credit); every change, deposit or manual, is recorded in an
+append-only ledger (`wallet_transactions`) visible on both the customer's
+wallet page and the admin user page.
+
 ## Admin panel
 
 Everything below is configurable from `/admin` — no SSH or file editing needed
@@ -252,11 +267,13 @@ for the first few days.
 
 ## Before accepting real payments
 
-The crypto payment verifier (`app/Services/Payments/TronUsdtVerifier.php`) checks
-a submitted transaction hash against TronGrid's public API for a matching TRC20
-USDT transfer to your configured address. Test it end-to-end with a small real
-transaction before relying on it — this is the part of the app that touches real
-money, so verify it yourself rather than trusting it blindly.
+The crypto payment verifiers (`app/Services/Payments/TronUsdtVerifier.php` for
+TRC20, `BscUsdtVerifier.php` for BEP20) check a submitted transaction hash
+against TronGrid's / BscScan's public API for a matching USDT transfer to your
+configured address. Wallet deposits use the exact same verifiers. Test each
+network end-to-end with a small real transaction before relying on it — this
+is the part of the app that touches real money, so verify it yourself rather
+than trusting it blindly.
 
 ## Key VMOS docs
 

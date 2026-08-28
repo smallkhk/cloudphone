@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\CloudInstance;
 use App\Models\User;
+use App\Models\WalletTransaction;
+use App\Services\Wallet\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 
 class UserController extends Controller
 {
@@ -33,12 +36,35 @@ class UserController extends Controller
         $user->load([
             'orders' => fn ($q) => $q->with('sku')->latest(),
             'cloudInstances' => fn ($q) => $q->with('sku')->latest(),
+            'walletTransactions' => fn ($q) => $q->limit(20),
         ]);
 
         // Devices in stock (not yet assigned to anyone) that can be handed to this user.
         $availableInstances = CloudInstance::unallocated()->latest()->get();
 
         return view('admin.users.show', compact('user', 'availableInstances'));
+    }
+
+    /** Manual balance credit/debit — refunds, goodwill, correcting a support mistake. */
+    public function adjustBalance(Request $request, User $user, WalletService $wallet)
+    {
+        $data = $request->validate([
+            'direction' => ['required', 'in:credit,debit'],
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:100000'],
+            'note' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            if ($data['direction'] === 'credit') {
+                $wallet->credit($user, (float) $data['amount'], WalletTransaction::TYPE_ADJUSTMENT, $data['note']);
+            } else {
+                $wallet->debit($user, (float) $data['amount'], WalletTransaction::TYPE_ADJUSTMENT, $data['note']);
+            }
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('status', 'Balance updated.');
     }
 
     public function store(Request $request)

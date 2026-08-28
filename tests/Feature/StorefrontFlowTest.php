@@ -190,6 +190,48 @@ class StorefrontFlowTest extends TestCase
     }
 
     #[Test]
+    public function a_customer_can_pay_for_an_order_from_wallet_balance(): void
+    {
+        Http::fake([
+            '*/vcpcloud/api/padApi/createMoneyOrder' => Http::response([
+                'code' => 200, 'msg' => 'success',
+                'data' => [['id' => 1, 'orderId' => 'VMOS-CLOUD123', 'equipmentId' => 555001, 'createTime' => now()->toDateTimeString(), 'creater' => '1']],
+            ]),
+        ]);
+
+        $user = User::factory()->create(['balance' => 50]);
+        $sku = Sku::factory()->create(['price' => 15.00, 'vmos_good_id' => 74]);
+
+        $this->actingAs($user)->post('/orders', [
+            'sku_id' => $sku->id,
+            'quantity' => 1,
+            'pay_with_balance' => '1',
+        ])->assertRedirect();
+
+        $order = Order::first();
+        $this->assertSame(Order::STATUS_COMPLETED, $order->fresh()->status);
+        $this->assertEquals(35, $user->fresh()->balance);
+        $this->assertSame(0, CryptoPayment::count());
+        $this->assertDatabaseHas('wallet_transactions', ['order_id' => $order->id, 'amount' => -15.00]);
+    }
+
+    #[Test]
+    public function checkout_rejects_paying_from_balance_without_enough_funds(): void
+    {
+        $user = User::factory()->create(['balance' => 5]);
+        $sku = Sku::factory()->create(['price' => 15.00]);
+
+        $this->actingAs($user)->post('/orders', [
+            'sku_id' => $sku->id,
+            'quantity' => 1,
+            'pay_with_balance' => '1',
+        ])->assertSessionHas('error');
+
+        $this->assertSame(0, Order::count());
+        $this->assertEquals(5, $user->fresh()->balance);
+    }
+
+    #[Test]
     public function checkout_falls_back_to_the_skus_default_region_when_none_is_picked(): void
     {
         $user = User::factory()->create();

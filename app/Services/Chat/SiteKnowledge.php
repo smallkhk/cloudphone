@@ -145,6 +145,7 @@ class SiteKnowledge
     protected function paymentFlow(): string
     {
         $wallet = Setting::get('crypto_usdt_trc20_address');
+        $bep20Wallet = Setting::get('crypto_usdt_bep20_address');
         $window = (int) Setting::get('crypto_payment_window_minutes', 60);
 
         if (! $wallet) {
@@ -152,19 +153,28 @@ class SiteKnowledge
                 .'Ask the customer to contact support to complete a purchase.';
         }
 
+        $networks = $bep20Wallet ? 'USDT on the TRC20 (Tron) or BEP20 (BNB Smart Chain) network' : 'USDT on the TRC20 (Tron) network only';
+        $networksWarning = $bep20Wallet
+            ? 'We accept USDT on TRC20 and BEP20 only — sending on any other network (ERC20, etc.) will lose the funds. Match the network they picked at checkout exactly.'
+            : 'We accept USDT on the TRC20 (Tron) network only. Sending USDT on ERC20, BEP20 or any other network will lose the funds.';
+
         return "# How buying works\n"
             ."1. The customer creates an account, then on the Plans page picks a device (name pill), then a duration, then optionally a proxy — in that order.\n"
             ."2. They can also pick a preferred region (a pill filter above the device list) — this doesn't change which devices are shown, it just pre-fills the region on the order.\n"
             ."3. Proxy is optional at checkout: either their own IP/port (free — they can click \"Test proxy\" right there to confirm it's reachable before paying) or a residential proxy bought through us (priced with our markup, added to the total).\n"
-            ."4. Clicking \"Buy now\" creates an order and shows a USDT (TRC20 / Tron network) payment address and the exact amount (device + proxy add-on if any).\n"
-            ."5. They send that exact amount of USDT from their own wallet or exchange, then paste the transaction hash (TXID) into the order page.\n"
-            ."6. The site checks the transaction on the Tron blockchain automatically, usually within a minute or two.\n"
-            ."7. Once confirmed, the cloud phone is created automatically — with the chosen region's SIM/carrier and any proxy already applied — and appears under \"My cloud phones\".\n\n"
+            ."4. If they have wallet balance (see below), they can tick \"Pay from wallet balance\" instead of paying with crypto — the order is paid and starts provisioning immediately, no waiting for on-chain confirmation.\n"
+            ."5. Otherwise, clicking \"Buy now\" creates an order and shows a {$networks} payment address and the exact amount (device + proxy add-on if any).\n"
+            ."6. They send that exact amount of USDT from their own wallet or exchange, then paste the transaction hash (TXID) into the order page.\n"
+            ."7. The site checks the transaction on-chain automatically, usually within a minute or two.\n"
+            ."8. Once confirmed, the cloud phone is created automatically — with the chosen region's SIM/carrier and any proxy already applied — and appears under \"My cloud phones\".\n\n"
+            ."# Wallet balance\n"
+            .'Customers can also hold a USD balance on the site (see "Wallet" in their account menu), topped up the same way as an order payment — pick a network, send USDT, paste the tx hash. '
+            ."Balance is spent instantly at checkout with no on-chain wait, useful for renewals. It never expires and can be topped up any amount \$5 or more.\n\n"
             ."Important payment facts:\n"
-            ."- We accept USDT on the TRC20 (Tron) network only. Sending USDT on ERC20, BEP20 or any other network will lose the funds.\n"
+            ."- {$networksWarning}\n"
             ."- The payment window is {$window} minutes; after that the quote expires and they should start a new order.\n"
             ."- Underpaying slightly may fail verification — send the exact amount shown.\n"
-            ."- Never post, guess or repeat a wallet address in chat. Always tell the customer to use the address shown on their own order page.\n"
+            ."- Never post, guess or repeat a wallet address in chat. Always tell the customer to use the address shown on their own order or wallet page.\n"
             .'- Never ask for a private key, seed phrase, password or exchange login.';
     }
 

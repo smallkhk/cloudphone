@@ -122,7 +122,7 @@
         </p>
 
         <div class="mt-4" x-data="{
-                selectedFamily: null, selectedSku: null, proxyMode: '',
+                selectedFamily: null, selectedSku: null, proxyMode: '', payWithBalance: false,
                 proxyTesting: false, proxyTestResult: null,
                 async testProxy(form) {
                     this.proxyTesting = true;
@@ -261,6 +261,25 @@
                                         {{ $group->name }} · {{ $sku->duration_label }} · ${{ number_format($sku->price, 2) }}
                                         @if ($preferredRegion) · {{ $regionOptions[$preferredRegion] ?? $preferredRegion }} @endif
                                     </p>
+
+                                    @if (auth()->user()->balance > 0)
+                                        <label class="mt-3 flex items-center gap-2 text-sm text-ink-700">
+                                            <input type="checkbox" name="pay_with_balance" value="1" x-model="payWithBalance"
+                                                   class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
+                                            Pay from wallet balance (${{ number_format(auth()->user()->balance, 2) }} available)
+                                        </label>
+                                    @endif
+
+                                    @if ($bep20Available)
+                                        <div x-show="!payWithBalance" class="mt-2">
+                                            <label class="label text-xs" for="payment_network-{{ $sku->id }}">Pay with</label>
+                                            <select id="payment_network-{{ $sku->id }}" name="payment_network" class="input text-sm">
+                                                <option value="TRC20">USDT (TRC20)</option>
+                                                <option value="BEP20">USDT (BEP20 / BNB Smart Chain)</option>
+                                            </select>
+                                        </div>
+                                    @endif
+
                                     <button class="btn-primary mt-3 w-full">Buy now</button>
                                 </form>
                             @else

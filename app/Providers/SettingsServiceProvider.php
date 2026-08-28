@@ -28,6 +28,8 @@ class SettingsServiceProvider extends ServiceProvider
         'crypto_payment_window_minutes' => 'crypto.payment_window_minutes',
         'crypto_amount_tolerance_percent' => 'crypto.amount_tolerance_percent',
         'trongrid_api_key' => 'crypto.trongrid_api_key',
+        'crypto_usdt_bep20_address' => 'crypto.usdt_bep20_address',
+        'bscscan_api_key' => 'crypto.bscscan_api_key',
 
         'assistant_enabled' => 'assistant.enabled',
         'assistant_provider' => 'assistant.provider',
