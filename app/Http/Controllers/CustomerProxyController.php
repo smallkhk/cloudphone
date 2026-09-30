@@ -21,10 +21,19 @@ class CustomerProxyController extends Controller
 {
     public function __construct(protected VmosCloudPhoneService $vmos) {}
 
-    /** Storefront: browse purchasable proxy plans. */
-    public function index()
+    /** Storefront: browse purchasable proxy plans, filterable by country. */
+    public function index(Request $request)
     {
-        $skus = Sku::available()->proxies()->where('price', '>', 0)->orderBy('default_country_code')->orderBy('name')->get();
+        $country = strtoupper((string) $request->query('country', ''));
+
+        $available = Sku::available()->proxies()->where('price', '>', 0);
+
+        $countries = (clone $available)->orderBy('default_country_code')
+            ->pluck('default_country_code')->filter()->unique()->values();
+
+        $skus = $available
+            ->when($country !== '', fn ($q) => $q->where('default_country_code', $country))
+            ->orderBy('default_country_code')->orderBy('name')->get();
 
         $owned = Auth::check()
             ? CustomerProxy::where('user_id', Auth::id())->with('sku')->latest()->get()
@@ -34,7 +43,7 @@ class CustomerProxyController extends Controller
             ? CloudInstance::where('user_id', Auth::id())->whereNotNull('pad_code')->get(['id', 'pad_code', 'nickname'])
             : collect();
 
-        return view('proxies.index', compact('skus', 'owned', 'devices'));
+        return view('proxies.index', compact('skus', 'owned', 'devices', 'countries', 'country'));
     }
 
     /** Attaches an owned, delivered proxy to one of the customer's own devices. */

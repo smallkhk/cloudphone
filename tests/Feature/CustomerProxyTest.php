@@ -32,6 +32,17 @@ class CustomerProxyTest extends TestCase
     }
 
     #[Test]
+    public function the_country_filter_only_shows_that_countrys_plans(): void
+    {
+        Sku::factory()->create(['type' => Sku::TYPE_PROXY, 'default_country_code' => 'US', 'price' => 12.99]);
+        Sku::factory()->create(['type' => Sku::TYPE_PROXY, 'default_country_code' => 'JP', 'price' => 14.99]);
+
+        $response = $this->get(route('proxies.index', ['country' => 'JP']));
+
+        $response->assertOk()->assertSee('$14.99')->assertDontSee('$12.99');
+    }
+
+    #[Test]
     public function a_customer_can_buy_a_proxy_and_it_completes(): void
     {
         Http::fake([

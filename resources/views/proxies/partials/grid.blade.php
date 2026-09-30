@@ -23,7 +23,13 @@
     </span>
 </div>
 
-@if ($skus->isEmpty())
+@if ($countries->isNotEmpty())
+    <x-pill-filter label="Country" param="country" route="proxies.index" all-label="All countries"
+        :active="$country"
+        :options="$countries->mapWithKeys(fn ($c) => [$c => $c])" />
+@endif
+
+@if ($skus->isEmpty() && $countries->isEmpty())
     <div class="card mx-auto max-w-lg p-10 text-center">
         <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-ink-100">
             <svg class="h-6 w-6 text-ink-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
@@ -47,6 +53,12 @@
                 <a href="{{ route('admin.skus.index', ['type' => 'proxy']) }}" class="btn-primary mt-6">Go to Plans &amp; pricing</a>
             @endif
         @endauth
+    </div>
+@elseif ($skus->isEmpty())
+    <div class="card mx-auto max-w-lg p-10 text-center">
+        <h2 class="text-lg font-semibold text-ink-900">No proxies for {{ $country }}</h2>
+        <p class="mt-2 text-sm text-ink-500">Try another country, or clear the filter to see everything available.</p>
+        <a href="{{ route('proxies.index') }}" class="btn-secondary mt-6">Clear filter</a>
     </div>
 @else
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
