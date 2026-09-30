@@ -17,10 +17,10 @@ class SyncCloudSkus extends Command
      * back with only 2 of these 4 versions. So every sync now loops over
      * this list explicitly instead of trusting an unfiltered call.
      */
-    protected const KNOWN_ANDROID_VERSIONS = ['13', '14', '15', '16'];
+    protected const KNOWN_ANDROID_VERSIONS = ['13', '14', '15', '16', '17'];
 
     protected $signature = 'vmos:sync-skus
-        {--android-versions= : Comma-separated Android versions; omit to sync every known version (13, 14, 15, 16)}';
+        {--android-versions= : Comma-separated Android versions; omit to sync every known version (13, 14, 15, 16, 17)}';
 
     protected $description = 'Pull the VMOS SKU/package catalogue and upsert it into the local skus table';
 
