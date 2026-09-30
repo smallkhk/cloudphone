@@ -193,7 +193,7 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th><th>Source</th><th>Proxy</th><th>Protocol</th><th>Status</th>
+                        <th>ID</th><th>Source</th><th>IP Address</th><th>Protocol</th><th>Expiration time</th><th>Status</th>
                         <th>Binding quantity</th><th>Attached to</th><th></th>
                     </tr>
                 </thead>
@@ -221,6 +221,10 @@
                             </td>
                             <td class="text-sm text-ink-600">
                                 {{ $proxy->proxy_name ? strtoupper($proxy->proxy_name) : '—' }}
+                            </td>
+                            <td class="text-sm text-ink-600">
+                                @php $expireTime = $proxy->raw_payload['list_record']['expireTime'] ?? null; @endphp
+                                {{ $expireTime ? \Carbon\Carbon::createFromTimestamp($expireTime)->format('d M Y') : '—' }}
                             </td>
                             <td>
                                 <span class="{{ match ($proxy->purchase_status) {
@@ -252,6 +256,7 @@
                                                     attached_pad_code: @js($proxy->attached_pad_code),
                                                     remarks: @js($proxy->remarks),
                                                     delivered_at: @js($proxy->delivered_at?->format('d M Y H:i')),
+                                                    expires_at: @js($expireTime ? \Carbon\Carbon::createFromTimestamp($expireTime)->format('d M Y') : null),
                                                 }">
                                             View
                                         </button>
@@ -306,7 +311,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="py-12 text-center text-sm text-ink-500">Proxies you buy or add will show up here.</td></tr>
+                        <tr><td colspan="9" class="py-12 text-center text-sm text-ink-500">Proxies you buy or add will show up here.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -408,6 +413,9 @@
                         <div class="flex justify-between py-2"><dt class="text-ink-500">Attached to</dt><dd class="font-mono text-ink-900" x-text="viewing.attached_pad_code || '—'"></dd></div>
                         <template x-if="viewing.delivered_at">
                             <div class="flex justify-between py-2"><dt class="text-ink-500">Delivered</dt><dd class="font-medium text-ink-900" x-text="viewing.delivered_at"></dd></div>
+                        </template>
+                        <template x-if="viewing.expires_at">
+                            <div class="flex justify-between py-2"><dt class="text-ink-500">Expiration time</dt><dd class="font-medium text-ink-900" x-text="viewing.expires_at"></dd></div>
                         </template>
                         <template x-if="viewing.remarks">
                             <div class="flex justify-between gap-4 py-2"><dt class="flex-none text-ink-500">Remarks</dt><dd class="text-right text-ink-900" x-text="viewing.remarks"></dd></div>

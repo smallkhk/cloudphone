@@ -71,6 +71,23 @@ class CustomerProxyTest extends TestCase
     }
 
     #[Test]
+    public function the_owned_proxies_table_shows_ip_address_and_expiration(): void
+    {
+        $user = User::factory()->create();
+        CustomerProxy::factory()->create([
+            'user_id' => $user->id, 'host' => '5.5.5.5', 'port' => 1080,
+            'raw_payload' => ['list_record' => ['expireTime' => strtotime('2027-01-15')]],
+        ]);
+
+        $this->actingAs($user)->get(route('proxies.index'))
+            ->assertOk()
+            ->assertSee('IP Address')
+            ->assertSee('5.5.5.5:1080')
+            ->assertSee('Expiration time')
+            ->assertSee('15 Jan 2027');
+    }
+
+    #[Test]
     public function a_customer_can_edit_their_own_manually_added_proxy(): void
     {
         $user = User::factory()->create();
