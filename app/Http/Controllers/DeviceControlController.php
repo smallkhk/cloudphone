@@ -9,7 +9,9 @@ use App\Services\Vmos\VmosRegionCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -52,17 +54,19 @@ class DeviceControlController extends Controller
                 }
             });
 
-            $storage = Cache::remember("device.{$instance->id}.storage", now()->addMinutes(2), function () use ($instance) {
+            // Cloud Drive is one account-wide space, not per device — cached
+            // under a single key rather than per instance.
+            $storage = Cache::remember('vmos.cloud_drive.storage', now()->addMinutes(2), function () {
                 try {
-                    return $this->vmos->storageInfo($instance->pad_code)['data'] ?? null;
+                    return $this->vmos->storageInfo()['data'] ?? null;
                 } catch (Throwable) {
                     return null;
                 }
             });
 
-            $files = Cache::remember("device.{$instance->id}.files", now()->addMinutes(2), function () use ($instance) {
+            $files = Cache::remember('vmos.cloud_drive.files', now()->addMinutes(2), function () {
                 try {
-                    return $this->vmos->listFiles($instance->pad_code)['data'] ?? [];
+                    return $this->vmos->listFiles()['data'] ?? [];
                 } catch (Throwable) {
                     return [];
                 }
@@ -300,7 +304,7 @@ class DeviceControlController extends Controller
         return back()->with('status', 'App list refreshed.');
     }
 
-    // --- Cloud Drive -------------------------------------------------------
+    // --- Cloud Drive (account-wide — see VmosCloudPhoneService) -------------
 
     public function uploadDriveFile(Request $request, CloudInstance $instance)
     {
@@ -309,11 +313,21 @@ class DeviceControlController extends Controller
             'file_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        return $this->run($instance, 'File download started — it will appear in Cloud Drive shortly.', function () use ($instance, $data) {
-            $response = $this->vmos->uploadCloudFile($instance->pad_code, $data['url'], $data['file_name'] ?? null);
+        return $this->run($instance, 'File uploaded to Cloud Drive.', function () use ($instance, $data) {
+            // VMOS's uploadFile only accepts an actual file body, not a URL —
+            // download it here and re-upload the bytes.
+            $download = Http::timeout(30)->get($data['url']);
+
+            if (! $download->successful()) {
+                throw new RuntimeException("Could not download that URL (HTTP {$download->status()}).");
+            }
+
+            $fileName = $data['file_name'] ?: (basename(parse_url($data['url'], PHP_URL_PATH) ?: '') ?: 'file');
+
+            $response = $this->vmos->uploadCloudFile($download->body(), $fileName);
             $this->recordTask($instance, 'upload_file', $response);
-            Cache::forget("device.{$instance->id}.files");
-            Cache::forget("device.{$instance->id}.storage");
+            Cache::forget('vmos.cloud_drive.files');
+            Cache::forget('vmos.cloud_drive.storage');
         });
     }
 
@@ -321,13 +335,13 @@ class DeviceControlController extends Controller
     {
         $data = $request->validate([
             'file_ids' => ['required', 'array', 'min:1'],
-            'file_ids.*' => ['string'],
+            'file_ids.*' => ['integer'],
         ]);
 
-        return $this->run($instance, 'File deleted.', function () use ($instance, $data) {
+        return $this->run($instance, 'File deleted.', function () use ($data) {
             $this->vmos->deleteCloudFiles($data['file_ids']);
-            Cache::forget("device.{$instance->id}.files");
-            Cache::forget("device.{$instance->id}.storage");
+            Cache::forget('vmos.cloud_drive.files');
+            Cache::forget('vmos.cloud_drive.storage');
         });
     }
 
@@ -367,13 +381,13 @@ class DeviceControlController extends Controller
         abort_unless(Auth::user()?->is_admin, 403);
 
         $data = $request->validate([
-            'good_id' => ['required', 'integer'],
-            'num' => ['required', 'integer', 'min:1', 'max:20'],
+            'storage_id' => ['required', 'integer'],
+            'auto_renew' => ['sometimes', 'boolean'],
         ]);
 
-        return $this->run($instance, 'Storage purchased — it may take a moment to reflect in the balance.', function () use ($instance, $data) {
-            $this->vmos->buyStorage((int) $data['good_id'], $instance->pad_code, (int) $data['num']);
-            Cache::forget("device.{$instance->id}.storage");
+        return $this->run($instance, 'Storage purchased — it may take a moment to reflect in the balance.', function () use ($request, $data) {
+            $this->vmos->buyStorage((int) $data['storage_id'], $request->boolean('auto_renew'));
+            Cache::forget('vmos.cloud_drive.storage');
         });
     }
 

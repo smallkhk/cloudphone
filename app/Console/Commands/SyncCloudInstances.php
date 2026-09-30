@@ -52,15 +52,19 @@ class SyncCloudInstances extends Command
                     'last_synced_at' => now(),
                 ]);
 
-                // A proxy add-on and the checkout region's carrier can only be
-                // applied once the padCode exists — this is the first moment
-                // that's true.
+                // The checkout region's carrier can only be applied once the
+                // padCode exists — this is the first moment that's true — and
+                // SimProvisioner is idempotent, so only needs the one attempt.
                 if ($justGotPadCode) {
-                    if ($instance->order?->hasProxy()) {
-                        $proxies->apply($instance->fresh());
-                    }
-
                     $sim->apply($instance->fresh());
+                }
+
+                // A VMOS proxy purchase is an async task on VMOS's side (can
+                // report PENDING/PROCESSING for a while), so this keeps
+                // retrying on every sync pass until it resolves one way or
+                // the other — apply() itself no-ops once attached or failed.
+                if ($instance->pad_code && $instance->order?->hasProxy()) {
+                    $proxies->apply($instance->fresh());
                 }
 
                 $updated++;

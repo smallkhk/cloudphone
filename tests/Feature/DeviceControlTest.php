@@ -202,7 +202,7 @@ class DeviceControlTest extends TestCase
     // --- Cloud Drive -------------------------------------------------------
 
     #[Test]
-    public function uploading_a_drive_file_pushes_the_url_to_vmos(): void
+    public function uploading_a_drive_file_downloads_the_url_and_reuploads_it(): void
     {
         $this->fakeVmosOk();
         $this->actingAs($this->owner)->post(route('instances.drive.upload', $this->device), [
@@ -210,8 +210,8 @@ class DeviceControlTest extends TestCase
             'file_name' => 'report.pdf',
         ])->assertSessionHas('status');
 
-        Http::assertSent(fn ($r) => str_contains($r->url(), 'uploadFile')
-            && $r['url'] === 'https://example.com/report.pdf' && $r['fileName'] === 'report.pdf');
+        Http::assertSent(fn ($r) => $r->url() === 'https://example.com/report.pdf');
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'uploadFile') && $r->isMultipart());
     }
 
     #[Test]
@@ -220,13 +220,13 @@ class DeviceControlTest extends TestCase
         $this->fakeVmosOk();
         $stranger = User::factory()->create();
 
-        $this->actingAs($stranger)->delete(route('instances.drive.delete', $this->device), ['file_ids' => ['f1']])
+        $this->actingAs($stranger)->delete(route('instances.drive.delete', $this->device), ['file_ids' => [1]])
             ->assertForbidden();
 
-        $this->actingAs($this->owner)->delete(route('instances.drive.delete', $this->device), ['file_ids' => ['f1']])
+        $this->actingAs($this->owner)->delete(route('instances.drive.delete', $this->device), ['file_ids' => [1]])
             ->assertSessionHas('status');
 
-        Http::assertSent(fn ($r) => str_contains($r->url(), 'deleteOssFiles') && $r['fileIds'] === ['f1']);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'deleteOssFiles') && $r['files'] === [1]);
     }
 
     #[Test]
@@ -241,6 +241,9 @@ class DeviceControlTest extends TestCase
             'cloud_instance_id' => $this->device->id,
             'type' => 'backup',
         ]);
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'addBackup')
+            && $r['vcPadBackupList'] === [['padCode' => 'AC55501']]);
     }
 
     #[Test]
@@ -267,16 +270,16 @@ class DeviceControlTest extends TestCase
         $this->fakeVmosOk();
 
         $this->actingAs($this->owner)
-            ->post(route('instances.drive.buy-storage', $this->device), ['good_id' => 1, 'num' => 1])
+            ->post(route('instances.drive.buy-storage', $this->device), ['storage_id' => 1])
             ->assertForbidden();
 
         $admin = User::factory()->create(['is_admin' => true]);
         $this->actingAs($admin)
-            ->post(route('instances.drive.buy-storage', $this->device), ['good_id' => 1, 'num' => 1])
+            ->post(route('instances.drive.buy-storage', $this->device), ['storage_id' => 1, 'auto_renew' => '1'])
             ->assertSessionHas('status');
 
         Http::assertSent(fn ($r) => str_contains($r->url(), 'buyStorageGoods')
-            && $r['goodId'] === 1 && $r['padCode'] === 'AC55501');
+            && $r['storageId'] === 1 && $r['autoRenewOrder'] === 1);
     }
 
     #[Test]

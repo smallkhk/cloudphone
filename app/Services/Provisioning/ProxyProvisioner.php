@@ -25,14 +25,19 @@ use Throwable;
  *    SyncCloudInstances, the same place padCode itself gets filled in), since
  *    both setCustomProxy and attachProxies require one.
  *
- * VMOS's createProxyOrder response doesn't document returning a usable proxy
- * ID the way createMoneyOrder returns an equipmentId — Admin → Proxies' own
- * purchase flow never uses one, it just re-lists owned proxies afterward. So
- * apply() for a VMOS proxy has to positively *find* the just-bought proxy in
- * that list (unused, matching country) rather than reference it directly. If
- * that match is ever ambiguous, this deliberately does NOT guess — it flags
- * the order for the admin to attach manually from Admin → Proxies, where the
- * existing working attach flow already lives.
+ * As of 2026-09, VMOS confirmed createProxyOrder is async: it only *accepts*
+ * the purchase and returns a taskId, which proxyOrderStatus() must be polled
+ * until FINISHED (or NEEDS_REVIEW, which VMOS itself flags as needing a human
+ * — never resubmit with a new idempotency key in that case) before the proxy
+ * reliably shows up in listStaticProxies(). Even once FINISHED, VMOS still
+ * doesn't hand back a direct proxy ID the way createMoneyOrder returns an
+ * equipmentId — Admin → Proxies' own purchase flow never uses one either, it
+ * just re-lists owned proxies afterward. So apply() for a VMOS proxy still
+ * has to positively *find* the just-bought proxy in that list (unused,
+ * matching country) rather than reference it directly. If that match is ever
+ * ambiguous, this deliberately does NOT guess — it flags the order for the
+ * admin to attach manually from Admin → Proxies, where the existing working
+ * attach flow already lives.
  */
 class ProxyProvisioner
 {
@@ -50,18 +55,28 @@ class ProxyProvisioner
 
         $config = $order->proxy_config ?? [];
 
+        // Stable per order, not per call — if purchase() ever runs twice for
+        // the same order (retry, job replay), VMOS treats it as the same
+        // request via this key instead of buying a second proxy.
+        $clientRequestId = 'order-'.$order->id.'-proxy';
+
         try {
             $response = $this->vmos->buyStaticProxy(
                 proxyGoodId: (int) $config['good_id'],
                 country: (string) $config['country'],
                 proxyAddress: (string) $config['proxy_address'],
+                clientRequestId: $clientRequestId,
                 num: 1,
                 autoRenew: false,
             );
 
             $order->update([
                 'proxy_status' => Order::PROXY_STATUS_PURCHASED,
-                'proxy_config' => array_merge($config, ['purchase_response' => $response['data'] ?? null]),
+                'proxy_config' => array_merge($config, [
+                    'purchase_response' => $response['data'] ?? null,
+                    'purchase_task_id' => $response['data']['taskId'] ?? null,
+                    'client_request_id' => $clientRequestId,
+                ]),
             ]);
         } catch (Throwable $e) {
             Log::error('proxy_provisioning.purchase_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
@@ -123,6 +138,15 @@ class ProxyProvisioner
         }
 
         $config = $order->proxy_config ?? [];
+        $taskId = $config['purchase_task_id'] ?? null;
+
+        if ($taskId && ! $this->purchaseFinished($order, $taskId, $config)) {
+            // Still PENDING/PROCESSING, or just got flagged NEEDS_REVIEW/failed
+            // above — either way, nothing to attach yet. Called again on the
+            // next sync pass until it resolves one way or the other.
+            return;
+        }
+
         $proxyId = $this->findUnattachedProxy((string) ($config['country'] ?? ''));
 
         if (! $proxyId) {
@@ -141,6 +165,31 @@ class ProxyProvisioner
             'proxy_status' => Order::PROXY_STATUS_ATTACHED,
             'proxy_config' => array_merge($config, ['matched_proxy_id' => $proxyId]),
         ]);
+    }
+
+    /**
+     * Polls the async purchase task. Returns true once it's safe to look for
+     * the proxy in listStaticProxies() (i.e. VMOS reports FINISHED); flags
+     * the order failed on NEEDS_REVIEW (VMOS explicitly says don't resubmit)
+     * and returns false either way otherwise.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    protected function purchaseFinished(Order $order, string $taskId, array $config): bool
+    {
+        $status = $this->vmos->proxyOrderStatus($taskId)['data']['status'] ?? null;
+
+        if ($status === 'NEEDS_REVIEW') {
+            $order->update([
+                'proxy_status' => Order::PROXY_STATUS_FAILED,
+                'proxy_error' => 'Purchase needs manual review on the provider side — check Admin → Proxies '
+                    .'and the provider console before attaching or repurchasing.',
+            ]);
+
+            return false;
+        }
+
+        return $status === 'FINISHED';
     }
 
     /**

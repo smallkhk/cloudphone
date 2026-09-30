@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CloudInstance;
 use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -17,9 +18,7 @@ use Throwable;
  */
 class ProxyController extends Controller
 {
-    public function __construct(protected VmosCloudPhoneService $vmos)
-    {
-    }
+    public function __construct(protected VmosCloudPhoneService $vmos) {}
 
     public function index()
     {
@@ -64,6 +63,7 @@ class ProxyController extends Controller
                 proxyGoodId: (int) $data['proxy_good_id'],
                 country: $data['country'],
                 proxyAddress: $data['proxy_address'],
+                clientRequestId: 'admin-'.now()->format('YmdHis').'-'.Str::random(8),
                 num: (int) $data['num'],
                 autoRenew: $request->boolean('auto_renew'),
             );
@@ -71,7 +71,7 @@ class ProxyController extends Controller
             return back()->with('error', 'Purchase failed: '.$e->getMessage());
         }
 
-        return back()->with('status', "Bought {$data['num']} proxy(ies) in {$data['proxy_address']}. They'll appear below once VMOS provisions them.");
+        return back()->with('status', "Purchase accepted for {$data['num']} proxy(ies) in {$data['proxy_address']} — it's processed in the background, refresh this page in a minute to see them below.");
     }
 
     /** Attaches a VMOS-owned proxy to one or more devices. */

@@ -99,6 +99,28 @@ class VmosClient
     }
 
     /**
+     * A multipart/form-data POST — for the handful of endpoints (uploadFile)
+     * that take an actual file body rather than JSON. Always an unsigned-body
+     * path (see UNSIGNED_BODY_PATHS): a multipart body's bytes on the wire
+     * depend on a boundary Guzzle generates itself, so there's nothing stable
+     * to sign here the way there is for a JSON body.
+     */
+    public function postMultipart(string $path, string $fieldName, string $contents, string $fileName): array
+    {
+        $response = $this->send($path, function () use ($path, $fieldName, $contents, $fileName) {
+            $timestamp = (string) time();
+            $sign = $this->sign($timestamp, $path, '');
+
+            return $this->pending()
+                ->withHeaders($this->headers($timestamp, $sign))
+                ->attach($fieldName, $contents, $fileName)
+                ->post($this->baseUrl.$path);
+        });
+
+        return $this->handle($path, $response->status(), $response->body());
+    }
+
+    /**
      * Shared transport settings.
      *
      * `timeout` covers a slow reply; `connectTimeout` covers a TCP handshake

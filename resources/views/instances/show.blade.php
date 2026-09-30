@@ -402,23 +402,20 @@
 
                 {{-- Cloud Drive tab --}}
                 <div x-show="tab === 'drive'" x-cloak class="space-y-6">
-                    @if (auth()->user()->is_admin)
-                        <div class="rounded-xl bg-ink-50 p-4 text-xs text-ink-500 ring-1 ring-inset ring-ink-200">
-                            Field names for Cloud Drive aren't fully confirmed yet — if capacity or a file looks
-                            wrong here, check <a href="{{ route('admin.diagnostics.index', ['probe' => 'storage_goods']) }}" class="font-medium text-brand-600 hover:underline">API diagnostics</a>
-                            against the raw response.
-                        </div>
-                    @endif
+                    <div class="rounded-xl bg-ink-50 p-4 text-xs text-ink-500 ring-1 ring-inset ring-ink-200">
+                        Cloud Drive is shared across your whole account, not this one device — files and storage
+                        here are the same on every device's Cloud Drive tab.
+                    </div>
 
                     @php
-                        $used = $storage['used'] ?? $storage['usedSize'] ?? $storage['useSize'] ?? null;
-                        $total = $storage['total'] ?? $storage['totalSize'] ?? $storage['capacity'] ?? null;
+                        $used = $storage['storageUsedAvail'] ?? null;
+                        $total = $storage['storageCapacityLimit'] ?? null;
                     @endphp
 
                     <div class="card p-6">
                         <h3 class="text-base font-semibold text-ink-900">Storage</h3>
                         @if ($used !== null && $total !== null)
-                            <p class="mt-2 text-sm text-ink-600">{{ $used }} / {{ $total }} used</p>
+                            <p class="mt-2 text-sm text-ink-600">{{ number_format($used / 1073741824, 2) }} GB / {{ number_format($total / 1073741824, 2) }} GB used</p>
                             <div class="mt-3 h-2 overflow-hidden rounded-full bg-ink-100">
                                 <div class="h-full bg-brand-600" style="width: {{ $total > 0 ? min(100, round($used / $total * 100)) : 0 }}%"></div>
                             </div>
@@ -432,17 +429,20 @@
                                   onsubmit="return confirm('This charges your VMOS balance. Continue?')">
                                 @csrf
                                 <div class="flex-1">
-                                    <label class="label" for="good_id">Buy more storage (admin)</label>
-                                    <select id="good_id" name="good_id" class="input">
+                                    <label class="label" for="storage_id">Buy more storage (admin)</label>
+                                    <select id="storage_id" name="storage_id" class="input">
                                         @foreach ($storageGoods as $good)
-                                            <option value="{{ $good['id'] ?? $good['goodId'] ?? '' }}">
-                                                {{ $good['name'] ?? $good['goodName'] ?? 'Storage package' }}
-                                                @if (isset($good['price'])) — ${{ number_format($good['price'] / 100, 2) }} @endif
+                                            <option value="{{ $good['storageId'] ?? '' }}">
+                                                {{ $good['storageName'] ?? 'Storage package' }}
+                                                @if (isset($good['payPrice'])) — ${{ number_format($good['payPrice'] / 100, 2) }} @endif
                                             </option>
                                         @endforeach
                                     </select>
                                 </div>
-                                <input type="number" name="num" value="1" min="1" max="20" class="input w-20">
+                                <label class="flex items-center gap-2 text-sm text-ink-700">
+                                    <input type="checkbox" name="auto_renew" value="1" class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
+                                    Auto-renew
+                                </label>
                                 <button class="btn-secondary">Buy</button>
                             </form>
                         @endif
@@ -451,7 +451,7 @@
                     <form method="POST" action="{{ route('instances.drive.upload', $instance) }}" class="card p-6">
                         @csrf
                         <h3 class="text-base font-semibold text-ink-900">Upload a file</h3>
-                        <p class="mt-1 text-sm text-ink-500">Paste a direct link — it's downloaded straight onto the device's cloud disk.</p>
+                        <p class="mt-1 text-sm text-ink-500">Paste a direct link — it's downloaded and stored on your Cloud Drive.</p>
                         <div class="mt-5 space-y-3">
                             <div>
                                 <label class="label" for="drive_url">File URL</label>
@@ -469,21 +469,18 @@
 
                     <div class="card">
                         <h3 class="px-5 py-4 text-base font-semibold text-ink-900">Files</h3>
-                        @php $fileList = collect($files ?? [])->flatMap(fn ($e) => $e['records'] ?? $e['files'] ?? (is_array($e) && (isset($e['fileId']) || isset($e['id'])) ? [$e] : [])); @endphp
+                        @php $fileList = collect($files ?? []); @endphp
 
                         @if ($fileList->isEmpty())
                             <p class="border-t border-ink-100 px-5 py-8 text-center text-sm text-ink-500">No files yet.</p>
                         @else
                             <ul class="divide-y divide-ink-100 border-t border-ink-100">
                                 @foreach ($fileList as $file)
-                                    @php $fileId = $file['fileId'] ?? $file['id'] ?? null; @endphp
+                                    @php $fileId = $file['fileId'] ?? null; @endphp
                                     @continue(! $fileId)
                                     <li class="flex flex-wrap items-center gap-3 px-5 py-3">
                                         <div class="min-w-0 flex-1">
-                                            <p class="truncate text-sm font-medium text-ink-900">{{ $file['fileName'] ?? $file['name'] ?? $fileId }}</p>
-                                            @if (isset($file['size']))
-                                                <p class="text-xs text-ink-500">{{ $file['size'] }}</p>
-                                            @endif
+                                            <p class="truncate text-sm font-medium text-ink-900">{{ $file['appName'] ?? $fileId }}</p>
                                         </div>
                                         <form method="POST" action="{{ route('instances.drive.delete', $instance) }}"
                                               onsubmit="return confirm('Delete this file?')">

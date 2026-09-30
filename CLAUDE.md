@@ -217,10 +217,22 @@ has the full reasoning in its docblock:
    `setCustomProxy` and `attachProxies` require one.
 
 The `custom` path is fully deterministic (the customer's own IP/port, applied
-directly) — trust that one. The `vmos` path is not: `createProxyOrder`
-doesn't hand back a usable proxy ID (confirmed — Admin → Proxies' own
-existing purchase flow never uses one either, it just re-lists owned proxies
-afterward), so `apply()` has to *find* the just-bought proxy in
+directly) — trust that one. The `vmos` path is better than it was, but still
+not fully deterministic. **Update (2026-09):** VMOS published real docs for
+`createProxyOrder` — it's confirmed async now: it only *accepts* the purchase
+and returns a `taskId`, and `proxyOrderStatus()` (new) must be polled until
+`FINISHED` (or `NEEDS_REVIEW`, which VMOS itself says never to resubmit —
+needs a human) before the proxy reliably shows up in `listStaticProxies()`.
+`purchase()` now sends a stable per-order `clientRequestId` (`order-{id}-proxy`)
+so a retried call can't double-buy, and `apply()` won't attempt to find/attach
+until the task reports `FINISHED` — `SyncCloudInstances` now retries proxy
+`apply()` on every sync pass (not just once, when padCode first appears),
+since the async task can still be `PENDING`/`PROCESSING` at that moment.
+
+Even once `FINISHED`, VMOS still doesn't hand back a direct proxy ID the way
+`createMoneyOrder` returns an `equipmentId` — Admin → Proxies' own existing
+purchase flow never uses one either, it just re-lists owned proxies
+afterward. So `apply()` still has to *find* the just-bought proxy in
 `listStaticProxies()` by matching country + unused. If a customer buys two
 VMOS proxies in the same country close together, or another admin-side
 purchase lands in between, that match can be ambiguous. Rather than guess
@@ -228,7 +240,8 @@ wrong on a paid purchase, it deliberately does NOT attach in that case — it
 marks the order `proxy_status = 'failed'` with a clear message and points to
 Admin → Proxies to attach by hand (visible on both the admin and customer
 order pages). **Watch Admin → Orders for a few real vmos-mode purchases
-before treating the auto-match as reliable.**
+before treating the auto-match as reliable** — this part is unchanged by the
+above and still needs that verification.
 
 **Plans page filters** — Android version and Device model are button/pill
 rows now (`x-pill-filter` component), not dropdowns. There's also a Region
@@ -250,25 +263,61 @@ VMOS ever exposes a real "regions available to buy in" endpoint, swap
 `PURCHASE_REGIONS` for that; until then, update the constant by hand if VMOS
 adds a region to their console.
 
-**Cloud Drive** (added, NOT yet tested against a live VMOS account): a new
-tab on the device control panel (`My cloud phones → Manage → Cloud Drive`).
-Storage capacity, file upload/list/delete (by URL, same pattern as APK
-install), and whole-disk backups are customer-facing; buying more storage is
-**admin-only** (charges the VMOS account balance, same as buying a proxy —
-see Admin → Proxies for the same pattern). VMOS's docs don't publish field
-names for these endpoints (`getVcStorageGoods`, `getRenewStorageInfo`,
-`selectFiles`, `uploadFile`, `deleteOssFiles`, `addBackup`,
-`queryBackupBatch`) the way they do for the phone-plan ones, so
-`VmosCloudPhoneService`'s Cloud Drive section and the view's field-name
-guesses (`used`/`usedSize`, `fileId`/`id`, etc.) are best-effort. **Check
-Admin → Diagnostics (`storage_goods` probe) and a real device's Cloud Drive
-tab against your VMOS account before relying on it.**
+**Cloud Drive** — a tab on the device control panel (`My cloud phones →
+Manage → Cloud Drive`). Storage capacity, file upload/list/delete, and
+whole-disk backups are customer-facing; buying more storage is **admin-only**
+(charges the VMOS account balance, same as buying a proxy — see Admin →
+Proxies for the same pattern). **Update (2026-09):** VMOS finally published
+real field names for these endpoints, and the original best-effort guesses
+were wrong in several places — fixed now:
+
+- It's **account-wide, not per device** — `getRenewStorageInfo` and
+  `selectFiles` take no `padCode` at all; the old code sent one, which VMOS
+  just silently ignored. Every device's Cloud Drive tab shows the same
+  shared files/capacity.
+- Capacity fields are `storageUsedAvail`/`storageCapacityLimit` (bytes), not
+  the guessed `used`/`total` variants — those never matched, so the capacity
+  bar showed "not available" the whole time this was live.
+- `buyStorageGoods` real params are `storageId`/`autoRenewOrder`, not
+  `goodId`/`padCode`/`num` — buying storage never actually worked before this.
+- `uploadFile` only accepts an actual file body (`multipart/form-data`) —
+  there is no "upload by URL" option at all, so the old "paste a link"
+  feature could never have worked. `uploadCloudFile()` now takes raw file
+  contents; `DeviceControlController::uploadDriveFile()` downloads the
+  customer's URL server-side first and re-uploads the bytes.
+- `deleteOssFiles` takes `files` (an array of numeric file IDs), not
+  `fileIds`.
+- `addBackup` takes `vcPadBackupList: [{padCode, name}]`, not
+  `padCodes`/`description`.
+
+If it breaks again, check Admin → Diagnostics' `storage_goods`/`storage_info`/
+`drive_files` probes against the raw response before assuming the code is
+wrong — but as of this fix, all of the above match VMOS's own published docs
+exactly, not a guess.
 
 Also investigated VMOS's "Automation + AI" console feature — the reseller
 API only exposes `asyncCmd` (run a shell/ADB command) plus result polling
 (`executeScriptInfo`, `padTaskDetail`), not a flow builder or any AI
 decision-making. Not built — the owner explicitly said skip it for now given
 what it actually is.
+
+## VMOS published a real "Cloud Number" phone service (not built)
+
+As of 2026-09, VMOS's docs gained a fully-specified **"云号码服务" / Cloud
+Number Service** (`/vcpcloud/api/padApi/cloudNumber/*`) — rentable virtual
+phone numbers (30/90/365-day plans, idempotent purchase via `clientToken`,
+paid from the VMOS account balance) that must be explicitly **bound to a
+specific cloud phone** (`bind`, which forces a real device restart) before
+receiving SMS on it, plus `sms/list` to read messages. This is a different
+product from the existing hidden/guessed `phone_number` Sku type — it isn't
+a one-off verification-code purchase, it's an ongoing rented number with its
+own auto-renew/release lifecycle, and its purchase flow (balance-based,
+idempotency-token, async-with-polling) doesn't fit the existing crypto-order
+pipeline the same way a Sku purchase does. **Not built** — this needs its
+own design discussion (new order type? separate balance draw? how does
+"bind + forced restart" fit the existing device panel?) before writing code,
+not a drop-in swap for the currently-hidden phone-number SKUs. If the owner
+wants this, treat it as a new feature, not a bug fix.
 
 Checked VMOS's separate "VMOS AI" console feature too (AI image/video
 generation, cutout, watermark remover, upscaling, its own points/credits

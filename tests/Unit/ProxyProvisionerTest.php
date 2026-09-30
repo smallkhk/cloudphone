@@ -32,7 +32,7 @@ class ProxyProvisionerTest extends TestCase
     #[Test]
     public function purchase_buys_a_vmos_proxy_and_marks_it_purchased(): void
     {
-        Http::fake(['*/createProxyOrder' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['orderId' => 'PX-1']])]);
+        Http::fake(['*/createProxyOrder' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['taskId' => 'PX-TASK-1', 'status' => 'PENDING']])]);
 
         $order = $this->makeOrder([
             'proxy_mode' => 'vmos',
@@ -43,9 +43,12 @@ class ProxyProvisionerTest extends TestCase
 
         $order->refresh();
         $this->assertSame(Order::PROXY_STATUS_PURCHASED, $order->proxy_status);
+        $this->assertSame('PX-TASK-1', $order->proxy_config['purchase_task_id']);
+        $this->assertSame('order-'.$order->id.'-proxy', $order->proxy_config['client_request_id']);
 
         Http::assertSent(fn ($r) => str_contains($r->url(), 'createProxyOrder')
-            && $r['proxyGoodId'] === 9 && $r['country'] === 'US' && $r['proxyAddress'] === 'United States');
+            && $r['proxyGoodId'] === 9 && $r['country'] === 'US' && $r['proxyAddress'] === 'United States'
+            && $r['clientRequestId'] === 'order-'.$order->id.'-proxy');
     }
 
     #[Test]
@@ -162,5 +165,72 @@ class ProxyProvisionerTest extends TestCase
         app(ProxyProvisioner::class)->apply($instance);
 
         Http::assertNothingSent();
+    }
+
+    #[Test]
+    public function apply_waits_for_a_still_processing_purchase_task_without_attaching(): void
+    {
+        Http::fake([
+            '*/createProxyOrder/status*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['status' => 'PROCESSING']]),
+        ]);
+
+        $order = $this->makeOrder([
+            'proxy_mode' => 'vmos',
+            'proxy_status' => Order::PROXY_STATUS_PURCHASED,
+            'proxy_config' => ['good_id' => 9, 'country' => 'US', 'proxy_address' => 'United States', 'purchase_task_id' => 'PX-TASK-1'],
+        ]);
+        $instance = CloudInstance::factory()->create(['order_id' => $order->id, 'user_id' => $order->user_id, 'pad_code' => 'AC005']);
+
+        app(ProxyProvisioner::class)->apply($instance);
+
+        $this->assertSame(Order::PROXY_STATUS_PURCHASED, $order->fresh()->proxy_status);
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'queryProxyList') || str_contains($r->url(), 'batchPadConfigProxy'));
+    }
+
+    #[Test]
+    public function apply_attaches_once_the_purchase_task_reports_finished(): void
+    {
+        Http::fake([
+            '*/createProxyOrder/status*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['status' => 'FINISHED']]),
+            '*/queryProxyList*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['records' => [
+                ['proxyId' => 555, 'proxyCountry' => 'us', 'proxyUseNumber' => 0],
+            ]]]),
+            '*/batchPadConfigProxy' => Http::response(['code' => 200, 'msg' => 'success', 'data' => []]),
+        ]);
+
+        $order = $this->makeOrder([
+            'proxy_mode' => 'vmos',
+            'proxy_status' => Order::PROXY_STATUS_PURCHASED,
+            'proxy_config' => ['good_id' => 9, 'country' => 'US', 'proxy_address' => 'United States', 'purchase_task_id' => 'PX-TASK-1'],
+        ]);
+        $instance = CloudInstance::factory()->create(['order_id' => $order->id, 'user_id' => $order->user_id, 'pad_code' => 'AC006']);
+
+        app(ProxyProvisioner::class)->apply($instance);
+
+        $order->refresh();
+        $this->assertSame(Order::PROXY_STATUS_ATTACHED, $order->proxy_status);
+        $this->assertSame(555, $order->proxy_config['matched_proxy_id']);
+    }
+
+    #[Test]
+    public function apply_flags_failed_without_attaching_when_the_purchase_needs_review(): void
+    {
+        Http::fake([
+            '*/createProxyOrder/status*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['status' => 'NEEDS_REVIEW']]),
+        ]);
+
+        $order = $this->makeOrder([
+            'proxy_mode' => 'vmos',
+            'proxy_status' => Order::PROXY_STATUS_PURCHASED,
+            'proxy_config' => ['good_id' => 9, 'country' => 'US', 'proxy_address' => 'United States', 'purchase_task_id' => 'PX-TASK-1'],
+        ]);
+        $instance = CloudInstance::factory()->create(['order_id' => $order->id, 'user_id' => $order->user_id, 'pad_code' => 'AC007']);
+
+        app(ProxyProvisioner::class)->apply($instance);
+
+        $order->refresh();
+        $this->assertSame(Order::PROXY_STATUS_FAILED, $order->proxy_status);
+        $this->assertStringContainsString('review', $order->proxy_error);
+        Http::assertNotSent(fn ($r) => str_contains($r->url(), 'batchPadConfigProxy'));
     }
 }
