@@ -25,9 +25,27 @@
         @if ($traffic)
             <div class="card mb-6 p-5">
                 <p class="text-sm font-medium text-ink-500">Dynamic proxy traffic balance</p>
-                <p class="mt-1.5 text-2xl font-extrabold text-ink-900">
-                    {{ is_array($traffic) ? ($traffic['balance'] ?? $traffic['traffic'] ?? json_encode($traffic)) : $traffic }}
-                </p>
+                @if (is_array($traffic) && array_key_exists('remainingTraffic', $traffic))
+                    <div class="mt-2 grid grid-cols-3 gap-4">
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-ink-400">Remaining</p>
+                            <p class="text-xl font-extrabold text-ink-900">{{ number_format((float) $traffic['remainingTraffic']) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-ink-400">Used</p>
+                            <p class="text-xl font-extrabold text-ink-900">{{ number_format((float) ($traffic['useTraffic'] ?? 0)) }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-ink-400">Accumulated</p>
+                            <p class="text-xl font-extrabold text-ink-900">{{ number_format((float) ($traffic['accumulatedTraffic'] ?? 0)) }}</p>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-ink-400">Unit not published by VMOS — treat these as raw counters, not confirmed bytes/MB.</p>
+                @else
+                    <p class="mt-1.5 text-2xl font-extrabold text-ink-900">
+                        {{ is_array($traffic) ? ($traffic['balance'] ?? $traffic['traffic'] ?? json_encode($traffic)) : $traffic }}
+                    </p>
+                @endif
             </div>
         @endif
 

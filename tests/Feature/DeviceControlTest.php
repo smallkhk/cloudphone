@@ -453,6 +453,27 @@ class DeviceControlTest extends TestCase
     }
 
     #[Test]
+    public function the_proxy_page_shows_formatted_traffic_not_raw_json(): void
+    {
+        $this->withVmosCredentials();
+
+        Http::fake([
+            '*/queryCurrentTrafficBalance*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => [
+                'accumulatedTraffic' => 1000, 'useTraffic' => 250, 'remainingTraffic' => 750,
+            ]]),
+            '*' => Http::response(['code' => 200, 'msg' => 'success', 'data' => []]),
+        ]);
+
+        $this->actingAs(User::factory()->create(['is_admin' => true]))
+            ->get(route('admin.proxies.index'))
+            ->assertOk()
+            ->assertSee('750')
+            ->assertSee('250')
+            ->assertSee('1,000')
+            ->assertDontSee('accumulatedTraffic');
+    }
+
+    #[Test]
     public function customers_cannot_reach_proxy_or_diagnostics_admin_pages(): void
     {
         $user = User::factory()->create();
