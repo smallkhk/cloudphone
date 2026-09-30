@@ -32,22 +32,22 @@ class CustomerProxyTest extends TestCase
     }
 
     #[Test]
-    public function the_country_filter_only_shows_that_countrys_plans(): void
+    public function the_buy_modal_lists_every_regions_plans(): void
     {
         Sku::factory()->create(['type' => Sku::TYPE_PROXY, 'default_country_code' => 'US', 'price' => 12.99]);
         Sku::factory()->create(['type' => Sku::TYPE_PROXY, 'default_country_code' => 'JP', 'price' => 14.99]);
 
-        $response = $this->get(route('proxies.index', ['country' => 'JP']));
+        $response = $this->actingAs(User::factory()->create())->get(route('proxies.index'));
 
-        $response->assertOk()->assertSee('$14.99')->assertDontSee('$12.99');
+        $response->assertOk()->assertSee('$12.99')->assertSee('$14.99')->assertSee('Buy Proxy');
     }
 
     #[Test]
-    public function the_filter_and_plan_cards_show_full_country_names_not_codes(): void
+    public function the_buy_modal_shows_full_country_names_not_codes(): void
     {
         Sku::factory()->create(['type' => Sku::TYPE_PROXY, 'default_country_code' => 'JP', 'price' => 14.99]);
 
-        $this->get(route('proxies.index'))->assertOk()->assertSee('Japan');
+        $this->actingAs(User::factory()->create())->get(route('proxies.index'))->assertOk()->assertSee('Japan');
     }
 
     #[Test]

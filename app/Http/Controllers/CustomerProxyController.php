@@ -21,18 +21,10 @@ class CustomerProxyController extends Controller
 {
     public function __construct(protected VmosCloudPhoneService $vmos) {}
 
-    /** Storefront: browse purchasable proxy plans, filterable by country. */
-    public function index(Request $request)
+    /** Storefront: browse purchasable proxy plans via the "Buy Proxy" modal (region, then plan). */
+    public function index()
     {
-        $country = strtoupper((string) $request->query('country', ''));
-
-        $available = Sku::available()->proxies()->where('price', '>', 0);
-
-        $countries = (clone $available)->orderBy('default_country_code')
-            ->pluck('default_country_code')->filter()->unique()->values();
-
-        $skus = $available
-            ->when($country !== '', fn ($q) => $q->where('default_country_code', $country))
+        $skus = Sku::available()->proxies()->where('price', '>', 0)
             ->orderBy('default_country_code')->orderBy('name')->get();
 
         $owned = Auth::check()
@@ -43,7 +35,7 @@ class CustomerProxyController extends Controller
             ? CloudInstance::where('user_id', Auth::id())->whereNotNull('pad_code')->get(['id', 'pad_code', 'nickname'])
             : collect();
 
-        return view('proxies.index', compact('skus', 'owned', 'devices', 'countries', 'country'));
+        return view('proxies.index', compact('skus', 'owned', 'devices'));
     }
 
     /** Adds the customer's own proxy directly — no order, no VMOS charge, ready immediately. */

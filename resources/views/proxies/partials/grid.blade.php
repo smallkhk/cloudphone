@@ -23,69 +23,116 @@
     </span>
 </div>
 
-@if ($countries->isNotEmpty())
-    <x-pill-filter label="Country" param="country" route="proxies.index" all-label="All countries"
-        :active="$country"
-        :options="$countries->mapWithKeys(fn ($c) => [$c => \App\Services\Vmos\VmosRegionCatalog::nameFor($c)])" />
-@endif
-
-@if ($skus->isEmpty() && $countries->isEmpty())
-    <div class="card mx-auto max-w-lg p-10 text-center">
-        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-ink-100">
-            <svg class="h-6 w-6 text-ink-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
-            </svg>
+<div x-data="{ buyOpen: false, region: {{ $skus->isNotEmpty() ? "'".$skus->first()->default_country_code."'" : 'null' }} }">
+    <div class="card flex flex-wrap items-center justify-between gap-4 p-5">
+        <div>
+            <h2 class="text-base font-semibold text-ink-900">Buy a static residential proxy</h2>
+            <p class="mt-1 text-sm text-ink-500">
+                {{ $skus->isNotEmpty() ? 'Pick a region and plan, then check out.' : 'No plans available yet.' }}
+            </p>
         </div>
-        <h2 class="mt-5 text-lg font-semibold text-ink-900">No proxies available yet</h2>
-        <p class="mt-2 text-sm text-ink-500">
-            @auth
-                @if (auth()->user()->is_admin)
-                    Sync the catalogue under Plans &amp; pricing → Proxies.
-                @else
-                    We're setting things up. Please check back shortly.
-                @endif
-            @else
-                We're setting things up. Please check back shortly.
-            @endauth
-        </p>
+
         @auth
-            @if (auth()->user()->is_admin)
-                <a href="{{ route('admin.skus.index', ['type' => 'proxy']) }}" class="btn-primary mt-6">Go to Plans &amp; pricing</a>
+            @if ($skus->isNotEmpty())
+                <button type="button" @click="buyOpen = true" class="btn-primary">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437m0 0L7.5 14.25M4.106 5.272l1.964 7.394m0 0h11.218a1.125 1.125 0 001.094-.852l1.5-6a1.125 1.125 0 00-1.094-1.398H5.25m0 0L4.106 5.272M7.5 18.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm10.5 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                    </svg>
+                    Buy Proxy
+                </button>
             @endif
+        @else
+            <a href="{{ route('login') }}" class="btn-primary">Log in to buy</a>
         @endauth
     </div>
-@elseif ($skus->isEmpty())
-    <div class="card mx-auto max-w-lg p-10 text-center">
-        <h2 class="text-lg font-semibold text-ink-900">No proxies for {{ \App\Services\Vmos\VmosRegionCatalog::nameFor($country) }}</h2>
-        <p class="mt-2 text-sm text-ink-500">Try another country, or clear the filter to see everything available.</p>
-        <a href="{{ route('proxies.index') }}" class="btn-secondary mt-6">Clear filter</a>
-    </div>
-@else
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        @foreach ($skus as $sku)
-            <div class="card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-                <p class="text-base font-bold tracking-tight text-ink-900">{{ \App\Services\Vmos\VmosRegionCatalog::nameFor($sku->default_country_code) }}</p>
-                <p class="text-xs text-ink-500">{{ $sku->duration_label }}</p>
-                <p class="mt-3 flex items-baseline gap-1">
-                    <span class="text-3xl font-extrabold tracking-tight text-ink-900">${{ number_format($sku->price, 2) }}</span>
-                </p>
-                <p class="mt-1 text-xs text-ink-400">Paid in USDT (TRC20) or wallet balance</p>
 
-                @auth
-                    <form method="POST" action="{{ route('orders.store') }}" class="mt-5">
-                        @csrf
-                        <input type="hidden" name="sku_id" value="{{ $sku->id }}">
-                        <input type="hidden" name="quantity" value="1">
-                        <input type="hidden" name="auto_renew" value="0">
-                        <button class="btn-primary w-full">Buy now</button>
-                    </form>
-                @else
-                    <a href="{{ route('login') }}" class="btn-primary mt-5 w-full">Log in to buy</a>
-                @endauth
+    @if ($skus->isEmpty())
+        <div class="card mx-auto mt-4 max-w-lg p-10 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-ink-100">
+                <svg class="h-6 w-6 text-ink-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+                </svg>
             </div>
-        @endforeach
-    </div>
-@endif
+            <h2 class="mt-5 text-lg font-semibold text-ink-900">No proxies available yet</h2>
+            <p class="mt-2 text-sm text-ink-500">
+                @auth
+                    @if (auth()->user()->is_admin)
+                        Sync the catalogue under Plans &amp; pricing → Proxies.
+                    @else
+                        We're setting things up. Please check back shortly.
+                    @endif
+                @else
+                    We're setting things up. Please check back shortly.
+                @endauth
+            </p>
+            @auth
+                @if (auth()->user()->is_admin)
+                    <a href="{{ route('admin.skus.index', ['type' => 'proxy']) }}" class="btn-primary mt-6">Go to Plans &amp; pricing</a>
+                @endif
+            @endauth
+        </div>
+    @endif
+
+    {{-- Buy modal — mirrors VMOS's own "Purchase Proxy IP" popup: region, then plan, then submit. --}}
+    @auth
+        <div x-show="buyOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+             @keydown.escape.window="buyOpen = false">
+            <div @click.outside="buyOpen = false" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-ink-900">Purchase Proxy IP</h3>
+                    <button type="button" @click="buyOpen = false" class="rounded-full p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="mt-4">
+                    <label class="label">IP Type</label>
+                    <div class="rounded-lg border-2 border-brand-600 bg-brand-50 p-3 text-sm font-medium text-brand-700">
+                        Static Residential IP
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ route('orders.store') }}" class="mt-4 space-y-4">
+                    @csrf
+                    <input type="hidden" name="quantity" value="1">
+                    <input type="hidden" name="auto_renew" value="0">
+
+                    <div>
+                        <label class="label" for="proxy-region">Region</label>
+                        <select id="proxy-region" class="input" x-model="region">
+                            @foreach ($skus->pluck('default_country_code')->unique()->sort() as $code)
+                                <option value="{{ $code }}">{{ \App\Services\Vmos\VmosRegionCatalog::nameFor($code) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label">Plan</label>
+                        <div class="space-y-2">
+                            @foreach ($skus as $sku)
+                                <label x-show="region === '{{ $sku->default_country_code }}'" x-cloak
+                                       class="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-ink-200 p-3 hover:border-brand-400">
+                                    <span class="flex items-center gap-2 text-sm text-ink-900">
+                                        <input type="radio" name="sku_id" value="{{ $sku->id }}" class="text-brand-600 focus:ring-brand-500">
+                                        {{ $sku->duration_label }}
+                                    </span>
+                                    <span class="text-sm font-semibold text-ink-900">${{ number_format($sku->price, 2) }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between border-t border-ink-100 pt-4">
+                        <span class="text-xs text-ink-500">Paid in USDT (TRC20) or wallet balance</span>
+                        <button class="btn-primary">Submit Purchase</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endauth
+</div>
 
 @auth
     <div class="mt-10">
@@ -215,6 +262,5 @@
                 </tbody>
             </table>
         </div>
-    </div>
     </div>
 @endauth

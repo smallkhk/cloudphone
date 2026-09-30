@@ -96,8 +96,9 @@ alongside. Sync the catalogue with `php artisan vmos:sync-proxy-skus`
 (hourly), and set prices under **Admin → Plans & pricing → Proxies**. Once
 paid, `StandaloneProxyProvisioner` buys it from VMOS the same
 purchase/poll/match way the checkout add-on does, then it shows up under
-"Your proxies" to attach, detach, or test. A Country filter narrows the
-browse list by full country name. You can also **add your own proxy
+"Your proxies" (a table) to attach, detach, or test. Buying is a **Buy
+Proxy** popup — pick a region, then a plan, then submit — rather than a
+flat list, matching VMOS's own "Purchase Proxy IP" popup. You can also **add your own proxy
 directly** — no order, no charge — from the same page, and manage/test it
 exactly like a bought one.
 

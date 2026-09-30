@@ -397,15 +397,22 @@ product here:
   and phone numbers, not Cloud Numbers or proxies — `Order::cloudNumbers()`/
   `Order::customerProxies()` relations and matching blocks on `/orders/{id}`
   were added alongside this feature to close that gap for both.
-- **Country filter** — the browse grid used to just list every synced
-  (product, country) Sku flat. Now has a Country pill filter
-  (`x-pill-filter`, same component `/plans` and `/cloud-numbers` use) that
-  actually narrows the list (unlike `/plans`' own Region pill, which is
-  cosmetic only — see that section above). Labels are full names
-  (`VmosRegionCatalog::nameFor()`, a small static code→name lookup built
-  from the confirmed 18 `PURCHASE_REGIONS` plus a larger best-effort list for
-  display only — never used for validation), not raw 2-letter codes, since
-  those read as meaningless to a non-technical customer.
+- **"Buy Proxy" popup, not a flat grid** — the browse UI went through two
+  iterations: first a flat card grid, then a Country pill filter narrowing
+  it, then (per the owner's own screenshots of VMOS's "Purchase Proxy IP"
+  popup) replaced entirely by a single **Buy Proxy** button that opens a
+  modal — Region select, then Plan radios filtered to that region by Alpine
+  (`x-show`, client-side, all SKUs are already in the page), then Submit —
+  mirroring VMOS's own purchase flow shape (their popup also has an IP Type
+  and IP Provider step we don't replicate, since we only resell one product
+  tier and don't expose VMOS's own upstream provider choice to customers).
+  Region labels are full names (`VmosRegionCatalog::nameFor()`, a small
+  static code→name lookup built from the confirmed 18 `PURCHASE_REGIONS`
+  plus a larger best-effort list for display only — never used for
+  validation), not raw 2-letter codes, since those read as meaningless to a
+  non-technical customer. The old `?country=` query-string filtering is
+  gone — `CustomerProxyController::index()` just loads every available Sku
+  and the modal's own Region `<select>` does the narrowing.
 - **Manually adding your own proxy** — `CustomerProxy.source` is `'vmos'`
   (bought through us, the async purchase/poll/match flow above) or
   `'custom'` (the customer's own proxy, added directly via a form on
