@@ -517,6 +517,112 @@ class VmosCloudPhoneService
         ]);
     }
 
+    // --- Cloud Number (rented virtual numbers, bindable to a device) -------
+    //
+    // Confirmed real and fully documented as of 2026-09 — unlike the SMS
+    // section above, VMOS publishes exact field names for all of these.
+    // Prefix: /vcpcloud/api/padApi/cloudNumber. Money is in cents throughout.
+
+    /** All countries' plans + live stock. $areaCode only filters US (213/480/702/813, default 213). */
+    public function cloudNumberSkus(?string $areaCode = null): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/skus', array_filter([
+            'areaCode' => $areaCode,
+        ], fn ($v) => $v !== null));
+    }
+
+    /**
+     * Buys cloud number(s). Async and idempotent — this only *accepts* the
+     * purchase; poll cloudNumberPurchaseStatus() with the same $clientToken
+     * until data.terminal is true. $clientToken must be stable per attempt
+     * (16-64 chars) — reusing it retries the same order rather than buying
+     * twice; a genuinely new purchase needs a new token.
+     */
+    public function buyCloudNumber(
+        string $countryCode,
+        int $planId,
+        string $clientToken,
+        int $quantity = 1,
+        bool $autoRenew = true,
+        ?string $areaCode = null,
+        ?int $expectedTotalCents = null,
+    ): array {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/purchase', array_filter([
+            'countryCode' => $countryCode,
+            'areaCode' => $areaCode,
+            'planId' => $planId,
+            'quantity' => $quantity,
+            'autoRenew' => $autoRenew ? 1 : 0,
+            'clientToken' => $clientToken,
+            'expectedTotalCents' => $expectedTotalCents,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** Status of a purchase started with buyCloudNumber() — same response shape as the purchase call itself. */
+    public function cloudNumberPurchaseStatus(string $clientToken): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/purchase/status', [
+            'clientToken' => $clientToken,
+        ]);
+    }
+
+    /** Numbers owned on this account (paginated). */
+    public function cloudNumberList(?string $countryCode = null, ?string $status = null, int $page = 1, int $size = 20): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/list', array_filter([
+            'countryCode' => $countryCode,
+            'status' => $status,
+            'page' => $page,
+            'size' => $size,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** $rowVersion is VMOS's optimistic-lock token from cloudNumberList()'s records[].rowVersion — refetch and retry on a conflict. */
+    public function cloudNumberSetAutoRenew(int $numberRecordId, bool $autoRenew, string $rowVersion): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/autoRenew', [
+            'id' => $numberRecordId,
+            'autoRenew' => $autoRenew ? 1 : 0,
+            'rowVersion' => $rowVersion,
+        ]);
+    }
+
+    /** Unsubscribes and releases a number. No refund for the already-elapsed billing period. */
+    public function releaseCloudNumber(string $number): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/release', ['number' => $number]);
+    }
+
+    /** SMS received on a cloud number (paginated, newest first). */
+    public function cloudNumberSms(string $number, int $page = 1, int $size = 10): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/sms/list', [
+            'number' => $number,
+            'page' => $page,
+            'size' => $size,
+        ]);
+    }
+
+    /**
+     * Binds a number to a device's SIM slot — async, and genuinely restarts
+     * the target device, so $restartAcknowledged must be explicitly true or
+     * VMOS rejects it outright. Poll cloudNumberBindStatus() for progress.
+     */
+    public function bindCloudNumber(int $numberRecordId, string $padCode, string $requestId, bool $restartAcknowledged): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/bind', [
+            'numberId' => $numberRecordId,
+            'padCode' => $padCode,
+            'requestId' => $requestId,
+            'restartAcknowledged' => $restartAcknowledged,
+        ]);
+    }
+
+    public function cloudNumberBindStatus(int $numberRecordId): array
+    {
+        return $this->client->post('/vcpcloud/api/padApi/cloudNumber/bind/status', ['numberId' => $numberRecordId]);
+    }
+
     // --- Cloud Drive (account-wide storage, files, backups) ----------------
     //
     // VMOS's own console lists "Cloud Drive" as its own top-level product,

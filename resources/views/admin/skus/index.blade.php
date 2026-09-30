@@ -6,6 +6,7 @@
                 <form method="POST" action="{{ match ($type) {
                         'email_account' => route('admin.skus.sync-email'),
                         'phone_number' => route('admin.skus.sync-sms'),
+                        'cloud_number' => route('admin.skus.sync-cloud-numbers'),
                         default => route('admin.skus.sync'),
                     } }}">
                     @csrf
@@ -32,6 +33,10 @@
         <a href="{{ route('admin.skus.index', ['type' => 'phone_number']) }}"
            class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'phone_number' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
             Phone numbers
+        </a>
+        <a href="{{ route('admin.skus.index', ['type' => 'cloud_number']) }}"
+           class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'cloud_number' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
+            Cloud numbers
         </a>
     </div>
 

@@ -301,23 +301,56 @@ API only exposes `asyncCmd` (run a shell/ADB command) plus result polling
 decision-making. Not built — the owner explicitly said skip it for now given
 what it actually is.
 
-## VMOS published a real "Cloud Number" phone service (not built)
+## Cloud Number Service (built, NOT yet tested against a live VMOS account)
 
-As of 2026-09, VMOS's docs gained a fully-specified **"云号码服务" / Cloud
-Number Service** (`/vcpcloud/api/padApi/cloudNumber/*`) — rentable virtual
-phone numbers (30/90/365-day plans, idempotent purchase via `clientToken`,
-paid from the VMOS account balance) that must be explicitly **bound to a
-specific cloud phone** (`bind`, which forces a real device restart) before
-receiving SMS on it, plus `sms/list` to read messages. This is a different
-product from the existing hidden/guessed `phone_number` Sku type — it isn't
-a one-off verification-code purchase, it's an ongoing rented number with its
-own auto-renew/release lifecycle, and its purchase flow (balance-based,
-idempotency-token, async-with-polling) doesn't fit the existing crypto-order
-pipeline the same way a Sku purchase does. **Not built** — this needs its
-own design discussion (new order type? separate balance draw? how does
-"bind + forced restart" fit the existing device panel?) before writing code,
-not a drop-in swap for the currently-hidden phone-number SKUs. If the owner
-wants this, treat it as a new feature, not a bug fix.
+VMOS's **"云号码服务" / Cloud Number Service** (`/vcpcloud/api/padApi/cloudNumber/*`)
+is a different product from the existing hidden/guessed `phone_number` Sku
+type — it's an ongoing *rented* number (30/90/365-day plans) with its own
+auto-renew/release lifecycle, rather than a one-off verification-code
+purchase. Unlike a normal Sku it's paid out of VMOS's own account balance
+(not customer USDT) and delivered asynchronously, and it must be explicitly
+**bound to a specific cloud phone** (`bind`, which forces a real device
+restart) before it can receive SMS. Built reusing the existing
+Sku/Order/OrderProvisioner pipeline (`Sku.type = 'cloud_number'`) the same
+way `email_account`/`phone_number` do, rather than a parallel system:
+
+- `Sku.android_version` is keyed as `cn-{countryCode}` (not the blank string
+  `email_account`/`phone_number` use) because VMOS's `planId` is only
+  confirmed unique *within* a country, not globally — two countries can
+  reuse the same `planId` for different plans, which would otherwise collide
+  on the `(vmos_good_id, android_version)` unique index.
+- `vmos:sync-cloud-number-skus` (hourly) calls `cloudNumberSkus()` once (it
+  returns every country in one response) and upserts a Sku per
+  country+plan. New SKUs sync **active by default** — unlike the
+  low-confidence `phone_number` type, Cloud Number's endpoints are fully
+  documented by VMOS, so there's no reason to hide them pending manual
+  confirmation the way `vmos:sync-sms-skus` does.
+- `CloudNumberProvisioner` (dispatched from `OrderProvisioner`) purchases
+  with a stable `clientToken` (`order-{id}-cloudnumber`) so a retried call
+  can't double-buy, mirroring the async-proxy-purchase pattern above. VMOS's
+  purchase call can return non-terminal (`PROCESSING`) immediately; when it
+  does, the order stays `provisioning` and `vmos:sync-cloud-number-purchases`
+  (every minute) polls `cloudNumberPurchaseStatus()` until terminal.
+- Like the proxy purchase, VMOS's purchase response gives back the delivered
+  number *strings* but not the internal record `id` needed for later
+  bind/auto-renew calls — that id is recovered by cross-referencing
+  `cloudNumberList()` and matching on the exact number string. Unlike the
+  proxy case this match is exact and unambiguous (no "which one did we just
+  buy" guesswork), since VMOS's own purchase response already tells us
+  which number strings were delivered.
+- Customer-facing at `/cloud-numbers`: browse/buy like any other Sku, then
+  from "My cloud numbers" bind to an owned device (requires ticking an
+  explicit "I understand this restarts the device" checkbox — `bind` is a
+  real, disruptive action, not something to trigger silently), check bind
+  progress, toggle auto-renew, check for SMS, or release the number. Admin →
+  Plans & pricing gained a **Cloud numbers** tab with its own sync button.
+
+Confidence: VMOS's docs for this service are fully specified (unlike the
+guessed `phone_number`/SMS endpoints), and the whole flow has full test
+coverage with faked HTTP responses. What's *not* tested is a real purchase
+against a live VMOS account — same caveat as email accounts, phone numbers,
+and the wallet BEP20 flow. Try a real purchase (small plan, cheap country)
+and a real bind before pointing customers at `/cloud-numbers`.
 
 Checked VMOS's separate "VMOS AI" console feature too (AI image/video
 generation, cutout, watermark remover, upscaling, its own points/credits

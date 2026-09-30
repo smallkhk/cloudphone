@@ -48,6 +48,24 @@ pricing → Email accounts / Phone numbers**.
 > (the `sms_*` probes) against your real VMOS account and confirm a real
 > purchase works before making one live to customers.
 
+### Cloud numbers (VMOS "Cloud Number Service")
+
+A separate product from Captcha Service's phone numbers above: an ongoing
+**rented** virtual number (30/90/365-day plans) rather than a one-off
+verification code. From **Cloud numbers** a customer buys a number for a
+plan+country; once paid, `CloudNumberProvisioner` purchases it from VMOS
+(paid out of the VMOS account balance, not the customer's USDT — same as a
+proxy or Cloud Drive storage purchase) and, once delivered, the customer can
+**bind** it to one of their own cloud phones (this forces a real device
+restart, so binding requires an explicit confirmation checkbox), toggle
+auto-renew, check for SMS, or release the number.
+
+Sync the catalogue with `php artisan vmos:sync-cloud-number-skus` (hourly),
+and set prices under **Admin → Plans & pricing → Cloud numbers**. Unlike the
+phone numbers above, VMOS's docs fully specify this service, so new SKUs
+sync live by default — but as with any money-touching feature here, test a
+real purchase and bind before relying on it for customers.
+
 ### Proxy add-on at checkout
 
 The "Buy now" form on the Plans page has an optional **Proxy** section — a

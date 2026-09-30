@@ -11,7 +11,7 @@ use Throwable;
 
 class SkuController extends Controller
 {
-    protected const TYPES = [Sku::TYPE_CLOUD_PHONE, Sku::TYPE_EMAIL_ACCOUNT, Sku::TYPE_PHONE_NUMBER];
+    protected const TYPES = [Sku::TYPE_CLOUD_PHONE, Sku::TYPE_EMAIL_ACCOUNT, Sku::TYPE_PHONE_NUMBER, Sku::TYPE_CLOUD_NUMBER];
 
     protected function resolveType(Request $request): string
     {
@@ -184,6 +184,21 @@ class SkuController extends Controller
         } catch (Throwable $e) {
             return back()->with('error', 'Sync failed: '.$e->getMessage()
                 .' — this endpoint is unconfirmed against VMOS, see CLAUDE.md.');
+        }
+    }
+
+    public function syncCloudNumbers()
+    {
+        if (! filled(config('vmos.access_key'))) {
+            return back()->with('error', 'Add your VMOS credentials under Settings → VMOS first.');
+        }
+
+        try {
+            Artisan::call('vmos:sync-cloud-number-skus');
+
+            return back()->with('status', trim(Artisan::output()) ?: 'Sync complete.');
+        } catch (Throwable $e) {
+            return back()->with('error', 'Sync failed: '.$e->getMessage());
         }
     }
 

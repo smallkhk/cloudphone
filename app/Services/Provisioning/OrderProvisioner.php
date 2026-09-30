@@ -16,8 +16,8 @@ class OrderProvisioner
         protected CloudPhoneProvisioner $cloudPhones,
         protected EmailAccountProvisioner $emailAccounts,
         protected PhoneNumberProvisioner $phoneNumbers,
-    ) {
-    }
+        protected CloudNumberProvisioner $cloudNumbers,
+    ) {}
 
     public function provision(Order $order): void
     {
@@ -26,6 +26,7 @@ class OrderProvisioner
         match ($order->sku?->type) {
             Sku::TYPE_EMAIL_ACCOUNT => $this->emailAccounts->provision($order),
             Sku::TYPE_PHONE_NUMBER => $this->phoneNumbers->provision($order),
+            Sku::TYPE_CLOUD_NUMBER => $this->cloudNumbers->provision($order),
             default => $this->cloudPhones->provision($order),
         };
     }

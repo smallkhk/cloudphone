@@ -10,7 +10,9 @@ Artisan::command('inspire', function () {
 
 Schedule::command('crypto:verify-payments')->everyMinute()->withoutOverlapping();
 Schedule::command('wallet:verify-deposits')->everyMinute()->withoutOverlapping();
+Schedule::command('vmos:sync-cloud-number-purchases')->everyMinute()->withoutOverlapping();
 Schedule::command('vmos:sync-instances')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('vmos:sync-skus')->hourly()->withoutOverlapping();
 Schedule::command('vmos:sync-email-skus')->hourly()->withoutOverlapping();
 Schedule::command('vmos:sync-sms-skus')->hourly()->withoutOverlapping();
+Schedule::command('vmos:sync-cloud-number-skus')->hourly()->withoutOverlapping();

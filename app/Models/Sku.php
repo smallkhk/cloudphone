@@ -30,6 +30,18 @@ class Sku extends Model
     // See CLAUDE.md: the underlying VMOS endpoints are unconfirmed.
     public const TYPE_PHONE_NUMBER = 'phone_number';
 
+    // A rented virtual number (VMOS's "Cloud Number" service) — different
+    // from TYPE_PHONE_NUMBER: it's a 30/90/365-day rental with auto-renew,
+    // bound to a specific cloud phone to receive SMS (see CloudNumber model
+    // and CloudNumberProvisioner). Reuses vmos_good_id for VMOS's planId and
+    // default_country_code for the real country it's sold in — unlike the
+    // other reused-table types, android_version is NOT left blank here: it's
+    // set to "cn-{countryCode}" so the table's existing unique(vmos_good_id,
+    // android_version) index can't collide a planId that (unconfirmed
+    // whether it can) repeats across countries with a same-numbered plan in
+    // another country.
+    public const TYPE_CLOUD_NUMBER = 'cloud_number';
+
     public const TIER_STANDARD = 'standard';
 
     public const TIER_HIGH_END = 'high_end';
@@ -71,6 +83,11 @@ class Sku extends Model
         return $query->where('type', self::TYPE_PHONE_NUMBER);
     }
 
+    public function scopeCloudNumbers($query)
+    {
+        return $query->where('type', self::TYPE_CLOUD_NUMBER);
+    }
+
     public function isEmailAccount(): bool
     {
         return $this->type === self::TYPE_EMAIL_ACCOUNT;
@@ -79,6 +96,11 @@ class Sku extends Model
     public function isPhoneNumber(): bool
     {
         return $this->type === self::TYPE_PHONE_NUMBER;
+    }
+
+    public function isCloudNumber(): bool
+    {
+        return $this->type === self::TYPE_CLOUD_NUMBER;
     }
 
     /**

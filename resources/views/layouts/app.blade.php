@@ -66,6 +66,11 @@
                 Phone numbers
             </x-side-nav-link>
 
+            <x-side-nav-link :href="route('cloud-numbers.index')" :active="request()->routeIs('cloud-numbers.*')"
+                             icon="M2 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C7.716 21 2 14.284 2 6V5zM17 3l1.5 3L22 7.5 19 9l-1.5 3-1.5-3L13 7.5 16.5 6 17 3z">
+                Cloud numbers
+            </x-side-nav-link>
+
             <x-side-nav-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')"
                              icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
                 Profile
