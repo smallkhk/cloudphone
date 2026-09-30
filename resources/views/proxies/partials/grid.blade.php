@@ -187,14 +187,14 @@
         </form>
     </div>
 
-    <div class="mt-10 card" x-data="{ editing: null }">
+    <div class="mt-10 card" x-data="{ editing: null, viewing: null }">
         <h2 class="px-5 py-4 text-base font-semibold text-ink-900">Your proxies</h2>
         <div class="table-wrap border-t border-ink-100">
             <table class="table">
                 <thead>
                     <tr>
                         <th>ID</th><th>Source</th><th>Proxy</th><th>Protocol</th><th>Status</th>
-                        <th>Attached to</th><th></th>
+                        <th>Binding quantity</th><th>Attached to</th><th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -230,11 +230,32 @@
                                 } }}">{{ ucfirst(strtolower($proxy->purchase_status)) }}</span>
                             </td>
                             <td class="text-sm text-ink-600">
+                                {{ $proxy->isAttached() ? 1 : 0 }}
+                            </td>
+                            <td class="text-sm text-ink-600">
                                 {{ $proxy->attached_pad_code ?: '—' }}
                             </td>
                             <td class="text-right">
                                 @if ($proxy->isDelivered())
                                     <div class="flex flex-wrap items-center justify-end gap-2">
+                                        <button type="button" class="btn-ghost btn-sm"
+                                                @click="viewing = {
+                                                    id: {{ $proxy->id }},
+                                                    source: @js($proxy->isCustom() ? 'Your own' : 'Bought'),
+                                                    label: @js($proxy->label),
+                                                    host: @js($proxy->host),
+                                                    port: {{ (int) $proxy->port }},
+                                                    account: @js($proxy->account),
+                                                    proxy_name: @js($proxy->proxy_name ? strtoupper($proxy->proxy_name) : '—'),
+                                                    proxy_type: @js($proxy->proxy_type),
+                                                    country_code: @js($proxy->country_code),
+                                                    attached_pad_code: @js($proxy->attached_pad_code),
+                                                    remarks: @js($proxy->remarks),
+                                                    delivered_at: @js($proxy->delivered_at?->format('d M Y H:i')),
+                                                }">
+                                            View
+                                        </button>
+
                                         @if (! $proxy->attached_pad_code && $devices->isNotEmpty())
                                             <form method="POST" action="{{ route('proxies.attach', $proxy) }}" class="flex items-center gap-1">
                                                 @csrf
@@ -285,7 +306,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="py-12 text-center text-sm text-ink-500">Proxies you buy or add will show up here.</td></tr>
+                        <tr><td colspan="8" class="py-12 text-center text-sm text-ink-500">Proxies you buy or add will show up here.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -352,6 +373,46 @@
                             <button class="btn-primary">Save changes</button>
                         </div>
                     </form>
+                </template>
+            </div>
+        </div>
+
+        {{-- View modal — read-only details, for both bought and your-own proxies --}}
+        <div x-show="viewing" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+             @keydown.escape.window="viewing = null">
+            <div @click.outside="viewing = null" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" x-cloak>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-ink-900">Proxy details</h3>
+                    <button type="button" @click="viewing = null" class="rounded-full p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <template x-if="viewing">
+                    <dl class="mt-4 divide-y divide-ink-100 text-sm">
+                        <template x-if="viewing.label">
+                            <div class="flex justify-between py-2"><dt class="text-ink-500">Label</dt><dd class="font-medium text-ink-900" x-text="viewing.label"></dd></div>
+                        </template>
+                        <div class="flex justify-between py-2"><dt class="text-ink-500">Source</dt><dd class="font-medium text-ink-900" x-text="viewing.source"></dd></div>
+                        <div class="flex justify-between py-2"><dt class="text-ink-500">Server address</dt><dd class="font-mono text-ink-900" x-text="viewing.host"></dd></div>
+                        <div class="flex justify-between py-2"><dt class="text-ink-500">Port</dt><dd class="font-mono text-ink-900" x-text="viewing.port"></dd></div>
+                        <template x-if="viewing.account">
+                            <div class="flex justify-between py-2"><dt class="text-ink-500">Account</dt><dd class="font-mono text-ink-900" x-text="viewing.account"></dd></div>
+                        </template>
+                        <div class="flex justify-between py-2"><dt class="text-ink-500">Protocol</dt><dd class="font-medium text-ink-900" x-text="viewing.proxy_name"></dd></div>
+                        <template x-if="viewing.country_code">
+                            <div class="flex justify-between py-2"><dt class="text-ink-500">Country</dt><dd class="font-medium text-ink-900" x-text="viewing.country_code"></dd></div>
+                        </template>
+                        <div class="flex justify-between py-2"><dt class="text-ink-500">Attached to</dt><dd class="font-mono text-ink-900" x-text="viewing.attached_pad_code || '—'"></dd></div>
+                        <template x-if="viewing.delivered_at">
+                            <div class="flex justify-between py-2"><dt class="text-ink-500">Delivered</dt><dd class="font-medium text-ink-900" x-text="viewing.delivered_at"></dd></div>
+                        </template>
+                        <template x-if="viewing.remarks">
+                            <div class="flex justify-between gap-4 py-2"><dt class="flex-none text-ink-500">Remarks</dt><dd class="text-right text-ink-900" x-text="viewing.remarks"></dd></div>
+                        </template>
+                    </dl>
                 </template>
             </div>
         </div>
