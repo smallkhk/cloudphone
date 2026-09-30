@@ -71,6 +71,11 @@
                 Cloud numbers
             </x-side-nav-link>
 
+            <x-side-nav-link :href="route('proxies.index')" :active="request()->routeIs('proxies.*')"
+                             icon="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25">
+                Proxies
+            </x-side-nav-link>
+
             <x-side-nav-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')"
                              icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
                 Profile

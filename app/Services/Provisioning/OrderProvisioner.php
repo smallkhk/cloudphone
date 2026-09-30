@@ -17,6 +17,7 @@ class OrderProvisioner
         protected EmailAccountProvisioner $emailAccounts,
         protected PhoneNumberProvisioner $phoneNumbers,
         protected CloudNumberProvisioner $cloudNumbers,
+        protected StandaloneProxyProvisioner $standaloneProxies,
     ) {}
 
     public function provision(Order $order): void
@@ -27,6 +28,7 @@ class OrderProvisioner
             Sku::TYPE_EMAIL_ACCOUNT => $this->emailAccounts->provision($order),
             Sku::TYPE_PHONE_NUMBER => $this->phoneNumbers->provision($order),
             Sku::TYPE_CLOUD_NUMBER => $this->cloudNumbers->provision($order),
+            Sku::TYPE_PROXY => $this->standaloneProxies->provision($order),
             default => $this->cloudPhones->provision($order),
         };
     }

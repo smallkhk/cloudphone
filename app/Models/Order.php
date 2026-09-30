@@ -105,4 +105,14 @@ class Order extends Model
     {
         return $this->hasMany(PhoneNumber::class);
     }
+
+    public function cloudNumbers(): HasMany
+    {
+        return $this->hasMany(CloudNumber::class);
+    }
+
+    public function customerProxies(): HasMany
+    {
+        return $this->hasMany(CustomerProxy::class);
+    }
 }

@@ -1,0 +1,146 @@
+@auth
+    @if (auth()->user()->is_admin && ! filled(config('crypto.usdt_trc20_address')))
+        <div class="mb-6 flex flex-wrap items-center gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20">
+            <svg class="h-5 w-5 flex-none text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.71-3L13.71 4a2 2 0 00-3.42 0L3.36 16a2 2 0 001.71 3z" />
+            </svg>
+            <span class="flex-1">
+                <strong>Checkout is disabled.</strong> No USDT receiving wallet is set, so customers can't complete a purchase.
+            </span>
+            <a href="{{ route('admin.settings.edit', 'payments') }}" class="btn-secondary btn-sm">Add wallet</a>
+        </div>
+    @endif
+@endauth
+
+<div class="mb-6 flex items-start gap-3 rounded-xl bg-ink-50 p-4 text-sm text-ink-600 ring-1 ring-inset ring-ink-200">
+    <svg class="h-5 w-5 flex-none text-ink-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span>
+        Buying a device already lets you add a proxy alongside it at checkout — this page is only for a proxy on its
+        own, so you can move it between devices later. Buying starts an order that finishes provisioning within a
+        minute or two, then it's ready to attach below.
+    </span>
+</div>
+
+@if ($skus->isEmpty())
+    <div class="card mx-auto max-w-lg p-10 text-center">
+        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-ink-100">
+            <svg class="h-6 w-6 text-ink-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+            </svg>
+        </div>
+        <h2 class="mt-5 text-lg font-semibold text-ink-900">No proxies available yet</h2>
+        <p class="mt-2 text-sm text-ink-500">
+            @auth
+                @if (auth()->user()->is_admin)
+                    Sync the catalogue under Plans &amp; pricing → Proxies.
+                @else
+                    We're setting things up. Please check back shortly.
+                @endif
+            @else
+                We're setting things up. Please check back shortly.
+            @endauth
+        </p>
+        @auth
+            @if (auth()->user()->is_admin)
+                <a href="{{ route('admin.skus.index', ['type' => 'proxy']) }}" class="btn-primary mt-6">Go to Plans &amp; pricing</a>
+            @endif
+        @endauth
+    </div>
+@else
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        @foreach ($skus as $sku)
+            <div class="card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+                <p class="text-base font-bold tracking-tight text-ink-900">{{ $sku->default_country_code }}</p>
+                <p class="text-xs text-ink-500">{{ $sku->duration_label }}</p>
+                <p class="mt-3 flex items-baseline gap-1">
+                    <span class="text-3xl font-extrabold tracking-tight text-ink-900">${{ number_format($sku->price, 2) }}</span>
+                </p>
+                <p class="mt-1 text-xs text-ink-400">Paid in USDT (TRC20) or wallet balance</p>
+
+                @auth
+                    <form method="POST" action="{{ route('orders.store') }}" class="mt-5">
+                        @csrf
+                        <input type="hidden" name="sku_id" value="{{ $sku->id }}">
+                        <input type="hidden" name="quantity" value="1">
+                        <input type="hidden" name="auto_renew" value="0">
+                        <button class="btn-primary w-full">Buy now</button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}" class="btn-primary mt-5 w-full">Log in to buy</a>
+                @endauth
+            </div>
+        @endforeach
+    </div>
+@endif
+
+@auth
+    <div class="mt-10">
+        <h2 class="text-lg font-semibold text-ink-900">Your proxies</h2>
+
+        @if ($owned->isEmpty())
+            <p class="mt-2 text-sm text-ink-500">Proxies you buy will show up here once provisioning finishes.</p>
+        @else
+            <div class="mt-4 space-y-3">
+                @foreach ($owned as $proxy)
+                    <div class="card p-5">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <p class="font-mono text-sm font-medium text-ink-900">
+                                    {{ $proxy->host ? "{$proxy->host}:{$proxy->port}" : 'Provisioning…' }}
+                                </p>
+                                @if ($proxy->account)
+                                    <p class="mt-0.5 font-mono text-xs text-ink-500">{{ $proxy->account }}</p>
+                                @endif
+                                <p class="mt-1 text-xs text-ink-500">{{ $proxy->sku?->name }}</p>
+                                @if ($proxy->attached_pad_code)
+                                    <p class="mt-1 text-xs text-ink-500">Attached to <span class="font-mono">{{ $proxy->attached_pad_code }}</span></p>
+                                @else
+                                    <p class="mt-1 text-xs text-ink-400">Not attached to a device</p>
+                                @endif
+                            </div>
+
+                            <span class="{{ match ($proxy->purchase_status) {
+                                'COMPLETED' => 'badge-green',
+                                'FAILED' => 'badge-red',
+                                default => 'badge-amber',
+                            } }}">{{ ucfirst(strtolower($proxy->purchase_status)) }}</span>
+                        </div>
+
+                        @if ($proxy->purchase_error)
+                            <p class="mt-3 text-xs text-red-600">{{ $proxy->purchase_error }}</p>
+                        @endif
+
+                        @if ($proxy->isDelivered())
+                            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
+                                @if (! $proxy->attached_pad_code && $devices->isNotEmpty())
+                                    <form method="POST" action="{{ route('proxies.attach', $proxy) }}" class="flex flex-wrap items-center gap-2">
+                                        @csrf
+                                        <select name="pad_code" class="input text-sm" required>
+                                            <option value="">Attach to device…</option>
+                                            @foreach ($devices as $device)
+                                                <option value="{{ $device->pad_code }}">{{ $device->nickname ?: $device->pad_code }}</option>
+                                            @endforeach
+                                        </select>
+                                        <button class="btn-secondary btn-sm">Attach</button>
+                                    </form>
+                                @elseif ($proxy->attached_pad_code)
+                                    <form method="POST" action="{{ route('proxies.detach', $proxy) }}">
+                                        @csrf
+                                        <button class="btn-ghost btn-sm">Detach</button>
+                                    </form>
+                                @endif
+
+                                <form method="POST" action="{{ route('proxies.test', $proxy) }}">
+                                    @csrf
+                                    <button class="btn-ghost btn-sm">Test proxy</button>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+@endauth

@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CloudInstanceController;
 use App\Http\Controllers\CloudNumberController;
+use App\Http\Controllers\CustomerProxyController;
 use App\Http\Controllers\DeviceControlController;
 use App\Http\Controllers\EmailAccountController;
 use App\Http\Controllers\OrderController;
@@ -29,6 +30,7 @@ Route::get('/plans', [PlanController::class, 'index'])->name('plans.index');
 Route::get('/email-accounts', [EmailAccountController::class, 'index'])->name('email-accounts.index');
 Route::get('/phone-numbers', [PhoneNumberController::class, 'index'])->name('phone-numbers.index');
 Route::get('/cloud-numbers', [CloudNumberController::class, 'index'])->name('cloud-numbers.index');
+Route::get('/proxies', [CustomerProxyController::class, 'index'])->name('proxies.index');
 
 // Live chat — open to guests as well as customers.
 Route::get('/chat/history', [ChatController::class, 'history'])->name('chat.history');
@@ -90,6 +92,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/cloud-numbers/{cloudNumber}/auto-renew', [CloudNumberController::class, 'toggleAutoRenew'])->name('cloud-numbers.auto-renew');
     Route::post('/cloud-numbers/{cloudNumber}/release', [CloudNumberController::class, 'release'])->name('cloud-numbers.release');
     Route::post('/cloud-numbers/{cloudNumber}/sms', [CloudNumberController::class, 'refreshSms'])->name('cloud-numbers.sms');
+
+    Route::post('/proxies/{proxy}/attach', [CustomerProxyController::class, 'attach'])->name('proxies.attach');
+    Route::post('/proxies/{proxy}/detach', [CustomerProxyController::class, 'detach'])->name('proxies.detach');
+    Route::post('/proxies/{proxy}/test', [CustomerProxyController::class, 'test'])->name('proxies.test');
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -102,6 +108,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/skus/sync-email', [AdminSkuController::class, 'syncEmail'])->name('skus.sync-email');
     Route::post('/skus/sync-sms', [AdminSkuController::class, 'syncSms'])->name('skus.sync-sms');
     Route::post('/skus/sync-cloud-numbers', [AdminSkuController::class, 'syncCloudNumbers'])->name('skus.sync-cloud-numbers');
+    Route::post('/skus/sync-proxies', [AdminSkuController::class, 'syncProxies'])->name('skus.sync-proxies');
     Route::post('/skus/bulk-markup', [AdminSkuController::class, 'bulkMarkup'])->name('skus.bulk-markup');
     Route::post('/skus/bulk-status', [AdminSkuController::class, 'bulkStatus'])->name('skus.bulk-status');
 

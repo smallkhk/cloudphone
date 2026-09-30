@@ -355,6 +355,55 @@ against a live VMOS account — same caveat as email accounts, phone numbers,
 and the wallet BEP20 flow. Try a real purchase (small plan, cheap country)
 and a real bind before pointing customers at `/cloud-numbers`.
 
+## Standalone proxies at `/proxies` (built, NOT yet tested against a live VMOS account)
+
+Added because the checkout proxy add-on (above) is permanently welded to the
+device it was bought alongside — there was no way for a customer to buy a
+VMOS residential proxy on its own and move it between their own devices
+later, the way VMOS's own console's "Proxy IP" menu lets you. `Sku.type =
+'proxy'` reuses the same Sku/Order/OrderProvisioner pipeline as every other
+product here:
+
+- VMOS's proxy products (`staticProxyGoods()`) aren't priced per-country, but
+  `vmos:sync-proxy-skus` (hourly) still syncs one Sku per (product, country)
+  combination — same `px-{countryCode}` android_version-placeholder trick as
+  `Sku::TYPE_CLOUD_NUMBER` — so a customer just picks a ready-made card on
+  `/proxies` instead of a separate country dropdown at checkout, and pricing
+  stays admin-editable the normal way.
+- `StandaloneProxyProvisioner` (dispatched from `OrderProvisioner`) purchases
+  via the same async `createProxyOrder` → `taskId` → `proxyOrderStatus()`
+  flow `ProxyProvisioner` uses for the checkout add-on (see that section
+  above for the full async history) — `vmos:sync-customer-proxy-purchases`
+  (every minute) polls any purchase VMOS left non-terminal.
+- VMOS doesn't hand back a proxy id from the purchase call itself here
+  either, so the delivered proxy/proxies are found by the same "newest
+  unused, country-matching entry in `listStaticProxies()`" heuristic
+  `ProxyProvisioner::findUnattachedProxy()` uses — and both code paths now
+  exclude whatever the *other* one has already claimed (`CustomerProxy` rows
+  and `Order.proxy_config.matched_proxy_id` respectively), since they draw
+  from the same VMOS proxy inventory pool. If fewer proxies can be positively
+  matched than were paid for, this does not guess on the remainder — it
+  records whatever matched and fails the order with a message pointing to
+  support, same "never guess on a paid purchase" rule as the checkout add-on.
+- Customer-facing at `/proxies`: browse/buy, then from "Your proxies" attach
+  to any owned device (VMOS's `attachProxies`), detach (`disableProxy`, the
+  same call the device panel's own "Clear proxy" already uses), or test
+  reachability (VMOS's `checkIP`, same as every other "Test proxy" button on
+  the site). VMOS's `listStaticProxies()` doesn't return a password field, so
+  only host/port/account are shown — same limitation Admin → Proxies already
+  has. Admin → Plans & pricing gained a **Proxies** tab with its own sync
+  button.
+- Order confirmation pages previously only showed delivered email accounts
+  and phone numbers, not Cloud Numbers or proxies — `Order::cloudNumbers()`/
+  `Order::customerProxies()` relations and matching blocks on `/orders/{id}`
+  were added alongside this feature to close that gap for both.
+
+Confidence: same tier as the checkout proxy add-on it reuses (the async
+purchase/poll/match mechanics are identical, just not tied to a device order)
+— full test coverage with faked HTTP responses, but no real purchase against
+a live VMOS account yet. Try a real standalone purchase and a real
+attach/detach before pointing customers at `/proxies`.
+
 Checked VMOS's separate "VMOS AI" console feature too (AI image/video
 generation, cutout, watermark remover, upscaling, its own points/credits
 system) — confirmed via the same doc sources this is **not exposed anywhere

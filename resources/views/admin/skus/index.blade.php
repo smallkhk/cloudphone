@@ -7,6 +7,7 @@
                         'email_account' => route('admin.skus.sync-email'),
                         'phone_number' => route('admin.skus.sync-sms'),
                         'cloud_number' => route('admin.skus.sync-cloud-numbers'),
+                        'proxy' => route('admin.skus.sync-proxies'),
                         default => route('admin.skus.sync'),
                     } }}">
                     @csrf
@@ -37,6 +38,10 @@
         <a href="{{ route('admin.skus.index', ['type' => 'cloud_number']) }}"
            class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'cloud_number' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
             Cloud numbers
+        </a>
+        <a href="{{ route('admin.skus.index', ['type' => 'proxy']) }}"
+           class="border-b-2 px-4 py-2.5 text-sm font-medium {{ $type === 'proxy' ? 'border-brand-600 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800' }}">
+            Proxies
         </a>
     </div>
 

@@ -3,6 +3,7 @@
 namespace App\Services\Provisioning;
 
 use App\Models\CloudInstance;
+use App\Models\CustomerProxy;
 use App\Models\Order;
 use App\Services\Vmos\VmosCloudPhoneService;
 use Illuminate\Support\Facades\Log;
@@ -202,12 +203,18 @@ class ProxyProvisioner
     {
         $owned = collect($this->vmos->listStaticProxies()['data']['records'] ?? []);
 
-        $alreadyClaimed = Order::query()
-            ->whereNotNull('proxy_config')
-            ->get(['proxy_config'])
-            ->map(fn (Order $o) => $o->proxy_config['matched_proxy_id'] ?? null)
-            ->filter()
-            ->all();
+        // Both this checkout add-on and the standalone proxy purchase
+        // (CustomerProxy, StandaloneProxyProvisioner) draw from the same
+        // VMOS proxy inventory — exclude whatever either has already claimed.
+        $alreadyClaimed = array_merge(
+            Order::query()
+                ->whereNotNull('proxy_config')
+                ->get(['proxy_config'])
+                ->map(fn (Order $o) => $o->proxy_config['matched_proxy_id'] ?? null)
+                ->filter()
+                ->all(),
+            CustomerProxy::claimedVmosProxyIds(),
+        );
 
         $candidate = $owned
             ->filter(fn ($p) => (int) ($p['proxyUseNumber'] ?? 1) === 0)

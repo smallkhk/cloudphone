@@ -162,6 +162,42 @@
                 </div>
             @endif
 
+            {{-- Cloud numbers --}}
+            @if ($order->cloudNumbers->isNotEmpty())
+                <div class="card p-6">
+                    <h2 class="text-base font-semibold text-ink-900">Your cloud number from this order</h2>
+                    <div class="mt-4 space-y-3">
+                        @foreach ($order->cloudNumbers as $number)
+                            <div class="rounded-xl bg-ink-50 p-4">
+                                <p class="font-mono text-sm font-medium text-ink-900">{{ $number->number ?: 'Provisioning…' }}</p>
+                                <p class="mt-1 text-xs text-ink-500">
+                                    <a href="{{ route('cloud-numbers.index') }}" class="font-medium text-brand-600 hover:underline">Manage it from Cloud numbers →</a>
+                                </p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            {{-- Standalone proxies --}}
+            @if ($order->customerProxies->isNotEmpty())
+                <div class="card p-6">
+                    <h2 class="text-base font-semibold text-ink-900">Your proxy from this order</h2>
+                    <div class="mt-4 space-y-3">
+                        @foreach ($order->customerProxies as $proxy)
+                            <div class="rounded-xl bg-ink-50 p-4">
+                                <p class="font-mono text-sm font-medium text-ink-900">
+                                    {{ $proxy->host ? "{$proxy->host}:{$proxy->port}" : 'Provisioning…' }}
+                                </p>
+                                <p class="mt-1 text-xs text-ink-500">
+                                    <a href="{{ route('proxies.index') }}" class="font-medium text-brand-600 hover:underline">Manage it from Proxies →</a>
+                                </p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- Proxy add-on --}}
             @if ($order->hasProxy())
                 <div class="card p-6">

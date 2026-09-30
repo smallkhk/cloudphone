@@ -86,6 +86,18 @@ device. Progress shows on the order page: pending → (bought →) attached.
 > Admin → Proxies rather than risk attaching the wrong one. The customer's
 > own proxy path has no such issue — it's applied directly, every time.
 
+### Standalone proxies (VMOS "Proxy IP", on their own)
+
+**Proxies** (separate from the checkout add-on above) lets a customer buy a
+VMOS residential proxy on its own and attach it to whichever of their own
+cloud phones they like, moving it between devices whenever they want —
+unlike the checkout add-on, which is welded to the device it was bought
+alongside. Sync the catalogue with `php artisan vmos:sync-proxy-skus`
+(hourly), and set prices under **Admin → Plans & pricing → Proxies**. Once
+paid, `StandaloneProxyProvisioner` buys it from VMOS the same
+purchase/poll/match way the checkout add-on does, then it shows up under
+"Your proxies" to attach, detach, or test.
+
 ### Wallet balance
 
 Customers can also hold a USD balance (**Wallet** in the account menu),

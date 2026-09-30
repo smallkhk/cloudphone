@@ -42,6 +42,17 @@ class Sku extends Model
     // another country.
     public const TYPE_CLOUD_NUMBER = 'cloud_number';
 
+    // A standalone VMOS static residential proxy, bought on its own (not as
+    // a checkout add-on to a device order) and attachable to any of the
+    // customer's own devices afterward — see CustomerProxy and
+    // StandaloneProxyProvisioner. Like TYPE_CLOUD_NUMBER, android_version is
+    // repurposed as "px-{countryCode}" rather than left blank, since VMOS's
+    // proxy products aren't priced per-country but this table is keyed one
+    // row per (product, country) combination anyway, to avoid a customer
+    // having to separately pick a region VMOS's own listProxyRegion() might
+    // not actually support for a given product.
+    public const TYPE_PROXY = 'proxy';
+
     public const TIER_STANDARD = 'standard';
 
     public const TIER_HIGH_END = 'high_end';
@@ -88,6 +99,11 @@ class Sku extends Model
         return $query->where('type', self::TYPE_CLOUD_NUMBER);
     }
 
+    public function scopeProxies($query)
+    {
+        return $query->where('type', self::TYPE_PROXY);
+    }
+
     public function isEmailAccount(): bool
     {
         return $this->type === self::TYPE_EMAIL_ACCOUNT;
@@ -101,6 +117,11 @@ class Sku extends Model
     public function isCloudNumber(): bool
     {
         return $this->type === self::TYPE_CLOUD_NUMBER;
+    }
+
+    public function isProxy(): bool
+    {
+        return $this->type === self::TYPE_PROXY;
     }
 
     /**
