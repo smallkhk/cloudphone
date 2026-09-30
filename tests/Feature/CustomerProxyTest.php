@@ -43,6 +43,82 @@ class CustomerProxyTest extends TestCase
     }
 
     #[Test]
+    public function the_filter_and_plan_cards_show_full_country_names_not_codes(): void
+    {
+        Sku::factory()->create(['type' => Sku::TYPE_PROXY, 'default_country_code' => 'JP', 'price' => 14.99]);
+
+        $this->get(route('proxies.index'))->assertOk()->assertSee('Japan');
+    }
+
+    #[Test]
+    public function a_customer_can_add_their_own_proxy_for_free(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('proxies.store'), [
+            'host' => '9.8.7.6', 'port' => 1080, 'account' => 'me', 'password' => 'secret',
+            'proxy_name' => 'socks5', 'proxy_type' => 'proxy',
+        ])->assertSessionHas('status');
+
+        $proxy = CustomerProxy::where('user_id', $user->id)->first();
+        $this->assertNotNull($proxy);
+        $this->assertTrue($proxy->isCustom());
+        $this->assertNull($proxy->order_id);
+        $this->assertNull($proxy->sku_id);
+        $this->assertTrue($proxy->isDelivered());
+    }
+
+    #[Test]
+    public function attaching_a_manually_added_proxy_uses_setcustomproxy_not_attachproxies(): void
+    {
+        Http::fake(['*/setProxy' => Http::response(['code' => 200, 'msg' => 'success', 'data' => []])]);
+
+        $user = User::factory()->create();
+        CloudInstance::factory()->create(['user_id' => $user->id, 'pad_code' => 'AC001']);
+        $proxy = CustomerProxy::factory()->custom()->create(['user_id' => $user->id, 'host' => '9.8.7.6', 'port' => 1080]);
+
+        $this->actingAs($user)
+            ->post(route('proxies.attach', $proxy), ['pad_code' => 'AC001'])
+            ->assertSessionHas('status');
+
+        $this->assertSame('AC001', $proxy->fresh()->attached_pad_code);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'setProxy')
+            && $r['padCodes'] === ['AC001'] && $r['ip'] === '9.8.7.6' && $r['port'] === 1080);
+    }
+
+    #[Test]
+    public function a_customer_can_remove_a_manually_added_proxy(): void
+    {
+        $user = User::factory()->create();
+        $proxy = CustomerProxy::factory()->custom()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)->delete(route('proxies.destroy', $proxy))->assertSessionHas('status');
+
+        $this->assertNull(CustomerProxy::find($proxy->id));
+    }
+
+    #[Test]
+    public function a_bought_proxy_cannot_be_removed_this_way(): void
+    {
+        $user = User::factory()->create();
+        $proxy = CustomerProxy::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)->delete(route('proxies.destroy', $proxy))->assertForbidden();
+
+        $this->assertNotNull(CustomerProxy::find($proxy->id));
+    }
+
+    #[Test]
+    public function a_stranger_cannot_remove_someone_elses_manual_proxy(): void
+    {
+        $owner = User::factory()->create();
+        $stranger = User::factory()->create();
+        $proxy = CustomerProxy::factory()->custom()->create(['user_id' => $owner->id]);
+
+        $this->actingAs($stranger)->delete(route('proxies.destroy', $proxy))->assertForbidden();
+    }
+
+    #[Test]
     public function a_customer_can_buy_a_proxy_and_it_completes(): void
     {
         Http::fake([

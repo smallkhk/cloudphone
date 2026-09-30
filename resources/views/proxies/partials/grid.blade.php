@@ -26,7 +26,7 @@
 @if ($countries->isNotEmpty())
     <x-pill-filter label="Country" param="country" route="proxies.index" all-label="All countries"
         :active="$country"
-        :options="$countries->mapWithKeys(fn ($c) => [$c => $c])" />
+        :options="$countries->mapWithKeys(fn ($c) => [$c => \App\Services\Vmos\VmosRegionCatalog::nameFor($c)])" />
 @endif
 
 @if ($skus->isEmpty() && $countries->isEmpty())
@@ -56,7 +56,7 @@
     </div>
 @elseif ($skus->isEmpty())
     <div class="card mx-auto max-w-lg p-10 text-center">
-        <h2 class="text-lg font-semibold text-ink-900">No proxies for {{ $country }}</h2>
+        <h2 class="text-lg font-semibold text-ink-900">No proxies for {{ \App\Services\Vmos\VmosRegionCatalog::nameFor($country) }}</h2>
         <p class="mt-2 text-sm text-ink-500">Try another country, or clear the filter to see everything available.</p>
         <a href="{{ route('proxies.index') }}" class="btn-secondary mt-6">Clear filter</a>
     </div>
@@ -64,7 +64,7 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach ($skus as $sku)
             <div class="card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-                <p class="text-base font-bold tracking-tight text-ink-900">{{ $sku->default_country_code }}</p>
+                <p class="text-base font-bold tracking-tight text-ink-900">{{ \App\Services\Vmos\VmosRegionCatalog::nameFor($sku->default_country_code) }}</p>
                 <p class="text-xs text-ink-500">{{ $sku->duration_label }}</p>
                 <p class="mt-3 flex items-baseline gap-1">
                     <span class="text-3xl font-extrabold tracking-tight text-ink-900">${{ number_format($sku->price, 2) }}</span>
@@ -89,6 +89,50 @@
 
 @auth
     <div class="mt-10">
+        <h2 class="text-lg font-semibold text-ink-900">Add your own proxy</h2>
+        <p class="mt-1 text-sm text-ink-500">Already have a proxy from somewhere else? Add it here for free — no order, nothing to buy.</p>
+
+        <form method="POST" action="{{ route('proxies.store') }}" class="card mt-3 p-5">
+            @csrf
+            <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <label class="label" for="proxy-host">Host / IP</label>
+                    <input id="proxy-host" name="host" class="input" placeholder="154.81.40.200" value="{{ old('host') }}" required>
+                </div>
+                <div>
+                    <label class="label" for="proxy-port">Port</label>
+                    <input id="proxy-port" name="port" type="number" class="input" placeholder="63007" value="{{ old('port') }}" required>
+                </div>
+                <div>
+                    <label class="label" for="proxy-account">Username</label>
+                    <input id="proxy-account" name="account" class="input" autocomplete="off" value="{{ old('account') }}">
+                </div>
+                <div>
+                    <label class="label" for="proxy-password">Password</label>
+                    <input id="proxy-password" name="password" type="password" class="input" autocomplete="off">
+                </div>
+                <div>
+                    <label class="label" for="proxy-name">Protocol</label>
+                    <select id="proxy-name" name="proxy_name" class="input">
+                        <option value="socks5">SOCKS5</option>
+                        <option value="http-relay">HTTP / HTTPS</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="proxy-type">Mode</label>
+                    <select id="proxy-type" name="proxy_type" class="input">
+                        <option value="proxy">Proxy</option>
+                        <option value="vpn">VPN (all traffic)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button class="btn-primary">Add proxy</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="mt-10">
         <h2 class="text-lg font-semibold text-ink-900">Your proxies</h2>
 
         @if ($owned->isEmpty())
@@ -105,7 +149,7 @@
                                 @if ($proxy->account)
                                     <p class="mt-0.5 font-mono text-xs text-ink-500">{{ $proxy->account }}</p>
                                 @endif
-                                <p class="mt-1 text-xs text-ink-500">{{ $proxy->sku?->name }}</p>
+                                <p class="mt-1 text-xs text-ink-500">{{ $proxy->isCustom() ? 'Your own proxy' : $proxy->sku?->name }}</p>
                                 @if ($proxy->attached_pad_code)
                                     <p class="mt-1 text-xs text-ink-500">Attached to <span class="font-mono">{{ $proxy->attached_pad_code }}</span></p>
                                 @else
@@ -148,6 +192,15 @@
                                     @csrf
                                     <button class="btn-ghost btn-sm">Test proxy</button>
                                 </form>
+
+                                @if ($proxy->isCustom())
+                                    <form method="POST" action="{{ route('proxies.destroy', $proxy) }}"
+                                          onsubmit="return confirm('Remove this proxy?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="btn-ghost btn-sm text-red-600 hover:bg-red-50">Remove</button>
+                                    </form>
+                                @endif
                             </div>
                         @endif
                     </div>

@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * flow.
  */
 #[Fillable([
-    'order_id', 'user_id', 'sku_id', 'vmos_proxy_id', 'host', 'port', 'account', 'country_code',
+    'order_id', 'user_id', 'sku_id', 'source', 'vmos_proxy_id', 'host', 'port', 'account', 'password',
+    'proxy_name', 'proxy_type', 'country_code',
     'purchase_client_token', 'purchase_status', 'purchase_error',
     'attached_pad_code', 'raw_payload', 'delivered_at',
 ])]
@@ -28,6 +29,14 @@ class CustomerProxy extends Model
     public const PURCHASE_COMPLETED = 'COMPLETED';
 
     public const PURCHASE_FAILED = 'FAILED';
+
+    // Bought through us — async VMOS purchase/poll/match, see StandaloneProxyProvisioner.
+    public const SOURCE_VMOS = 'vmos';
+
+    // The customer's own proxy, added directly — no order, no VMOS charge,
+    // delivered immediately. Same idea as the checkout add-on's "Use my own
+    // proxy" mode.
+    public const SOURCE_CUSTOM = 'custom';
 
     protected function casts(): array
     {
@@ -59,7 +68,16 @@ class CustomerProxy extends Model
 
     public function isDelivered(): bool
     {
+        if ($this->source === self::SOURCE_CUSTOM) {
+            return filled($this->host) && filled($this->port);
+        }
+
         return $this->purchase_status === self::PURCHASE_COMPLETED && filled($this->vmos_proxy_id);
+    }
+
+    public function isCustom(): bool
+    {
+        return $this->source === self::SOURCE_CUSTOM;
     }
 
     /** VMOS proxyIds already claimed by a completed standalone purchase — never re-match these to a different order. */

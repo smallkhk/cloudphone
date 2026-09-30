@@ -397,6 +397,31 @@ product here:
   and phone numbers, not Cloud Numbers or proxies — `Order::cloudNumbers()`/
   `Order::customerProxies()` relations and matching blocks on `/orders/{id}`
   were added alongside this feature to close that gap for both.
+- **Country filter** — the browse grid used to just list every synced
+  (product, country) Sku flat. Now has a Country pill filter
+  (`x-pill-filter`, same component `/plans` and `/cloud-numbers` use) that
+  actually narrows the list (unlike `/plans`' own Region pill, which is
+  cosmetic only — see that section above). Labels are full names
+  (`VmosRegionCatalog::nameFor()`, a small static code→name lookup built
+  from the confirmed 18 `PURCHASE_REGIONS` plus a larger best-effort list for
+  display only — never used for validation), not raw 2-letter codes, since
+  those read as meaningless to a non-technical customer.
+- **Manually adding your own proxy** — `CustomerProxy.source` is `'vmos'`
+  (bought through us, the async purchase/poll/match flow above) or
+  `'custom'` (the customer's own proxy, added directly via a form on
+  `/proxies` — same idea as the checkout add-on's "Use my own proxy" mode:
+  free, no order, no VMOS charge, usable immediately). This needed
+  `customer_proxies.order_id`/`sku_id` to go nullable (a custom entry has
+  neither) plus new `password`/`proxy_name`/`proxy_type` columns — VMOS's
+  `listStaticProxies()` never returns a password for a *bought* proxy, but a
+  *custom* one needs one, since it's the customer's own real credentials.
+  `attach()` branches on `source`: a `custom` proxy attaches via
+  `setCustomProxy()` (the same call the device panel's own proxy form uses),
+  a `vmos` one via `attachProxies()` as before — `detach()`/`test()` already
+  worked for both without changes, since `disableProxy()`/`checkProxyIp()`
+  don't care where the proxy came from. A customer can remove a `custom`
+  entry outright (`DELETE /proxies/{id}`); a `vmos` one can't be deleted this
+  way — it's real, paid-for inventory, not a free-text entry.
 
 Confidence: same tier as the checkout proxy add-on it reuses (the async
 purchase/poll/match mechanics are identical, just not tied to a device order)

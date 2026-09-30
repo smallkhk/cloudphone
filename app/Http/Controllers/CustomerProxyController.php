@@ -46,6 +46,53 @@ class CustomerProxyController extends Controller
         return view('proxies.index', compact('skus', 'owned', 'devices', 'countries', 'country'));
     }
 
+    /** Adds the customer's own proxy directly — no order, no VMOS charge, ready immediately. */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'host' => ['required', 'string', 'max:255'],
+            'port' => ['required', 'integer', 'min:1', 'max:65535'],
+            'account' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255'],
+            'proxy_name' => ['required', 'in:socks5,http-relay'],
+            'proxy_type' => ['required', 'in:proxy,vpn'],
+        ]);
+
+        CustomerProxy::create([
+            'user_id' => Auth::id(),
+            'source' => CustomerProxy::SOURCE_CUSTOM,
+            'host' => $data['host'],
+            'port' => $data['port'],
+            'account' => $data['account'] ?? null,
+            'password' => $data['password'] ?? null,
+            'proxy_name' => $data['proxy_name'],
+            'proxy_type' => $data['proxy_type'],
+            'purchase_status' => CustomerProxy::PURCHASE_COMPLETED,
+            'delivered_at' => now(),
+        ]);
+
+        return back()->with('status', 'Proxy added — test it, then attach it to a device whenever you\'re ready.');
+    }
+
+    /** Removes a manually-added proxy. A bought one can't be deleted this way — it's real, paid-for inventory. */
+    public function destroy(CustomerProxy $proxy)
+    {
+        abort_unless($proxy->user_id === Auth::id(), 403);
+        abort_unless($proxy->isCustom(), 403);
+
+        if ($proxy->isAttached()) {
+            try {
+                $this->vmos->disableProxy([$proxy->attached_pad_code]);
+            } catch (Throwable $e) {
+                Log::warning('customer_proxies.remove_detach_failed', ['customer_proxy_id' => $proxy->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        $proxy->delete();
+
+        return back()->with('status', 'Proxy removed.');
+    }
+
     /** Attaches an owned, delivered proxy to one of the customer's own devices. */
     public function attach(Request $request, CustomerProxy $proxy)
     {
@@ -61,7 +108,14 @@ class CustomerProxyController extends Controller
         }
 
         try {
-            $this->vmos->attachProxies([$data['pad_code']], [$proxy->vmos_proxy_id]);
+            if ($proxy->isCustom()) {
+                $this->vmos->setCustomProxy(
+                    [$data['pad_code']], (string) $proxy->host, (int) $proxy->port,
+                    $proxy->account, $proxy->password, $proxy->proxy_name, $proxy->proxy_type,
+                );
+            } else {
+                $this->vmos->attachProxies([$data['pad_code']], [$proxy->vmos_proxy_id]);
+            }
 
             $proxy->update(['attached_pad_code' => $data['pad_code']]);
 
@@ -105,7 +159,7 @@ class CustomerProxyController extends Controller
         }
 
         try {
-            $response = $this->vmos->checkProxyIp((string) $proxy->host, (int) $proxy->port, $proxy->account);
+            $response = $this->vmos->checkProxyIp((string) $proxy->host, (int) $proxy->port, $proxy->account, $proxy->password, $proxy->proxy_name ?: 'socks5');
             $info = $response['data'] ?? [];
             $where = collect([$info['city'] ?? null, $info['country'] ?? null])->filter()->implode(', ');
 

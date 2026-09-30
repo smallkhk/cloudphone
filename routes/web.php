@@ -93,6 +93,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/cloud-numbers/{cloudNumber}/release', [CloudNumberController::class, 'release'])->name('cloud-numbers.release');
     Route::post('/cloud-numbers/{cloudNumber}/sms', [CloudNumberController::class, 'refreshSms'])->name('cloud-numbers.sms');
 
+    Route::post('/proxies', [CustomerProxyController::class, 'store'])->name('proxies.store');
+    Route::delete('/proxies/{proxy}', [CustomerProxyController::class, 'destroy'])->name('proxies.destroy');
     Route::post('/proxies/{proxy}/attach', [CustomerProxyController::class, 'attach'])->name('proxies.attach');
     Route::post('/proxies/{proxy}/detach', [CustomerProxyController::class, 'detach'])->name('proxies.detach');
     Route::post('/proxies/{proxy}/test', [CustomerProxyController::class, 'test'])->name('proxies.test');

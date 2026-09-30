@@ -50,7 +50,32 @@ class VmosRegionCatalog
         'AU' => 'Australia',
     ];
 
+    /**
+     * Extra common markets seen in VMOS's wider (but unconfirmed-as-a-fixed-
+     * list) proxy/SIM region data, beyond the 18 confirmed device-purchase
+     * regions above — used only for display labels, never for validation.
+     */
+    protected const EXTRA_NAMES = [
+        'NG' => 'Nigeria', 'ZA' => 'South Africa', 'IN' => 'India',
+        'AE' => 'United Arab Emirates', 'CA' => 'Canada', 'MX' => 'Mexico',
+        'NL' => 'Netherlands', 'PL' => 'Poland', 'SE' => 'Sweden', 'CH' => 'Switzerland',
+        'AR' => 'Argentina', 'CO' => 'Colombia', 'CL' => 'Chile', 'EG' => 'Egypt',
+        'SA' => 'Saudi Arabia', 'TR' => 'Turkey', 'RU' => 'Russia', 'PK' => 'Pakistan',
+        'BD' => 'Bangladesh', 'NZ' => 'New Zealand', 'PT' => 'Portugal', 'BE' => 'Belgium',
+        'AT' => 'Austria', 'IE' => 'Ireland', 'DK' => 'Denmark', 'NO' => 'Norway',
+        'FI' => 'Finland', 'GR' => 'Greece', 'CZ' => 'Czechia', 'RO' => 'Romania',
+        'IL' => 'Israel', 'KE' => 'Kenya', 'MA' => 'Morocco', 'CN' => 'China',
+    ];
+
     public function __construct(protected VmosCloudPhoneService $vmos) {}
+
+    /** Best-effort full country name for a 2-letter code — falls back to the code itself if unknown. Display only. */
+    public static function nameFor(?string $code): string
+    {
+        $code = strtoupper((string) $code);
+
+        return self::PURCHASE_REGIONS[$code] ?? self::EXTRA_NAMES[$code] ?? $code;
+    }
 
     /** @return array<string, string> country code => name, cached since it rarely changes. */
     public function options(): array
