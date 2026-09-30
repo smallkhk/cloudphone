@@ -17,7 +17,7 @@ class ProxyTestTest extends TestCase
     {
         Http::fake(['*/checkIP' => Http::response([
             'code' => 200, 'msg' => 'success',
-            'data' => ['city' => 'Los Angeles', 'country' => 'US'],
+            'data' => ['proxyWorking' => true, 'proxyLocation' => 'Los Angeles, US', 'publicIp' => '1.2.3.4'],
         ])]);
 
         $this->actingAs(User::factory()->create())
@@ -26,6 +26,20 @@ class ProxyTestTest extends TestCase
             ])
             ->assertOk()
             ->assertJson(['ok' => true, 'message' => 'Proxy is reachable — appears to be in Los Angeles, US.']);
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'checkIP')
+            && $r['host'] === '10.0.0.5' && $r['type'] === 'Socks5' && ! isset($r['ip']) && ! isset($r['proxyName']));
+    }
+
+    #[Test]
+    public function vmos_reporting_proxyworking_false_counts_as_a_failure(): void
+    {
+        Http::fake(['*/checkIP' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['proxyWorking' => false]])]);
+
+        $this->actingAs(User::factory()->create())
+            ->postJson('/proxy/test', ['ip' => '10.0.0.5', 'port' => 1080, 'proxy_name' => 'socks5'])
+            ->assertStatus(422)
+            ->assertJson(['ok' => false]);
     }
 
     #[Test]

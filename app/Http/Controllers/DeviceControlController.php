@@ -236,7 +236,12 @@ class DeviceControlController extends Controller
             );
 
             $info = $response['data'] ?? [];
-            $where = collect([$info['city'] ?? null, $info['country'] ?? null])->filter()->implode(', ');
+
+            if (($info['proxyWorking'] ?? true) === false) {
+                return back()->with('error', 'Proxy check failed. Double-check the details and try again.');
+            }
+
+            $where = $info['proxyLocation'] ?? null;
 
             return back()->with('status', 'Proxy is reachable'.($where ? " — appears to be in {$where}." : '.'));
         } catch (Throwable $e) {

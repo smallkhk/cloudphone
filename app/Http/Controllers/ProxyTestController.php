@@ -32,7 +32,12 @@ class ProxyTestController extends Controller
             );
 
             $info = $response['data'] ?? [];
-            $where = collect([$info['city'] ?? null, $info['country'] ?? null])->filter()->implode(', ');
+
+            if (($info['proxyWorking'] ?? true) === false) {
+                return response()->json(['ok' => false, 'message' => 'Proxy check failed. Double-check the details and try again.'], 422);
+            }
+
+            $where = $info['proxyLocation'] ?? null;
 
             return response()->json([
                 'ok' => true,

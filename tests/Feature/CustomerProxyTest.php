@@ -264,12 +264,25 @@ class CustomerProxyTest extends TestCase
     #[Test]
     public function testing_a_proxy_checks_it_via_vmos(): void
     {
-        Http::fake(['*/checkIP' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['city' => 'Ashburn', 'country' => 'US']])]);
+        Http::fake(['*/checkIP' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['proxyWorking' => true, 'proxyLocation' => 'Ashburn, US']])]);
 
         $user = User::factory()->create();
         $proxy = CustomerProxy::factory()->create(['user_id' => $user->id, 'host' => '1.1.1.1', 'port' => 1080]);
 
         $this->actingAs($user)->post(route('proxies.test', $proxy))->assertSessionHas('status');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'checkIP') && $r['host'] === '1.1.1.1' && $r['type'] === 'Socks5');
+    }
+
+    #[Test]
+    public function a_proxy_vmos_reports_as_not_working_counts_as_a_failed_test(): void
+    {
+        Http::fake(['*/checkIP' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['proxyWorking' => false]])]);
+
+        $user = User::factory()->create();
+        $proxy = CustomerProxy::factory()->create(['user_id' => $user->id, 'host' => '1.1.1.1', 'port' => 1080]);
+
+        $this->actingAs($user)->post(route('proxies.test', $proxy))->assertSessionHas('error');
     }
 
     #[Test]

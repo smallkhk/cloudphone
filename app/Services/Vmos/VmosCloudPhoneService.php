@@ -322,15 +322,27 @@ class VmosCloudPhoneService
         ]);
     }
 
-    /** Checks whether a proxy is reachable and where it geolocates. */
+    /**
+     * Checks whether a proxy is reachable and where it geolocates.
+     *
+     * Confirmed against VMOS's published spec (2026-09) — this was wrong
+     * before: the real body fields are host/port/account/password/type, not
+     * ip/port/account/password/proxyName, and type wants "Socks5"/"http"/
+     * "https" (capitalized Socks5), not our internal socks5/http-relay
+     * values. Every "Test proxy" button on the site called this with the old
+     * field names, so none of them were ever actually testing anything —
+     * VMOS rejected the request outright rather than testing the wrong
+     * protocol, which is why this always failed even for a proxy confirmed
+     * working in VMOS's own console with identical credentials.
+     */
     public function checkProxyIp(string $ip, int $port, ?string $account = null, ?string $password = null, string $proxyName = 'socks5'): array
     {
         return $this->client->post('/vcpcloud/api/padApi/checkIP', array_filter([
-            'ip' => $ip,
+            'host' => $ip,
             'port' => $port,
             'account' => $account,
             'password' => $password,
-            'proxyName' => $proxyName,
+            'type' => $proxyName === 'socks5' ? 'Socks5' : 'http',
         ], fn ($v) => $v !== null));
     }
 

@@ -165,6 +165,19 @@ class DeviceControlTest extends TestCase
     }
 
     #[Test]
+    public function testing_a_custom_proxy_sends_vmoss_real_checkip_field_names(): void
+    {
+        Http::fake(['*/checkIP' => Http::response(['code' => 200, 'msg' => 'success', 'data' => ['proxyWorking' => true, 'proxyLocation' => 'Ashburn, US']])]);
+
+        $this->actingAs($this->owner)->post(route('instances.proxy.test', $this->device), [
+            'ip' => '154.81.40.200', 'port' => 63007, 'proxy_name' => 'socks5',
+        ])->assertSessionHas('status', fn ($m) => str_contains($m, 'Ashburn, US'));
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'checkIP')
+            && $r['host'] === '154.81.40.200' && $r['type'] === 'Socks5' && ! isset($r['ip']));
+    }
+
+    #[Test]
     public function installing_an_app_requires_a_valid_url(): void
     {
         $this->fakeVmosOk();

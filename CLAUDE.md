@@ -81,6 +81,31 @@ location reporting causes a real problem again, the fix is a geolocation
 lookup layered *on top of* a successful VMOS reachability check (not
 instead of it), not a full replacement.
 
+**Update (2026-09): every "Test proxy" button was silently broken from the
+start.** `checkIP`'s real request fields (confirmed against VMOS's published
+spec) are `host`/`port`/`account`/`password`/`type` — the code had guessed
+`ip`/`port`/`account`/`password`/`proxyName`, and `type` wants `"Socks5"` /
+`"http"` / `"https"` (capitalized `Socks5`), not the internal `socks5`/
+`http-relay` values the UI uses. Because `host` was missing and `type` was
+never a value VMOS recognized, VMOS rejected every check outright — this
+reproduced with a real proxy, real credentials, confirmed working seconds
+earlier in VMOS's own console's own Network Detection feature, failing every
+single time through our site with a generic `code: 400` "Network error
+detected, please try again in 1 minute", consistently over 24+ minutes and
+5 attempts (so not a transient rate limit — every attempt sent the same
+wrong fields). The response was also being parsed wrong: VMOS actually
+returns `proxyWorking` (boolean)/`proxyLocation`/`publicIp`, not `city`/
+`country`, so even a *successful* check would have shown no location and,
+worse, a `proxyWorking: false` response was being read as success since
+nothing checked that field. All three call sites (`ProxyTestController`,
+`DeviceControlController::testProxy`, `CustomerProxyController::test`) share
+one fixed `VmosCloudPhoneService::checkProxyIp()`, so this one fix corrects
+every "Test proxy" button on the site at once. Our UI's `http-relay` option
+doesn't distinguish HTTP from HTTPS the way VMOS's `type` does — it's
+mapped to `"http"`; if a customer's proxy is actually HTTPS-only, this could
+still show a false failure, which would need a third UI option to fix
+properly if it comes up.
+
 Applying a proxy to a device still has to go through VMOS's `setCustomProxy`
 either way, since VMOS is what actually hosts and controls the device's
 network stack — no proxy checker, ours or anyone else's, changes that part.

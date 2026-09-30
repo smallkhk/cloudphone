@@ -188,7 +188,12 @@ class CustomerProxyController extends Controller
         try {
             $response = $this->vmos->checkProxyIp((string) $proxy->host, (int) $proxy->port, $proxy->account, $proxy->password, $proxy->proxy_name ?: 'socks5');
             $info = $response['data'] ?? [];
-            $where = collect([$info['city'] ?? null, $info['country'] ?? null])->filter()->implode(', ');
+
+            if (($info['proxyWorking'] ?? true) === false) {
+                return back()->with('error', 'Proxy check failed. Double-check it\'s still active and try again.');
+            }
+
+            $where = $info['proxyLocation'] ?? null;
 
             return back()->with('status', 'Proxy is reachable'.($where ? " — appears to be in {$where}." : '.'));
         } catch (Throwable $e) {
