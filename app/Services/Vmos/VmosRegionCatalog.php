@@ -22,18 +22,32 @@ use Throwable;
  */
 class VmosRegionCatalog
 {
-    /** Exactly what VMOS's own "Select Region" purchase selector shows. Update by hand if VMOS adds one. */
+    /**
+     * Exactly what VMOS's own "Select Region" purchase selector shows.
+     * Update (2026-09): VMOS expanded this from 10 to 18 regions — confirmed
+     * from a fresh console screenshot, adding Vietnam, Malaysia, France,
+     * Italy, Spain, Thailand, the UK and Australia. Update by hand if VMOS
+     * adds more.
+     */
     public const PURCHASE_REGIONS = [
         'HK' => 'Hong Kong',
-        'PH' => 'Philippines',
         'US' => 'United States',
         'JP' => 'Japan',
         'KR' => 'South Korea',
-        'BR' => 'Brazil',
         'DE' => 'Germany',
         'SG' => 'Singapore',
+        'BR' => 'Brazil',
+        'VN' => 'Vietnam',
         'ID' => 'Indonesia',
+        'MY' => 'Malaysia',
         'TW' => 'Taiwan',
+        'FR' => 'France',
+        'IT' => 'Italy',
+        'ES' => 'Spain',
+        'TH' => 'Thailand',
+        'GB' => 'United Kingdom',
+        'PH' => 'Philippines',
+        'AU' => 'Australia',
     ];
 
     public function __construct(protected VmosCloudPhoneService $vmos) {}

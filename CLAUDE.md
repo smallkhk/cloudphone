@@ -252,9 +252,12 @@ takes `countryCode` as an independent parameter). Picking a region just
 pre-selects it on every device's "Buy now" form below.
 
 The checkout region list itself (`VmosRegionCatalog::purchaseOptions()` /
-`PURCHASE_REGIONS`) is a **fixed list, not live-pulled** — HK, PH, US, JP,
-KR, BR, DE, SG, ID, TW, confirmed from the owner's own VMOS console
-screenshot. The live `…/padApi/country` list (`options()`) is real but
+`PURCHASE_REGIONS`) is a **fixed list, not live-pulled** — HK, US, JP, KR,
+DE, SG, BR, VN, ID, MY, TW, FR, IT, ES, TH, GB, PH, AU (18 regions, confirmed
+2026-09 from the owner's own VMOS console screenshot — VMOS expanded this
+from an original 10 by adding Vietnam, Malaysia, France, Italy, Spain,
+Thailand, the UK and Australia; watch for this drifting stale again, it's
+happened once already). The live `…/padApi/country` list (`options()`) is real but
 broader than what VMOS's purchase flow actually accepts (it's meant for SIM
 regeneration on an already-owned device, a separate feature that does
 support more countries) — using it for checkout showed the customer regions
