@@ -132,80 +132,89 @@
         </form>
     </div>
 
-    <div class="mt-10">
-        <h2 class="text-lg font-semibold text-ink-900">Your proxies</h2>
-
-        @if ($owned->isEmpty())
-            <p class="mt-2 text-sm text-ink-500">Proxies you buy will show up here once provisioning finishes.</p>
-        @else
-            <div class="mt-4 space-y-3">
-                @foreach ($owned as $proxy)
-                    <div class="card p-5">
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div class="min-w-0">
-                                <p class="font-mono text-sm font-medium text-ink-900">
+    <div class="mt-10 card">
+        <h2 class="px-5 py-4 text-base font-semibold text-ink-900">Your proxies</h2>
+        <div class="table-wrap border-t border-ink-100">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Source</th><th>Proxy</th><th>Protocol</th><th>Status</th>
+                        <th>Attached to</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($owned as $proxy)
+                        <tr>
+                            <td class="text-sm text-ink-600">{{ $proxy->id }}</td>
+                            <td class="text-sm text-ink-600">{{ $proxy->isCustom() ? 'Your own' : 'Bought' }}</td>
+                            <td>
+                                <p class="font-mono text-xs font-medium text-ink-900">
                                     {{ $proxy->host ? "{$proxy->host}:{$proxy->port}" : 'Provisioning…' }}
                                 </p>
                                 @if ($proxy->account)
-                                    <p class="mt-0.5 font-mono text-xs text-ink-500">{{ $proxy->account }}</p>
+                                    <p class="font-mono text-xs text-ink-500">{{ $proxy->account }}</p>
                                 @endif
-                                <p class="mt-1 text-xs text-ink-500">{{ $proxy->isCustom() ? 'Your own proxy' : $proxy->sku?->name }}</p>
-                                @if ($proxy->attached_pad_code)
-                                    <p class="mt-1 text-xs text-ink-500">Attached to <span class="font-mono">{{ $proxy->attached_pad_code }}</span></p>
-                                @else
-                                    <p class="mt-1 text-xs text-ink-400">Not attached to a device</p>
+                                @if ($proxy->purchase_error)
+                                    <p class="mt-1 text-xs text-red-600">{{ $proxy->purchase_error }}</p>
                                 @endif
-                            </div>
+                            </td>
+                            <td class="text-sm text-ink-600">
+                                {{ $proxy->proxy_name ? strtoupper($proxy->proxy_name) : '—' }}
+                            </td>
+                            <td>
+                                <span class="{{ match ($proxy->purchase_status) {
+                                    'COMPLETED' => 'badge-green',
+                                    'FAILED' => 'badge-red',
+                                    default => 'badge-amber',
+                                } }}">{{ ucfirst(strtolower($proxy->purchase_status)) }}</span>
+                            </td>
+                            <td class="text-sm text-ink-600">
+                                {{ $proxy->attached_pad_code ?: '—' }}
+                            </td>
+                            <td class="text-right">
+                                @if ($proxy->isDelivered())
+                                    <div class="flex flex-wrap items-center justify-end gap-2">
+                                        @if (! $proxy->attached_pad_code && $devices->isNotEmpty())
+                                            <form method="POST" action="{{ route('proxies.attach', $proxy) }}" class="flex items-center gap-1">
+                                                @csrf
+                                                <select name="pad_code" class="input text-xs" required>
+                                                    <option value="">Bind to…</option>
+                                                    @foreach ($devices as $device)
+                                                        <option value="{{ $device->pad_code }}">{{ $device->nickname ?: $device->pad_code }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <button class="btn-secondary btn-sm">Bind</button>
+                                            </form>
+                                        @elseif ($proxy->attached_pad_code)
+                                            <form method="POST" action="{{ route('proxies.detach', $proxy) }}">
+                                                @csrf
+                                                <button class="btn-ghost btn-sm">Unbind</button>
+                                            </form>
+                                        @endif
 
-                            <span class="{{ match ($proxy->purchase_status) {
-                                'COMPLETED' => 'badge-green',
-                                'FAILED' => 'badge-red',
-                                default => 'badge-amber',
-                            } }}">{{ ucfirst(strtolower($proxy->purchase_status)) }}</span>
-                        </div>
+                                        <form method="POST" action="{{ route('proxies.test', $proxy) }}">
+                                            @csrf
+                                            <button class="btn-ghost btn-sm">Test</button>
+                                        </form>
 
-                        @if ($proxy->purchase_error)
-                            <p class="mt-3 text-xs text-red-600">{{ $proxy->purchase_error }}</p>
-                        @endif
-
-                        @if ($proxy->isDelivered())
-                            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
-                                @if (! $proxy->attached_pad_code && $devices->isNotEmpty())
-                                    <form method="POST" action="{{ route('proxies.attach', $proxy) }}" class="flex flex-wrap items-center gap-2">
-                                        @csrf
-                                        <select name="pad_code" class="input text-sm" required>
-                                            <option value="">Attach to device…</option>
-                                            @foreach ($devices as $device)
-                                                <option value="{{ $device->pad_code }}">{{ $device->nickname ?: $device->pad_code }}</option>
-                                            @endforeach
-                                        </select>
-                                        <button class="btn-secondary btn-sm">Attach</button>
-                                    </form>
-                                @elseif ($proxy->attached_pad_code)
-                                    <form method="POST" action="{{ route('proxies.detach', $proxy) }}">
-                                        @csrf
-                                        <button class="btn-ghost btn-sm">Detach</button>
-                                    </form>
+                                        @if ($proxy->isCustom())
+                                            <form method="POST" action="{{ route('proxies.destroy', $proxy) }}"
+                                                  onsubmit="return confirm('Remove this proxy?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="btn-ghost btn-sm text-red-600 hover:bg-red-50">Delete</button>
+                                            </form>
+                                        @endif
+                                    </div>
                                 @endif
-
-                                <form method="POST" action="{{ route('proxies.test', $proxy) }}">
-                                    @csrf
-                                    <button class="btn-ghost btn-sm">Test proxy</button>
-                                </form>
-
-                                @if ($proxy->isCustom())
-                                    <form method="POST" action="{{ route('proxies.destroy', $proxy) }}"
-                                          onsubmit="return confirm('Remove this proxy?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="btn-ghost btn-sm text-red-600 hover:bg-red-50">Remove</button>
-                                    </form>
-                                @endif
-                            </div>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="py-12 text-center text-sm text-ink-500">Proxies you buy or add will show up here.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
     </div>
 @endauth
