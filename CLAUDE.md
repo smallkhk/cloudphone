@@ -429,6 +429,18 @@ product here:
   don't care where the proxy came from. A customer can remove a `custom`
   entry outright (`DELETE /proxies/{id}`); a `vmos` one can't be deleted this
   way — it's real, paid-for inventory, not a free-text entry.
+- **Label, Remarks, and Edit** — the owner compared the add-proxy form
+  against VMOS's own "Add Proxy" dialog and it was missing a nickname field,
+  a free-text notes field, and any way to fix a mistake short of delete+redo.
+  Added `label`/`remarks` columns and a `PUT /proxies/{id}` (`update()`,
+  `custom` source only, same ownership check as `destroy()`) — the edit
+  modal reuses the add form's fields via Alpine (`x-data="{ editing: null
+  }"` on the table, populated from `@js($proxy->...)` on each row's Edit
+  button). Leaving the password field blank on an edit keeps the existing
+  one rather than clearing it, since VMOS's own `listStaticProxies()` (and
+  by extension anything reading a *bought* proxy's details) never hands a
+  password back to redisplay — there'd be nothing to show in that field even
+  if we tried.
 
 Confidence: same tier as the checkout proxy add-on it reuses (the async
 purchase/poll/match mechanics are identical, just not tied to a device order)

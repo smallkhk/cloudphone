@@ -56,16 +56,73 @@ class CustomerProxyTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)->post(route('proxies.store'), [
-            'host' => '9.8.7.6', 'port' => 1080, 'account' => 'me', 'password' => 'secret',
-            'proxy_name' => 'socks5', 'proxy_type' => 'proxy',
+            'label' => 'Home proxy', 'host' => '9.8.7.6', 'port' => 1080, 'account' => 'me', 'password' => 'secret',
+            'proxy_name' => 'socks5', 'proxy_type' => 'proxy', 'remarks' => 'from my ISP',
         ])->assertSessionHas('status');
 
         $proxy = CustomerProxy::where('user_id', $user->id)->first();
         $this->assertNotNull($proxy);
         $this->assertTrue($proxy->isCustom());
+        $this->assertSame('Home proxy', $proxy->label);
+        $this->assertSame('from my ISP', $proxy->remarks);
         $this->assertNull($proxy->order_id);
         $this->assertNull($proxy->sku_id);
         $this->assertTrue($proxy->isDelivered());
+    }
+
+    #[Test]
+    public function a_customer_can_edit_their_own_manually_added_proxy(): void
+    {
+        $user = User::factory()->create();
+        $proxy = CustomerProxy::factory()->custom()->create(['user_id' => $user->id, 'host' => '1.1.1.1', 'port' => 1080]);
+
+        $this->actingAs($user)->put(route('proxies.update', $proxy), [
+            'label' => 'Updated label', 'host' => '2.2.2.2', 'port' => 9090, 'account' => 'newuser',
+            'proxy_name' => 'http-relay', 'proxy_type' => 'vpn', 'remarks' => 'updated',
+        ])->assertSessionHas('status');
+
+        $proxy->refresh();
+        $this->assertSame('Updated label', $proxy->label);
+        $this->assertSame('2.2.2.2', $proxy->host);
+        $this->assertSame(9090, $proxy->port);
+        $this->assertSame('http-relay', $proxy->proxy_name);
+    }
+
+    #[Test]
+    public function leaving_the_password_blank_when_editing_keeps_the_existing_one(): void
+    {
+        $user = User::factory()->create();
+        $proxy = CustomerProxy::factory()->custom()->create(['user_id' => $user->id, 'password' => 'original-secret']);
+
+        $this->actingAs($user)->put(route('proxies.update', $proxy), [
+            'host' => $proxy->host, 'port' => $proxy->port,
+            'proxy_name' => 'socks5', 'proxy_type' => 'proxy',
+        ]);
+
+        $this->assertSame('original-secret', $proxy->fresh()->password);
+    }
+
+    #[Test]
+    public function a_bought_proxy_cannot_be_edited(): void
+    {
+        $user = User::factory()->create();
+        $proxy = CustomerProxy::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user)->put(route('proxies.update', $proxy), [
+            'host' => 'x', 'port' => 1, 'proxy_name' => 'socks5', 'proxy_type' => 'proxy',
+        ])->assertForbidden();
+    }
+
+    #[Test]
+    public function a_stranger_cannot_edit_someone_elses_proxy(): void
+    {
+        $owner = User::factory()->create();
+        $stranger = User::factory()->create();
+        $proxy = CustomerProxy::factory()->custom()->create(['user_id' => $owner->id]);
+
+        $this->actingAs($stranger)->put(route('proxies.update', $proxy), [
+            'host' => 'x', 'port' => 1, 'proxy_name' => 'socks5', 'proxy_type' => 'proxy',
+        ])->assertForbidden();
     }
 
     #[Test]

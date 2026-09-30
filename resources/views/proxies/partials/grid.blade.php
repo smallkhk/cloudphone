@@ -142,8 +142,12 @@
         <form method="POST" action="{{ route('proxies.store') }}" class="card mt-3 p-5">
             @csrf
             <div class="grid gap-3 sm:grid-cols-2">
+                <div class="sm:col-span-2">
+                    <label class="label" for="proxy-label">Label (optional)</label>
+                    <input id="proxy-label" name="label" class="input" placeholder="e.g. Home proxy" value="{{ old('label') }}">
+                </div>
                 <div>
-                    <label class="label" for="proxy-host">Host / IP</label>
+                    <label class="label" for="proxy-host">Server address</label>
                     <input id="proxy-host" name="host" class="input" placeholder="154.81.40.200" value="{{ old('host') }}" required>
                 </div>
                 <div>
@@ -151,7 +155,7 @@
                     <input id="proxy-port" name="port" type="number" class="input" placeholder="63007" value="{{ old('port') }}" required>
                 </div>
                 <div>
-                    <label class="label" for="proxy-account">Username</label>
+                    <label class="label" for="proxy-account">Account</label>
                     <input id="proxy-account" name="account" class="input" autocomplete="off" value="{{ old('account') }}">
                 </div>
                 <div>
@@ -172,6 +176,10 @@
                         <option value="vpn">VPN (all traffic)</option>
                     </select>
                 </div>
+                <div class="sm:col-span-2">
+                    <label class="label" for="proxy-remarks">Remarks (optional)</label>
+                    <textarea id="proxy-remarks" name="remarks" class="input" rows="2">{{ old('remarks') }}</textarea>
+                </div>
             </div>
             <div class="mt-4 flex justify-end">
                 <button class="btn-primary">Add proxy</button>
@@ -179,7 +187,7 @@
         </form>
     </div>
 
-    <div class="mt-10 card">
+    <div class="mt-10 card" x-data="{ editing: null }">
         <h2 class="px-5 py-4 text-base font-semibold text-ink-900">Your proxies</h2>
         <div class="table-wrap border-t border-ink-100">
             <table class="table">
@@ -195,11 +203,17 @@
                             <td class="text-sm text-ink-600">{{ $proxy->id }}</td>
                             <td class="text-sm text-ink-600">{{ $proxy->isCustom() ? 'Your own' : 'Bought' }}</td>
                             <td>
+                                @if ($proxy->label)
+                                    <p class="text-xs font-semibold text-ink-900">{{ $proxy->label }}</p>
+                                @endif
                                 <p class="font-mono text-xs font-medium text-ink-900">
                                     {{ $proxy->host ? "{$proxy->host}:{$proxy->port}" : 'Provisioning…' }}
                                 </p>
                                 @if ($proxy->account)
                                     <p class="font-mono text-xs text-ink-500">{{ $proxy->account }}</p>
+                                @endif
+                                @if ($proxy->remarks)
+                                    <p class="mt-1 text-xs text-ink-400">{{ $proxy->remarks }}</p>
                                 @endif
                                 @if ($proxy->purchase_error)
                                     <p class="mt-1 text-xs text-red-600">{{ $proxy->purchase_error }}</p>
@@ -245,6 +259,20 @@
                                         </form>
 
                                         @if ($proxy->isCustom())
+                                            <button type="button" class="btn-ghost btn-sm"
+                                                    @click="editing = {
+                                                        id: {{ $proxy->id }},
+                                                        label: @js($proxy->label),
+                                                        host: @js($proxy->host),
+                                                        port: {{ (int) $proxy->port }},
+                                                        account: @js($proxy->account),
+                                                        proxy_name: @js($proxy->proxy_name),
+                                                        proxy_type: @js($proxy->proxy_type),
+                                                        remarks: @js($proxy->remarks),
+                                                    }">
+                                                Edit
+                                            </button>
+
                                             <form method="POST" action="{{ route('proxies.destroy', $proxy) }}"
                                                   onsubmit="return confirm('Remove this proxy?')">
                                                 @csrf
@@ -261,6 +289,71 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+
+        {{-- Edit modal for a manually-added proxy --}}
+        <div x-show="editing" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+             @keydown.escape.window="editing = null">
+            <div @click.outside="editing = null" class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" x-cloak>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-ink-900">Edit proxy</h3>
+                    <button type="button" @click="editing = null" class="rounded-full p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <template x-if="editing">
+                    <form method="POST" :action="'/proxies/' + editing.id" class="mt-4 space-y-3">
+                        @csrf
+                        @method('PUT')
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <label class="label">Label (optional)</label>
+                                <input name="label" class="input" x-model="editing.label">
+                            </div>
+                            <div>
+                                <label class="label">Server address</label>
+                                <input name="host" class="input" x-model="editing.host" required>
+                            </div>
+                            <div>
+                                <label class="label">Port</label>
+                                <input name="port" type="number" class="input" x-model="editing.port" required>
+                            </div>
+                            <div>
+                                <label class="label">Account</label>
+                                <input name="account" class="input" x-model="editing.account" autocomplete="off">
+                            </div>
+                            <div>
+                                <label class="label">Password</label>
+                                <input name="password" type="password" class="input" autocomplete="off" placeholder="Leave blank to keep current">
+                            </div>
+                            <div>
+                                <label class="label">Protocol</label>
+                                <select name="proxy_name" class="input" x-model="editing.proxy_name">
+                                    <option value="socks5">SOCKS5</option>
+                                    <option value="http-relay">HTTP / HTTPS</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="label">Mode</label>
+                                <select name="proxy_type" class="input" x-model="editing.proxy_type">
+                                    <option value="proxy">Proxy</option>
+                                    <option value="vpn">VPN (all traffic)</option>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="label">Remarks (optional)</label>
+                                <textarea name="remarks" class="input" rows="2" x-model="editing.remarks"></textarea>
+                            </div>
+                        </div>
+                        <div class="flex justify-end border-t border-ink-100 pt-4">
+                            <button class="btn-primary">Save changes</button>
+                        </div>
+                    </form>
+                </template>
+            </div>
         </div>
     </div>
 @endauth

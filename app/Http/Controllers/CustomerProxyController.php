@@ -41,29 +41,64 @@ class CustomerProxyController extends Controller
     /** Adds the customer's own proxy directly — no order, no VMOS charge, ready immediately. */
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'host' => ['required', 'string', 'max:255'],
-            'port' => ['required', 'integer', 'min:1', 'max:65535'],
-            'account' => ['nullable', 'string', 'max:255'],
-            'password' => ['nullable', 'string', 'max:255'],
-            'proxy_name' => ['required', 'in:socks5,http-relay'],
-            'proxy_type' => ['required', 'in:proxy,vpn'],
-        ]);
+        $data = $request->validate($this->customProxyRules());
 
         CustomerProxy::create([
             'user_id' => Auth::id(),
             'source' => CustomerProxy::SOURCE_CUSTOM,
+            'label' => $data['label'] ?? null,
             'host' => $data['host'],
             'port' => $data['port'],
             'account' => $data['account'] ?? null,
             'password' => $data['password'] ?? null,
             'proxy_name' => $data['proxy_name'],
             'proxy_type' => $data['proxy_type'],
+            'remarks' => $data['remarks'] ?? null,
             'purchase_status' => CustomerProxy::PURCHASE_COMPLETED,
             'delivered_at' => now(),
         ]);
 
         return back()->with('status', 'Proxy added — test it, then attach it to a device whenever you\'re ready.');
+    }
+
+    /** Edits a manually-added proxy's details. A bought one has nothing here to edit — VMOS owns its details. */
+    public function update(Request $request, CustomerProxy $proxy)
+    {
+        abort_unless($proxy->user_id === Auth::id(), 403);
+        abort_unless($proxy->isCustom(), 403);
+
+        $data = $request->validate($this->customProxyRules());
+
+        $proxy->update([
+            'label' => $data['label'] ?? null,
+            'host' => $data['host'],
+            'port' => $data['port'],
+            'account' => $data['account'] ?? null,
+            // Blank password on the edit form means "leave it as-is", not "clear it" —
+            // VMOS's own list never hands a password back, so there's no way to show
+            // one to a customer editing an entry that had one but left the field empty.
+            'password' => filled($data['password'] ?? null) ? $data['password'] : $proxy->password,
+            'proxy_name' => $data['proxy_name'],
+            'proxy_type' => $data['proxy_type'],
+            'remarks' => $data['remarks'] ?? null,
+        ]);
+
+        return back()->with('status', 'Proxy updated'.($proxy->isAttached() ? ' — reattach it to the device to apply the change.' : '.'));
+    }
+
+    /** @return array<string, array<int, mixed>> */
+    protected function customProxyRules(): array
+    {
+        return [
+            'label' => ['nullable', 'string', 'max:255'],
+            'host' => ['required', 'string', 'max:255'],
+            'port' => ['required', 'integer', 'min:1', 'max:65535'],
+            'account' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255'],
+            'proxy_name' => ['required', 'in:socks5,http-relay'],
+            'proxy_type' => ['required', 'in:proxy,vpn'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ];
     }
 
     /** Removes a manually-added proxy. A bought one can't be deleted this way — it's real, paid-for inventory. */

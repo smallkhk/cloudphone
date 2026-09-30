@@ -15,8 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * flow.
  */
 #[Fillable([
-    'order_id', 'user_id', 'sku_id', 'source', 'vmos_proxy_id', 'host', 'port', 'account', 'password',
-    'proxy_name', 'proxy_type', 'country_code',
+    'order_id', 'user_id', 'sku_id', 'source', 'label', 'vmos_proxy_id', 'host', 'port', 'account', 'password',
+    'proxy_name', 'proxy_type', 'remarks', 'country_code',
     'purchase_client_token', 'purchase_status', 'purchase_error',
     'attached_pad_code', 'raw_payload', 'delivered_at',
 ])]
