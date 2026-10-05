@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\SkuController as AdminSkuController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\CloudDriveController;
 use App\Http\Controllers\CloudInstanceController;
 use App\Http\Controllers\CloudNumberController;
 use App\Http\Controllers\CustomerProxyController;
@@ -51,6 +52,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/deposit', [WalletController::class, 'deposit'])->name('wallet.deposit');
     Route::post('/wallet/deposits/{walletDeposit}/tx', [WalletController::class, 'submitTxHash'])->name('wallet.deposit.tx');
+
+    Route::get('/cloud-drive', [CloudDriveController::class, 'index'])->name('cloud-drive.index');
+    Route::post('/cloud-drive/upload', [CloudDriveController::class, 'upload'])->name('cloud-drive.upload');
+    Route::delete('/cloud-drive/file', [CloudDriveController::class, 'destroy'])->name('cloud-drive.delete');
+    Route::post('/cloud-drive/backup', [CloudDriveController::class, 'backup'])->name('cloud-drive.backup');
+    Route::post('/cloud-drive/backup/{task}/progress', [CloudDriveController::class, 'backupProgress'])->name('cloud-drive.backup-progress');
+    Route::post('/cloud-drive/storage', [CloudDriveController::class, 'buyStorage'])->name('cloud-drive.buy-storage');
 
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');

@@ -323,6 +323,19 @@ If it breaks again, check Admin → Diagnostics' `storage_goods`/`storage_info`/
 wrong — but as of this fix, all of the above match VMOS's own published docs
 exactly, not a guess.
 
+**Standalone Cloud Drive page at `/cloud-drive`** — since Cloud Drive is
+account-wide anyway, it didn't need to live only inside a specific device's
+tab. `CloudDriveController` is the exact same storage/files/backups/
+buy-storage logic as the device tab (`DeviceControlController`), reachable
+on its own URL instead. The one thing that genuinely needs a device —
+backups, since VMOS's `addBackup` takes a `padCode` — asks the customer to
+pick one of their own owned devices from a dropdown, since the standalone
+page has no "current device" the way a device tab does. Nothing is written
+to our own disk anywhere in this flow (upload-by-URL downloads into memory
+for one request and re-uploads straight to VMOS, nothing cached but small
+display metadata) — came up because the owner specifically wanted that
+confirmed before building this page, worth remembering if asked again.
+
 Also investigated VMOS's "Automation + AI" console feature — the reseller
 API only exposes `asyncCmd` (run a shell/ADB command) plus result polling
 (`executeScriptInfo`, `padTaskDetail`), not a flow builder or any AI

@@ -155,7 +155,11 @@ Each cloud phone has its own control panel (**My cloud phones → Manage**):
 - **Apps** — install by APK URL, then start / stop / uninstall installed apps
 - **Cloud Drive** — account-wide storage (shared across every device, not
   per device), upload/list/delete files, and whole-disk backups. Buying more
-  storage is admin-only (charges the VMOS balance, like buying a proxy).
+  storage is admin-only (charges the VMOS balance, like buying a proxy). Also
+  reachable as its own page at **Cloud Drive** in the sidebar, not just from
+  inside a device — same storage either way, since it's account-wide; backing
+  up from there just asks which device to back up, since that part does need
+  one.
 - **ADB** — enable remote debugging and get the `adb connect` command
 - **One-key new device** — wipe and regenerate a completely new hardware identity
 - **Factory reset**, restart, and live screenshot

@@ -76,6 +76,11 @@
                 Proxies
             </x-side-nav-link>
 
+            <x-side-nav-link :href="route('cloud-drive.index')" :active="request()->routeIs('cloud-drive.*')"
+                             icon="M3 15a4 4 0 004 4h10a4 4 0 001.414-7.743 5.002 5.002 0 00-9.336-2.246A4.5 4.5 0 003 15z">
+                Cloud Drive
+            </x-side-nav-link>
+
             <x-side-nav-link :href="route('profile.edit')" :active="request()->routeIs('profile.*')"
                              icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
                 Profile
