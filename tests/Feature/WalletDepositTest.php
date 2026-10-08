@@ -18,8 +18,7 @@ class WalletDepositTest extends TestCase
         parent::setUp();
         config([
             'crypto.usdt_trc20_address' => 'TReceivingAddressXXXXXXXXXXXXXXXXX',
-            'crypto.usdt_bep20_address' => '0xReceivingAddress0000000000000000000001',
-            'crypto.bscscan_api_key' => 'test-key',
+            'crypto.usdt_bep20_address' => '0x1234567890123456789012345678901234567890',
         ]);
     }
 
@@ -51,7 +50,7 @@ class WalletDepositTest extends TestCase
 
         $deposit = WalletDeposit::first();
         $this->assertSame('BEP20', $deposit->network);
-        $this->assertSame('0xReceivingAddress0000000000000000000001', $deposit->pay_to_address);
+        $this->assertSame('0x1234567890123456789012345678901234567890', $deposit->pay_to_address);
     }
 
     #[Test]
@@ -128,24 +127,31 @@ class WalletDepositTest extends TestCase
     public function verifying_a_confirmed_bep20_deposit_credits_the_balance(): void
     {
         $user = User::factory()->create(['balance' => 0]);
+        $payTo = '0x1234567890123456789012345678901234567890';
         $deposit = WalletDeposit::factory()->create([
             'user_id' => $user->id,
             'network' => 'BEP20',
-            'pay_to_address' => '0xReceivingAddress0000000000000000000001',
+            'pay_to_address' => $payTo,
             'amount_crypto' => 50,
             'amount_usd' => 50,
             'tx_hash' => '0xdeposit-hash',
             'status' => WalletDeposit::STATUS_SUBMITTED,
         ]);
 
-        Http::fake(['api.bscscan.com/*' => Http::response([
-            'status' => '1', 'message' => 'OK',
-            'result' => [[
-                'hash' => '0xdeposit-hash',
-                'to' => '0xReceivingAddress0000000000000000000001',
-                'value' => '50000000000000000000',
-                'tokenDecimal' => '18',
-            ]],
+        Http::fake(['*bsc-dataseed.binance.org*' => Http::response([
+            'jsonrpc' => '2.0', 'id' => 1,
+            'result' => [
+                'status' => '0x1',
+                'logs' => [[
+                    'address' => '0x55d398326f99059fF775485246999027B3197955',
+                    'topics' => [
+                        '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+                        '0x0000000000000000000000001111111111111111111111111111111111111111',
+                        '0x'.str_pad(ltrim($payTo, '0x'), 64, '0', STR_PAD_LEFT),
+                    ],
+                    'data' => '0x2b5e3af16b1880000', // 50 USDT at 18 decimals
+                ]],
+            ],
         ])]);
 
         $this->artisan('wallet:verify-deposits')->assertExitCode(0);

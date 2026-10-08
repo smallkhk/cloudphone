@@ -301,9 +301,11 @@ for the first few days.
 ## Before accepting real payments
 
 The crypto payment verifiers (`app/Services/Payments/TronUsdtVerifier.php` for
-TRC20, `BscUsdtVerifier.php` for BEP20) check a submitted transaction hash
-against TronGrid's / BscScan's public API for a matching USDT transfer to your
-configured address. Wallet deposits use the exact same verifiers. Test each
+TRC20, `BscUsdtVerifier.php` for BEP20) check a submitted transaction hash for
+a matching USDT transfer to your configured address — TRC20 against
+TronGrid's public API, BEP20 directly against a public BSC RPC node
+(`BSC_RPC_URL`), no API key needed for either. Wallet deposits use the exact
+same verifiers. Test each
 network end-to-end with a small real transaction before relying on it — this
 is the part of the app that touches real money, so verify it yourself rather
 than trusting it blindly.

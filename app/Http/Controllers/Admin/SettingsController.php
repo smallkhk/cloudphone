@@ -16,7 +16,7 @@ class SettingsController extends Controller
     /** Setting keys that are encrypted and never rendered back to the browser. */
     protected const SECRET_KEYS = [
         'vmos_access_key', 'vmos_secret_key', 'vmos_webhook_token',
-        'trongrid_api_key', 'bscscan_api_key', 'mail_password', 'anthropic_api_key',
+        'trongrid_api_key', 'mail_password', 'anthropic_api_key',
         'assistant_openai_api_key',
     ];
 
@@ -56,7 +56,6 @@ class SettingsController extends Controller
             'crypto_payment_window_minutes' => ['nullable', 'integer', 'min:5', 'max:1440'],
             'crypto_amount_tolerance_percent' => ['nullable', 'numeric', 'min:0', 'max:10'],
             'trongrid_api_key' => ['nullable', 'string', 'max:255'],
-            'bscscan_api_key' => ['nullable', 'string', 'max:255'],
         ]);
 
         $this->save($data);

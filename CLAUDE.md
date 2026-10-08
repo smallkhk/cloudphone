@@ -125,9 +125,17 @@ balance moves:
   (`WalletDepositService`, mirrors `CryptoPaymentService`), send USDT, paste
   the tx hash, and `wallet:verify-deposits` (scheduled every minute,
   mirrors `crypto:verify-payments`) confirms it on-chain and credits the
-  balance. BEP20 verification is a new `BscUsdtVerifier` (mirrors
-  `TronUsdtVerifier`) using BscScan's free `tokentx` API — needs a
-  `bscscan_api_key` set under Settings → Payments or nothing verifies.
+  balance. BEP20 verification is a new `BscUsdtVerifier`. **Update (2026-10):**
+  originally used BscScan's `tokentx` API like `TronUsdtVerifier` uses
+  TronGrid — but unlike TronGrid, BscScan (now merged into "Etherscan V2")
+  requires a registered API key for every request, even the free tier, with
+  no keyless path at all. The owner didn't want to manage that key, so this
+  was rewritten to read the transfer straight off a **public BSC RPC node**
+  instead (`eth_getTransactionReceipt`, decoding the standard ERC20/BEP20
+  `Transfer` event out of the logs) — genuinely keyless, since public chain
+  RPC nodes don't require registration the way block-explorer APIs do.
+  `BSC_RPC_URL` defaults to `https://bsc-dataseed.binance.org`; only change
+  it if that default proves unreliable from the live host.
 - **Checkout** — the "3. Order" step on `/plans` shows a "Pay from wallet
   balance" checkbox when the signed-in customer has any balance. Picking it
   skips the crypto quote entirely: `OrderController::store` debits the
