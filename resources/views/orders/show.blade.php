@@ -34,18 +34,23 @@
                             </div>
                         </div>
 
-                        <div class="mt-4" x-data="{ copied: false }">
-                            <p class="label">Send USDT ({{ $payment->network }}) to this address</p>
-                            <div class="flex gap-2">
-                                <code class="flex-1 break-all rounded-xl bg-ink-900 px-4 py-3 font-mono text-xs text-white">{{ $payment->pay_to_address }}</code>
-                                <button type="button"
-                                        @click="navigator.clipboard.writeText('{{ $payment->pay_to_address }}'); copied = true; setTimeout(() => copied = false, 2000)"
-                                        class="btn-secondary flex-none">
-                                    <span x-show="!copied">Copy</span>
-                                    <span x-show="copied" x-cloak class="text-emerald-600">Copied</span>
-                                </button>
+                        <div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start" x-data="{ copied: false }">
+                            <div x-data="paymentQr(@js($payment->pay_to_address))" class="flex-none self-center sm:self-start">
+                                <canvas x-ref="canvas" class="rounded-xl ring-1 ring-inset ring-ink-200"></canvas>
                             </div>
-                            <p class="hint">Send only USDT on the {{ $payment->network }} network. Other tokens or networks will be lost.</p>
+                            <div class="min-w-0 flex-1">
+                                <p class="label">Send USDT ({{ $payment->network }}) to this address</p>
+                                <div class="flex gap-2">
+                                    <code class="flex-1 break-all rounded-xl bg-ink-900 px-4 py-3 font-mono text-xs text-white">{{ $payment->pay_to_address }}</code>
+                                    <button type="button"
+                                            @click="navigator.clipboard.writeText('{{ $payment->pay_to_address }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                            class="btn-secondary flex-none">
+                                        <span x-show="!copied">Copy</span>
+                                        <span x-show="copied" x-cloak class="text-emerald-600">Copied</span>
+                                    </button>
+                                </div>
+                                <p class="hint">Send only USDT on the {{ $payment->network }} network. Other tokens or networks will be lost.</p>
+                            </div>
                         </div>
 
                         <form method="POST" action="{{ route('orders.payment', $order) }}" class="mt-6 border-t border-ink-100 pt-6">

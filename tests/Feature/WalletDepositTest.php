@@ -174,6 +174,22 @@ class WalletDepositTest extends TestCase
     }
 
     #[Test]
+    public function a_pending_deposit_shows_a_qr_code_for_the_receiving_address(): void
+    {
+        $user = User::factory()->create();
+        WalletDeposit::factory()->create([
+            'user_id' => $user->id,
+            'status' => WalletDeposit::STATUS_AWAITING_PAYMENT,
+            'pay_to_address' => 'TReceivingAddressXXXXXXXXXXXXXXXXX',
+        ]);
+
+        $this->actingAs($user)->get(route('wallet.index'))
+            ->assertOk()
+            ->assertSee('paymentQr', false)
+            ->assertSee('TReceivingAddressXXXXXXXXXXXXXXXXX');
+    }
+
+    #[Test]
     public function an_expired_unpaid_quote_is_marked_expired(): void
     {
         $deposit = WalletDeposit::factory()->create([

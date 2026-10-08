@@ -145,6 +145,16 @@ balance moves:
 - Admin → a user's page has a manual credit/debit form (refunds, goodwill,
   correcting a support mistake) — goes through the same `WalletService`, so
   it's ledgered identically to a real deposit or purchase.
+- Both payment screens (`/wallet` and the order payment page) show a **QR
+  code** next to the receiving address now, not just copyable text — the
+  `qrcode` npm package (bundled via Vite like everything else; CLAUDE.md's
+  "npm never needed on the server" rule still holds, the built JS/CSS is
+  committed) renders onto a `<canvas>` via a small Alpine component
+  (`resources/js/payment-qr.js`, `Alpine.data('paymentQr', …)`). It encodes
+  the plain receiving address as text, not a payment URI — TRC20 and BEP20
+  don't share a standardized URI scheme the way `bitcoin:` does for BTC, and
+  every wallet checked treats a scanned plain address as "fill in the
+  recipient," which is the one behavior that has to work everywhere.
 
 Confidence: the BscScan API itself is well-documented and stable (unlike
 several VMOS endpoints elsewhere in this file), and the whole flow —

@@ -70,6 +70,21 @@ class StorefrontFlowTest extends TestCase
     }
 
     #[Test]
+    public function the_order_payment_page_shows_a_qr_code_for_the_receiving_address(): void
+    {
+        $user = User::factory()->create();
+        $sku = Sku::factory()->create(['price' => 15.00]);
+        $this->actingAs($user)->post('/orders', ['sku_id' => $sku->id, 'quantity' => 1]);
+
+        $order = Order::first();
+
+        $this->actingAs($user)->get(route('orders.show', $order))
+            ->assertOk()
+            ->assertSee('paymentQr', false)
+            ->assertSee('TReceivingAddressXXXXXXXXXXXXXXXXX');
+    }
+
+    #[Test]
     public function a_customer_can_pick_a_region_at_checkout(): void
     {
         $user = User::factory()->create();
