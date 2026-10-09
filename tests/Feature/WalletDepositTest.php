@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\WalletDeposit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -19,7 +20,9 @@ class WalletDepositTest extends TestCase
         config([
             'crypto.usdt_trc20_address' => 'TReceivingAddressXXXXXXXXXXXXXXXXX',
             'crypto.usdt_bep20_address' => '0x1234567890123456789012345678901234567890',
+            'crypto.ltc_address' => 'LReceivingAddressXXXXXXXXXXXXXXXX',
         ]);
+        Cache::forget('ltc_usd_price');
     }
 
     #[Test]
@@ -51,6 +54,23 @@ class WalletDepositTest extends TestCase
         $deposit = WalletDeposit::first();
         $this->assertSame('BEP20', $deposit->network);
         $this->assertSame('0x1234567890123456789012345678901234567890', $deposit->pay_to_address);
+    }
+
+    #[Test]
+    public function a_customer_can_start_an_ltc_deposit_converted_at_the_live_price(): void
+    {
+        Http::fake(['*coingecko.com*' => Http::response(['litecoin' => ['usd' => 50.0]])]);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('wallet.deposit'), ['amount_usd' => 100, 'network' => 'LTC'])
+            ->assertRedirect(route('wallet.index'));
+
+        $deposit = WalletDeposit::first();
+        $this->assertSame('LTC', $deposit->network);
+        $this->assertSame('LTC', $deposit->currency);
+        $this->assertSame('LReceivingAddressXXXXXXXXXXXXXXXX', $deposit->pay_to_address);
+        $this->assertEquals(2.0, $deposit->amount_crypto);
+        $this->assertEquals(100, $deposit->amount_usd);
     }
 
     #[Test]
@@ -158,6 +178,34 @@ class WalletDepositTest extends TestCase
 
         $this->assertSame(WalletDeposit::STATUS_CONFIRMED, $deposit->fresh()->status);
         $this->assertEquals(50, $user->fresh()->balance);
+    }
+
+    #[Test]
+    public function verifying_a_confirmed_ltc_deposit_credits_the_balance(): void
+    {
+        $user = User::factory()->create(['balance' => 0]);
+        $payTo = 'LReceivingAddressXXXXXXXXXXXXXXXX';
+        $deposit = WalletDeposit::factory()->create([
+            'user_id' => $user->id,
+            'network' => 'LTC',
+            'currency' => 'LTC',
+            'pay_to_address' => $payTo,
+            'amount_crypto' => 2.0,
+            'amount_usd' => 100,
+            'tx_hash' => 'ltc-deposit-hash',
+            'status' => WalletDeposit::STATUS_SUBMITTED,
+        ]);
+
+        Http::fake(['*blockcypher.com*' => Http::response([
+            'confirmations' => 2,
+            'double_spend' => false,
+            'outputs' => [['value' => 200_000_000, 'addresses' => [$payTo]]],
+        ])]);
+
+        $this->artisan('wallet:verify-deposits')->assertExitCode(0);
+
+        $this->assertSame(WalletDeposit::STATUS_CONFIRMED, $deposit->fresh()->status);
+        $this->assertEquals(100, $user->fresh()->balance);
     }
 
     #[Test]

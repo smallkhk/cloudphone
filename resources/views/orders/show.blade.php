@@ -23,7 +23,7 @@
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200">
                                 <p class="text-xs font-medium uppercase tracking-wider text-ink-500">Amount to send</p>
-                                <p class="mt-2 text-2xl font-extrabold text-ink-900">{{ number_format($payment->amount_crypto, 2) }} <span class="text-base font-semibold text-ink-500">USDT</span></p>
+                                <p class="mt-2 text-2xl font-extrabold text-ink-900">{{ number_format($payment->amount_crypto, $payment->network === 'LTC' ? 8 : 2) }} <span class="text-base font-semibold text-ink-500">{{ $payment->currency }}</span></p>
                                 <p class="mt-1 text-xs text-ink-500">Network: {{ $payment->network }}</p>
                             </div>
 
@@ -39,7 +39,7 @@
                                 <canvas x-ref="canvas" class="rounded-xl ring-1 ring-inset ring-ink-200"></canvas>
                             </div>
                             <div class="min-w-0 flex-1">
-                                <p class="label">Send USDT ({{ $payment->network }}) to this address</p>
+                                <p class="label">Send {{ $payment->currency }} ({{ $payment->network }}) to this address</p>
                                 <div class="flex gap-2">
                                     <code class="flex-1 break-all rounded-xl bg-ink-900 px-4 py-3 font-mono text-xs text-white">{{ $payment->pay_to_address }}</code>
                                     <button type="button"
@@ -49,7 +49,7 @@
                                         <span x-show="copied" x-cloak class="text-emerald-600">Copied</span>
                                     </button>
                                 </div>
-                                <p class="hint">Send only USDT on the {{ $payment->network }} network. Other tokens or networks will be lost.</p>
+                                <p class="hint">Send only {{ $payment->currency }} on the {{ $payment->network }} network. Other tokens or networks will be lost.</p>
                             </div>
                         </div>
 
@@ -77,7 +77,7 @@
                         <div class="min-w-0">
                             <h2 class="text-base font-semibold text-ink-900">Verifying your payment</h2>
                             <p class="mt-1 text-sm text-ink-500">
-                                We're checking the TRON network for your transaction. This page updates automatically once confirmed —
+                                We're checking the {{ $payment->network }} network for your transaction. This page updates automatically once confirmed —
                                 your cloud phone is provisioned right after.
                             </p>
                             <p class="mt-3 break-all font-mono text-xs text-ink-500">{{ $payment->tx_hash }}</p>

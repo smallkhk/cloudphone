@@ -17,7 +17,7 @@ class SettingsController extends Controller
     protected const SECRET_KEYS = [
         'vmos_access_key', 'vmos_secret_key', 'vmos_webhook_token',
         'trongrid_api_key', 'mail_password', 'anthropic_api_key',
-        'assistant_openai_api_key',
+        'assistant_openai_api_key', 'blockcypher_api_token',
     ];
 
     public function edit(string $tab = 'site')
@@ -53,9 +53,12 @@ class SettingsController extends Controller
         $data = $request->validate([
             'crypto_usdt_trc20_address' => ['nullable', 'string', 'max:64'],
             'crypto_usdt_bep20_address' => ['nullable', 'string', 'max:64'],
+            'crypto_ltc_address' => ['nullable', 'string', 'max:64'],
             'crypto_payment_window_minutes' => ['nullable', 'integer', 'min:5', 'max:1440'],
             'crypto_amount_tolerance_percent' => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'crypto_ltc_amount_tolerance_percent' => ['nullable', 'numeric', 'min:0', 'max:15'],
             'trongrid_api_key' => ['nullable', 'string', 'max:255'],
+            'blockcypher_api_token' => ['nullable', 'string', 'max:255'],
         ]);
 
         $this->save($data);

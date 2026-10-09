@@ -105,9 +105,11 @@ exactly like a bought one.
 ### Wallet balance
 
 Customers can also hold a USD balance (**Wallet** in the account menu),
-topped up with USDT the same way as an order — pick a network (TRC20, or
-BEP20/BNB Smart Chain if you've configured a second receiving address under
-**Admin → Settings → Payments**), send the exact amount, paste the tx hash.
+topped up the same way as an order — pick a network (TRC20, or BEP20/BNB
+Smart Chain or Litecoin if you've configured a receiving address for them
+under **Admin → Settings → Payments**), send the exact amount, paste the tx
+hash. LTC isn't a stablecoin, so its amount is converted from USD at a live
+rate when the quote is created.
 `php artisan wallet:verify-deposits` (every minute, same cron entry) confirms
 it on-chain and credits the balance. At checkout, a customer with any balance
 gets a "Pay from wallet balance" option that skips the crypto quote entirely
@@ -130,7 +132,7 @@ after the first deploy.
 | **Users** | Create, edit, promote to admin, delete (their devices return to stock), see per-customer orders/devices/spend |
 | **Plans & pricing** | Sync the catalogue from VMOS, set per-plan prices, bulk re-price at cost + markup%, toggle what's live |
 | **Settings → Site** | Site name, tagline, URL, support links, default markup |
-| **Settings → Payments** | USDT (TRC20) receiving wallet, payment window, underpayment tolerance, TronGrid key |
+| **Settings → Payments** | USDT (TRC20/BEP20) and LTC receiving wallets, payment window, underpayment tolerance (separate, wider one for LTC), TronGrid/BlockCypher keys |
 | **Settings → VMOS API** | Access/Secret key, callback token, plus a **Test connection** button |
 | **Settings → Email** | SMTP host/port/credentials and a **Send test email** button |
 | **Settings → AI live chat** | Turn the chat widget on, store your Anthropic API key, pick the model, cap messages per visitor per hour, and **teach it your business rules** |
@@ -301,14 +303,19 @@ for the first few days.
 ## Before accepting real payments
 
 The crypto payment verifiers (`app/Services/Payments/TronUsdtVerifier.php` for
-TRC20, `BscUsdtVerifier.php` for BEP20) check a submitted transaction hash for
-a matching USDT transfer to your configured address — TRC20 against
-TronGrid's public API, BEP20 directly against a public BSC RPC node
-(`BSC_RPC_URL`), no API key needed for either. Wallet deposits use the exact
-same verifiers. Test each
-network end-to-end with a small real transaction before relying on it — this
-is the part of the app that touches real money, so verify it yourself rather
-than trusting it blindly.
+TRC20, `BscUsdtVerifier.php` for BEP20, `LtcVerifier.php` for Litecoin) check
+a submitted transaction hash for a matching transfer to your configured
+address — TRC20 against TronGrid's public API, BEP20 directly against a
+public BSC RPC node (`BSC_RPC_URL`), LTC against BlockCypher's public
+Litecoin API — no API key needed for any of them (an API key/token for any
+of the three only raises its rate limit, never required). LTC quotes are
+also converted from USD at a live rate (`LtcPriceFeed`, CoinGecko's public
+API, also keyless) since, unlike USDT, it isn't pegged to $1 — that's a
+second thing worth sanity-checking against a real quote before relying on
+it. Wallet deposits use the exact same verifiers. Test each network
+end-to-end with a small real transaction before relying on it — this is the
+part of the app that touches real money, so verify it yourself rather than
+trusting it blindly.
 
 ## Key VMOS docs
 

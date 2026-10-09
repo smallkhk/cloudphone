@@ -22,6 +22,7 @@ class WalletController extends Controller
             'networksAvailable' => array_filter([
                 'TRC20' => filled(config('crypto.usdt_trc20_address')),
                 'BEP20' => filled(config('crypto.usdt_bep20_address')),
+                'LTC' => filled(config('crypto.ltc_address')),
             ]),
         ]);
     }
@@ -30,7 +31,7 @@ class WalletController extends Controller
     {
         $data = $request->validate([
             'amount_usd' => ['required', 'numeric', 'min:5', 'max:100000'],
-            'network' => ['required', 'in:TRC20,BEP20'],
+            'network' => ['required', 'in:TRC20,BEP20,LTC'],
         ]);
 
         try {
@@ -44,7 +45,7 @@ class WalletController extends Controller
         }
 
         return redirect()->route('wallet.index')
-            ->with('status', "Deposit created — send the exact USDT ({$deposit->network}) amount shown below.")
+            ->with('status', "Deposit created — send the exact {$deposit->currency} ({$deposit->network}) amount shown below.")
             ->with('newDepositId', $deposit->id);
     }
 

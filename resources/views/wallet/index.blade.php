@@ -22,7 +22,7 @@
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200">
                                 <p class="text-xs font-medium uppercase tracking-wider text-ink-500">Amount to send</p>
-                                <p class="mt-2 text-2xl font-extrabold text-ink-900">{{ number_format($pendingDeposit->amount_crypto, 2) }} <span class="text-base font-semibold text-ink-500">USDT</span></p>
+                                <p class="mt-2 text-2xl font-extrabold text-ink-900">{{ number_format($pendingDeposit->amount_crypto, $pendingDeposit->network === 'LTC' ? 8 : 2) }} <span class="text-base font-semibold text-ink-500">{{ $pendingDeposit->currency }}</span></p>
                                 <p class="mt-1 text-xs text-ink-500">Network: {{ $pendingDeposit->network }}</p>
                             </div>
                             <div class="rounded-xl bg-ink-50 p-4 ring-1 ring-inset ring-ink-200">
@@ -37,7 +37,7 @@
                                 <canvas x-ref="canvas" class="rounded-xl ring-1 ring-inset ring-ink-200"></canvas>
                             </div>
                             <div class="min-w-0 flex-1">
-                                <p class="label">Send USDT ({{ $pendingDeposit->network }}) to this address</p>
+                                <p class="label">Send {{ $pendingDeposit->currency }} ({{ $pendingDeposit->network }}) to this address</p>
                                 <div class="flex gap-2">
                                     <code class="flex-1 break-all rounded-xl bg-ink-900 px-4 py-3 font-mono text-xs text-white">{{ $pendingDeposit->pay_to_address }}</code>
                                     <button type="button"
@@ -47,7 +47,7 @@
                                         <span x-show="copied" x-cloak class="text-emerald-600">Copied</span>
                                     </button>
                                 </div>
-                                <p class="hint">Send only USDT on the {{ $pendingDeposit->network }} network. Other tokens or networks will be lost.</p>
+                                <p class="hint">Send only {{ $pendingDeposit->currency }} on the {{ $pendingDeposit->network }} network. Other tokens or networks will be lost.</p>
                             </div>
                         </div>
 
@@ -80,7 +80,7 @@
                                 <label class="label" for="network">Network</label>
                                 <select id="network" name="network" class="input">
                                     @foreach (array_keys($networksAvailable) as $network)
-                                        <option value="{{ $network }}">USDT ({{ $network }})</option>
+                                        <option value="{{ $network }}">{{ $network === 'LTC' ? 'Litecoin (LTC)' : "USDT ({$network})" }}</option>
                                     @endforeach
                                 </select>
                             </div>

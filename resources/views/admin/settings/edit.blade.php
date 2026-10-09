@@ -154,6 +154,39 @@
                                    placeholder="0x..." value="{{ old('crypto_usdt_bep20_address', $settings['crypto_usdt_bep20_address'] ?? '') }}">
                             <p class="hint">Optional second network — leave blank to only offer TRC20. BEP20 payments are verified directly against a public BNB Smart Chain node — no API key needed.</p>
                         </div>
+
+                        <div class="border-t border-ink-100 pt-5">
+                            <label class="label" for="crypto_ltc_address">LTC receiving address</label>
+                            <input id="crypto_ltc_address" name="crypto_ltc_address" class="input font-mono"
+                                   placeholder="L... / M... / ltc1..." value="{{ old('crypto_ltc_address', $settings['crypto_ltc_address'] ?? '') }}">
+                            <p class="hint">
+                                Optional third network — leave blank to hide it. Unlike USDT, LTC isn't pegged to $1: the
+                                amount shown to the customer is converted at the live rate (CoinGecko, no API key needed)
+                                when the quote is created. Payments are verified directly against BlockCypher's public
+                                Litecoin API — also no API key needed.
+                            </p>
+                        </div>
+
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <div>
+                                <label class="label" for="crypto_ltc_amount_tolerance_percent">LTC underpayment tolerance %</label>
+                                <input id="crypto_ltc_amount_tolerance_percent" name="crypto_ltc_amount_tolerance_percent" type="number" step="0.1" min="0" max="15" class="input"
+                                       value="{{ old('crypto_ltc_amount_tolerance_percent', $settings['crypto_ltc_amount_tolerance_percent'] ?? 3) }}">
+                                <p class="hint">Wider than the USDT tolerance above — LTC's price can drift between quote and payment.</p>
+                            </div>
+
+                            <div>
+                                <label class="label" for="blockcypher_api_token">
+                                    BlockCypher API token
+                                    @if ($stored('blockcypher_api_token'))
+                                        <span class="badge-green ml-1">Stored</span>
+                                    @endif
+                                </label>
+                                <input id="blockcypher_api_token" name="blockcypher_api_token" type="password" class="input"
+                                       placeholder="{{ $stored('blockcypher_api_token') ? 'Leave blank to keep current token' : 'Optional' }}" autocomplete="off">
+                                <p class="hint">Optional — raises the rate limit for on-chain checks. Free at blockcypher.com.</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mt-7 flex justify-end border-t border-ink-100 pt-5">

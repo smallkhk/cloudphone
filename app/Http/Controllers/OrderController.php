@@ -44,7 +44,7 @@ class OrderController extends Controller
             'quantity' => ['required', 'integer', 'min:1', 'max:20'],
             'auto_renew' => ['sometimes', 'boolean'],
             'pay_with_balance' => ['sometimes', 'boolean'],
-            'payment_network' => ['nullable', 'in:TRC20,BEP20'],
+            'payment_network' => ['nullable', 'in:TRC20,BEP20,LTC'],
             // A VMOS country code the customer picked at checkout, or blank to
             // let VMOS assign one. Restricted to the confirmed purchase-region
             // list (matching VMOS's own console) rather than just any 2-letter
@@ -127,8 +127,10 @@ class OrderController extends Controller
                 ->with('status', 'Paid from your wallet balance — your order is being provisioned now.');
         }
 
+        $currency = $network === 'LTC' ? 'LTC' : 'USDT';
+
         return redirect()->route('orders.show', $order)
-            ->with('status', "Order created — send the exact USDT ({$network}) amount shown below to complete your purchase.");
+            ->with('status', "Order created — send the exact {$currency} ({$network}) amount shown below to complete your purchase.");
     }
 
     /**

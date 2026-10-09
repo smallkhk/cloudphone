@@ -18,6 +18,7 @@ class WalletDepositService
         $address = match ($network) {
             'TRC20' => config('crypto.usdt_trc20_address'),
             'BEP20' => config('crypto.usdt_bep20_address'),
+            'LTC' => config('crypto.ltc_address'),
             default => throw new RuntimeException("Unsupported crypto network: {$network}"),
         };
 
@@ -29,10 +30,12 @@ class WalletDepositService
         }
 
         return $user->walletDeposits()->create([
-            'currency' => 'USDT',
+            'currency' => $network === 'LTC' ? 'LTC' : 'USDT',
             'network' => $network,
             'pay_to_address' => $address,
-            'amount_crypto' => $amountUsd,
+            'amount_crypto' => $network === 'LTC'
+                ? round($amountUsd / app(LtcPriceFeed::class)->usdPrice(), 8)
+                : $amountUsd,
             'amount_usd' => $amountUsd,
             'status' => WalletDeposit::STATUS_AWAITING_PAYMENT,
             'expires_at' => now()->addMinutes((int) config('crypto.payment_window_minutes')),

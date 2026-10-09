@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\CryptoPayment;
 use App\Models\Order;
 use App\Services\Payments\BscUsdtVerifier;
+use App\Services\Payments\LtcVerifier;
 use App\Services\Payments\TronUsdtVerifier;
 use App\Services\Provisioning\OrderProvisioner;
 use Illuminate\Console\Command;
@@ -17,16 +18,20 @@ class VerifyCryptoPayments extends Command
 
     protected $description = 'Check submitted crypto payments on-chain, confirm them, and provision paid orders';
 
-    public function handle(TronUsdtVerifier $tron, BscUsdtVerifier $bsc, OrderProvisioner $provisioner): int
+    public function handle(TronUsdtVerifier $tron, BscUsdtVerifier $bsc, LtcVerifier $ltc, OrderProvisioner $provisioner): int
     {
         $submitted = CryptoPayment::query()
             ->where('status', CryptoPayment::STATUS_SUBMITTED)
-            ->whereIn('network', ['TRC20', 'BEP20'])
+            ->whereIn('network', ['TRC20', 'BEP20', 'LTC'])
             ->get();
 
         foreach ($submitted as $payment) {
             try {
-                $verifier = $payment->network === 'BEP20' ? $bsc : $tron;
+                $verifier = match ($payment->network) {
+                    'BEP20' => $bsc,
+                    'LTC' => $ltc,
+                    default => $tron,
+                };
 
                 if ($verifier->verify($payment)) {
                     $payment->update([

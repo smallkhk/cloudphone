@@ -270,12 +270,17 @@
                                         </label>
                                     @endif
 
-                                    @if ($bep20Available)
+                                    @if ($bep20Available || $ltcAvailable)
                                         <div x-show="!payWithBalance" class="mt-2">
                                             <label class="label text-xs" for="payment_network-{{ $sku->id }}">Pay with</label>
                                             <select id="payment_network-{{ $sku->id }}" name="payment_network" class="input text-sm">
                                                 <option value="TRC20">USDT (TRC20)</option>
-                                                <option value="BEP20">USDT (BEP20 / BNB Smart Chain)</option>
+                                                @if ($bep20Available)
+                                                    <option value="BEP20">USDT (BEP20 / BNB Smart Chain)</option>
+                                                @endif
+                                                @if ($ltcAvailable)
+                                                    <option value="LTC">Litecoin (LTC)</option>
+                                                @endif
                                             </select>
                                         </div>
                                     @endif

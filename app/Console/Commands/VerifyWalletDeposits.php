@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\WalletDeposit;
 use App\Models\WalletTransaction;
 use App\Services\Payments\BscUsdtVerifier;
+use App\Services\Payments\LtcVerifier;
 use App\Services\Payments\TronUsdtVerifier;
 use App\Services\Wallet\WalletService;
 use Illuminate\Console\Command;
@@ -17,16 +18,20 @@ class VerifyWalletDeposits extends Command
 
     protected $description = 'Check submitted wallet deposits on-chain and credit confirmed ones to the customer\'s balance';
 
-    public function handle(TronUsdtVerifier $tron, BscUsdtVerifier $bsc, WalletService $wallet): int
+    public function handle(TronUsdtVerifier $tron, BscUsdtVerifier $bsc, LtcVerifier $ltc, WalletService $wallet): int
     {
         $submitted = WalletDeposit::query()
             ->where('status', WalletDeposit::STATUS_SUBMITTED)
-            ->whereIn('network', ['TRC20', 'BEP20'])
+            ->whereIn('network', ['TRC20', 'BEP20', 'LTC'])
             ->get();
 
         foreach ($submitted as $deposit) {
             try {
-                $verifier = $deposit->network === 'BEP20' ? $bsc : $tron;
+                $verifier = match ($deposit->network) {
+                    'BEP20' => $bsc,
+                    'LTC' => $ltc,
+                    default => $tron,
+                };
 
                 if ($verifier->verifyTransfer($deposit->tx_hash, $deposit->pay_to_address, (float) $deposit->amount_crypto)) {
                     $deposit->update([

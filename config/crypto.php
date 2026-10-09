@@ -21,10 +21,26 @@ return [
     // A public BSC RPC node — no API key needed, unlike BscScan's API.
     'bsc_rpc_url' => env('BSC_RPC_URL', 'https://bsc-dataseed.binance.org'),
 
+    // Wallet address customers pay native LTC to.
+    'ltc_address' => env('CRYPTO_LTC_ADDRESS'),
+
+    // Keyless public price feed used to convert the order/deposit USD total
+    // into an LTC amount at quote time — LTC, unlike USDT, isn't pegged to $1.
+    'coingecko_base_url' => env('COINGECKO_BASE_URL', 'https://api.coingecko.com/api/v3'),
+
+    // Keyless public block explorer used to verify LTC transactions on-chain.
+    'blockcypher_ltc_base_url' => env('BLOCKCYPHER_LTC_BASE_URL', 'https://api.blockcypher.com/v1/ltc/main'),
+    'blockcypher_api_token' => env('BLOCKCYPHER_API_TOKEN'), // optional, raises BlockCypher's rate limit
+    'ltc_min_confirmations' => (int) env('CRYPTO_LTC_MIN_CONFIRMATIONS', 1),
+
     // How long a customer has to pay before the quote expires and must be recreated.
     'payment_window_minutes' => (int) env('CRYPTO_PAYMENT_WINDOW_MINUTES', 30),
 
     // Accept slightly underpaid amounts (network fee rounding, etc.).
     'amount_tolerance_percent' => (float) env('CRYPTO_AMOUNT_TOLERANCE_PERCENT', 0.5),
+
+    // LTC needs a wider tolerance than the stablecoin networks — its USD price
+    // can drift between quote creation and the customer actually paying.
+    'ltc_amount_tolerance_percent' => (float) env('CRYPTO_LTC_AMOUNT_TOLERANCE_PERCENT', 3),
 
 ];

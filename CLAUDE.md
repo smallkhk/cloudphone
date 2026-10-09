@@ -110,7 +110,7 @@ Applying a proxy to a device still has to go through VMOS's `setCustomProxy`
 either way, since VMOS is what actually hosts and controls the device's
 network stack — no proxy checker, ours or anyone else's, changes that part.
 
-## Wallet balance + BEP20 deposits (added, NOT yet tested against a live transaction)
+## Wallet balance + BEP20/LTC deposits (added, NOT yet tested against a live transaction)
 
 Customers can hold a USD balance (`users.balance`, decimal — the *only* place
 it's ever written is `App\Services\Wallet\WalletService::credit()`/`debit()`,
@@ -136,6 +136,23 @@ balance moves:
   RPC nodes don't require registration the way block-explorer APIs do.
   `BSC_RPC_URL` defaults to `https://bsc-dataseed.binance.org`; only change
   it if that default proves unreliable from the live host.
+- **Update (2026-10): added LTC (native Litecoin) as a third network.**
+  Unlike USDT, LTC isn't pegged to $1 — `LtcPriceFeed` pulls a live LTC/USD
+  rate from **CoinGecko's public `simple/price` endpoint** (keyless, cached
+  60s so a burst of checkouts doesn't hammer it) and `CryptoPaymentService`/
+  `WalletDepositService` convert the order/deposit's USD total into an LTC
+  amount at quote time. Verification (`LtcVerifier`) reads the transaction
+  straight from **BlockCypher's public Litecoin API** (`GET /txs/{hash}`,
+  also keyless — an optional `BLOCKCYPHER_API_TOKEN` just raises the rate
+  limit, same optional-key pattern as `TRONGRID_API_KEY`), checking
+  `confirmations`/`double_spend` and summing `outputs[].value` for any output
+  paying the receiving address. Because LTC's price can drift between quote
+  creation and the customer actually paying (unlike a stablecoin, where
+  under/overpayment is only ever network-fee rounding), it gets its own wider
+  tolerance — `crypto.ltc_amount_tolerance_percent`, defaults to 3% vs the
+  USDT networks' 0.5% — editable separately in Admin → Settings → Payments.
+  Set `CRYPTO_LTC_ADDRESS` (or the admin field) to enable it; leave it blank
+  to keep LTC hidden everywhere, same as BEP20's existing blank-to-hide rule.
 - **Checkout** — the "3. Order" step on `/plans` shows a "Pay from wallet
   balance" checkbox when the signed-in customer has any balance. Picking it
   skips the crypto quote entirely: `OrderController::store` debits the
@@ -146,10 +163,11 @@ balance moves:
   If provisioning itself then fails, the order stays `paid`/unprovisioned
   exactly like a manually-marked-paid order does — same recovery path,
   Admin → Orders → "Provision now" — nothing new invented for that case.
-- Regular per-order crypto payment also gained a network choice (TRC20 vs
-  BEP20) at checkout, once BEP20 is configured — reuses the same
+- Regular per-order crypto payment also gained a network choice (TRC20 /
+  BEP20 / LTC) at checkout, once a network is configured — reuses the same
   `CryptoPaymentService`/`VerifyCryptoPayments` path, just dispatching to
-  `BscUsdtVerifier` instead of `TronUsdtVerifier` by `payment.network`.
+  `BscUsdtVerifier`/`LtcVerifier` instead of `TronUsdtVerifier` by
+  `payment.network`.
 - Admin → a user's page has a manual credit/debit form (refunds, goodwill,
   correcting a support mistake) — goes through the same `WalletService`, so
   it's ledgered identically to a real deposit or purchase.
@@ -159,18 +177,23 @@ balance moves:
   "npm never needed on the server" rule still holds, the built JS/CSS is
   committed) renders onto a `<canvas>` via a small Alpine component
   (`resources/js/payment-qr.js`, `Alpine.data('paymentQr', …)`). It encodes
-  the plain receiving address as text, not a payment URI — TRC20 and BEP20
-  don't share a standardized URI scheme the way `bitcoin:` does for BTC, and
-  every wallet checked treats a scanned plain address as "fill in the
+  the plain receiving address as text, not a payment URI — none of the three
+  networks share a standardized URI scheme the way `bitcoin:` does for BTC
+  (LTC wallets do support one, `litecoin:`, but plain-address scanning
+  already works everywhere, so it wasn't worth a second QR encoding path),
+  and every wallet checked treats a scanned plain address as "fill in the
   recipient," which is the one behavior that has to work everywhere.
 
 Confidence: the BscScan API itself is well-documented and stable (unlike
-several VMOS endpoints elsewhere in this file), and the whole flow —
-deposit quote → tx hash → cron verification → balance credit → spend at
-checkout — has full test coverage with faked HTTP responses. What's *not*
-tested is a real on-chain transaction on either network, same caveat
-`TronUsdtVerifier` has always carried. Try a real TRC20 and BEP20 deposit
-with a small amount before relying on this for real customer funds.
+several VMOS endpoints elsewhere in this file), CoinGecko's and
+BlockCypher's public APIs are likewise well-documented and confirmed keyless
+by hand (`curl`, no key, 200 OK) before building against them, and the whole
+flow — deposit quote → tx hash → cron verification → balance credit → spend
+at checkout — has full test coverage with faked HTTP responses for all three
+networks. What's *not* tested is a real on-chain transaction on any of them,
+same caveat `TronUsdtVerifier` has always carried. Try a real TRC20, BEP20,
+and LTC deposit with a small amount before relying on this for real customer
+funds.
 
 ## `auto_renew` already works — VMOS does it, not this app
 

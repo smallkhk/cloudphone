@@ -1,11 +1,10 @@
 import QRCode from 'qrcode';
 
 /**
- * Renders a scannable QR code for a USDT receiving address onto a <canvas>.
- * Encodes the plain address — every TRC20/BEP20 wallet we've checked treats
- * a scanned address as "fill in the recipient", which is the one behavior
- * that needs to work across wallets; there's no standardized payment-URI
- * scheme shared by both networks the way bitcoin: is for BTC.
+ * Renders a scannable QR code for a crypto receiving address onto a <canvas>.
+ * Encodes the plain address — every TRC20/BEP20/LTC wallet we've checked
+ * treats a scanned address as "fill in the recipient", which is the one
+ * behavior that needs to work across wallets and networks consistently.
  */
 export default (address) => ({
     address,

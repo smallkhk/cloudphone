@@ -14,11 +14,12 @@ use RuntimeException;
  */
 class CryptoPaymentService
 {
-    public function createForOrder(Order $order, string $network = 'TRC20', string $currency = 'USDT'): CryptoPayment
+    public function createForOrder(Order $order, string $network = 'TRC20'): CryptoPayment
     {
         $address = match ($network) {
             'TRC20' => config('crypto.usdt_trc20_address'),
             'BEP20' => config('crypto.usdt_bep20_address'),
+            'LTC' => config('crypto.ltc_address'),
             default => throw new RuntimeException("Unsupported crypto network: {$network}"),
         };
 
@@ -30,11 +31,14 @@ class CryptoPaymentService
         }
 
         return $order->payments()->create([
-            'currency' => $currency,
+            'currency' => $network === 'LTC' ? 'LTC' : 'USDT',
             'network' => $network,
             'pay_to_address' => $address,
-            // USDT is a USD stablecoin, so the crypto amount tracks the USD price 1:1.
-            'amount_crypto' => $order->total_price,
+            // USDT is a USD stablecoin, so the crypto amount tracks the USD price
+            // 1:1. LTC isn't, so it needs converting at the live rate.
+            'amount_crypto' => $network === 'LTC'
+                ? round($order->total_price / app(LtcPriceFeed::class)->usdPrice(), 8)
+                : $order->total_price,
             'amount_usd' => $order->total_price,
             'status' => CryptoPayment::STATUS_AWAITING_PAYMENT,
             'expires_at' => now()->addMinutes((int) config('crypto.payment_window_minutes')),
