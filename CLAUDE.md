@@ -262,6 +262,57 @@ balance itself running dry, which is already visible in Admin → Diagnostics
 and Admin → Proxies' "Account balance" line. If a customer's device expires
 unexpectedly, check that first, not this app's cron.
 
+## Email OTP at registration (added 2026-10)
+
+Registering never actually required a real, reachable email address — the
+Breeze scaffolding this app shipped with had the verification *views and
+routes* (`verify-email.blade.php`, `VerifyEmailController`, signed-link
+verification) but `User` never implemented `MustVerifyEmail` (commented out
+in the model) and no route used the `verified` middleware, so none of it
+ran. Anyone could type a fake email and use the site immediately.
+
+Replaced with a 6-digit code instead of Breeze's signed-link flow, since a
+link requires opening the email client from the same device/browser session
+that started registration, which doesn't always work — a typed code does:
+
+- `App\Services\Auth\EmailOtpService` generates a 6-digit code, hashes it
+  into `users.email_otp`/`email_otp_expires_at` (10-minute expiry, migration
+  `add_email_otp_to_users_table`) and emails it via `Mail::raw()` — same
+  plain-text approach `SettingsController::testMail` already used, not a new
+  Mailable class. Like password, the code is only ever stored hashed and
+  compared with `Hash::check()`.
+- `RegisteredUserController::store()` creates the user, sends the code, but
+  **does not log them in** — the pending user id goes into the session
+  (`otp_user_id`) and they're redirected to `GET /verify-otp`
+  (`EmailOtpController`), not the dashboard. Only a correct, unexpired code
+  (`POST /verify-otp`) sets `email_verified_at`, clears the OTP columns, and
+  logs them in. "Resend" (`POST /verify-otp/resend`, `throttle:5,1`) issues
+  a fresh code — the old one simply stops matching once overwritten, no
+  separate invalidation needed.
+- **Closed the obvious bypass**: an abandoned verify-otp screen leaves a
+  real row in `users` with a working password and `email_verified_at =
+  null` — logging in through the normal `/login` form with correct
+  credentials would otherwise skip the OTP step entirely, since
+  `LoginRequest::authenticate()` just calls `Auth::attempt()` with no
+  verification check. `AuthenticatedSessionController::store()` now checks
+  the freshly-authenticated user's `email_verified_at` right after a
+  successful `Auth::attempt()`; if it's still null, it logs them back out,
+  sends a new code, and redirects to `/verify-otp` instead of the dashboard
+  — same destination as a first-time registration.
+- Admin → Users → **Create** is unaffected on purpose — `UserController::store()`
+  sets `email_verified_at = now()` directly, since an admin manually
+  creating an account is already vouching for it; no OTP step there.
+
+**This makes a working mailer mandatory for anyone to register at all** —
+unlike the BEP20/LTC/SMTP features elsewhere in this file that degrade to
+"hidden" or "unavailable" when unconfigured, there's no fallback here: with
+`MAIL_MAILER=log` (the `.env.example` default), the code goes to
+`storage/logs/laravel.log` instead of an inbox and nobody can finish signing
+up. **Confirm SMTP is configured and working in Admin → Settings → Email
+(use its "Send test email" button) before this reaches real customers** —
+on a fresh/un-configured install this would silently lock out every new
+registration, not just degrade a secondary feature.
+
 ## Current state
 
 Working in production: plan sync and pricing, crypto checkout, wallet
