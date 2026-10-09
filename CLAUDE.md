@@ -180,6 +180,25 @@ balance moves:
   `CryptoPaymentService`/`VerifyCryptoPayments` path, just dispatching to
   `BscUsdtVerifier`/`LtcVerifier` instead of `TronUsdtVerifier` by
   `payment.network`.
+  **Update (2026-10): removed from the cloud-phone checkout page specifically**
+  — the owner wanted `/plans` to be wallet-only, not a crypto-vs-balance
+  choice. `plans/partials/grid.blade.php`'s "3. Order" step no longer has a
+  network `<select>` or a "pay from balance" *checkbox* at all: if the
+  customer has any balance, a `pay_with_balance` hidden input is sent
+  unconditionally (so it's the only path this form can submit) alongside an
+  "Add more funds" link; if they have none, the Buy Now button is replaced
+  entirely by an "Add funds" button straight to `/wallet` — no submission
+  possible until they fund first. `OrderController::store`'s crypto-payment
+  branch (`$payments->createForOrder($order, $network)`) and the
+  TRC20/BEP20/LTC `payment_network` validation rule are untouched — still
+  there and still exercised by the *other* product checkouts (email
+  accounts, phone numbers, cloud numbers, proxies), which never had a
+  wallet option in the first place and still default silently to TRC20.
+  Net effect: direct per-order BEP20/LTC payment has no UI entry point
+  anywhere right now — the only way to spend BEP20/LTC is to deposit it at
+  `/wallet` first, then pay with the resulting balance. If a direct
+  BEP20/LTC checkout option is wanted again later, on `/plans` or anywhere
+  else, it's a Blade change only — nothing server-side was removed.
 - Admin → a user's page has a manual credit/debit form (refunds, goodwill,
   correcting a support mistake) — goes through the same `WalletService`, so
   it's ledgered identically to a real deposit or purchase.

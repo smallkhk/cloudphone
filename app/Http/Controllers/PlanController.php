@@ -77,8 +77,6 @@ class PlanController extends Controller
             // (VMOS residential proxy) or supplied by the customer (their own).
             'proxyProducts' => $this->proxyCatalog->products(),
             'proxyRegions' => $this->proxyCatalog->regions(),
-            'bep20Available' => filled(config('crypto.usdt_bep20_address')),
-            'ltcAvailable' => filled(config('crypto.ltc_address')),
             'durations' => Sku::available()
                 ->cloudPhones()
                 ->select('duration_minutes', 'duration_label')

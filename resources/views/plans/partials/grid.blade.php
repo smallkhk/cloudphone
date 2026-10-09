@@ -122,7 +122,7 @@
         </p>
 
         <div class="mt-4" x-data="{
-                selectedFamily: null, selectedSku: null, proxyMode: '', payWithBalance: false,
+                selectedFamily: null, selectedSku: null, proxyMode: '',
                 proxyTesting: false, proxyTestResult: null,
                 async testProxy(form) {
                     this.proxyTesting = true;
@@ -263,37 +263,22 @@
                                     </p>
 
                                     @if (auth()->user()->balance > 0)
-                                        <label class="mt-3 flex items-center gap-2 text-sm text-ink-700">
-                                            <input type="checkbox" name="pay_with_balance" value="1" x-model="payWithBalance"
-                                                   class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
-                                            Pay from wallet balance (${{ number_format(auth()->user()->balance, 2) }} available)
-                                        </label>
+                                        <input type="hidden" name="pay_with_balance" value="1">
+                                        <p class="mt-3 flex items-center gap-2 text-sm text-ink-700">
+                                            <svg class="h-4 w-4 flex-none text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Pay with balance <span class="text-ink-400">(${{ number_format(auth()->user()->balance, 2) }} available)</span>
+                                        </p>
+                                        <p class="mt-1 text-xs text-ink-500">
+                                            <a href="{{ route('wallet.index') }}" target="_blank" class="font-medium text-brand-600 hover:underline">Add more funds</a>
+                                        </p>
+
+                                        <button class="btn-primary mt-3 w-full">Buy now</button>
+                                    @else
+                                        <p class="mt-3 text-sm text-ink-700">You need funds in your wallet to buy this.</p>
+                                        <a href="{{ route('wallet.index') }}" target="_blank" class="btn-primary mt-3 block w-full text-center">Add funds</a>
                                     @endif
-
-                                    <p class="mt-2 text-xs text-ink-500">
-                                        <a href="{{ route('wallet.index') }}" target="_blank" class="font-medium text-brand-600 hover:underline">
-                                            {{ auth()->user()->balance > 0 ? 'Top up your wallet balance' : 'Fund your wallet' }}
-                                        </a>
-                                        — opens in a new tab so you don't lose this order. Once topped up, come back and tick
-                                        "Pay from wallet balance" for an instant checkout, no crypto wait.
-                                    </p>
-
-                                    @if ($bep20Available || $ltcAvailable)
-                                        <div x-show="!payWithBalance" class="mt-2">
-                                            <label class="label text-xs" for="payment_network-{{ $sku->id }}">Pay with</label>
-                                            <select id="payment_network-{{ $sku->id }}" name="payment_network" class="input text-sm">
-                                                <option value="TRC20">USDT (TRC20)</option>
-                                                @if ($bep20Available)
-                                                    <option value="BEP20">USDT (BEP20 / BNB Smart Chain)</option>
-                                                @endif
-                                                @if ($ltcAvailable)
-                                                    <option value="LTC">Litecoin (LTC)</option>
-                                                @endif
-                                            </select>
-                                        </div>
-                                    @endif
-
-                                    <button class="btn-primary mt-3 w-full">Buy now</button>
                                 </form>
                             @else
                                 <a href="{{ route('login') }}" class="btn-primary w-full">Log in to buy</a>

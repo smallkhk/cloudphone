@@ -110,7 +110,7 @@ class OrderController extends Controller
                 : 'Checkout is temporarily unavailable. Please contact support — we\'ve been notified.');
         } catch (RuntimeException $e) {
             // Balance changed (e.g. another tab) between page load and submit.
-            return back()->with('error', 'Not enough wallet balance to cover this order. Please top up or pay with crypto instead.');
+            return back()->with('error', 'Not enough wallet balance to cover this order. Please top up your wallet and try again.');
         }
 
         if ($order->status === Order::STATUS_PAID) {

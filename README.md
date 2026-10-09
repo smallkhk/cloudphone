@@ -12,9 +12,15 @@ workers required — a single cron entry drives everything).
 1. **Plans** (`skus` table) are synced from VMOS's `getCloudGoodList` API
    (`php artisan vmos:sync-skus`). New plans default to a 30% markup; adjust
    prices under **Admin → Plans**.
-2. A customer buys a plan → an **Order** is created and a **USDT (TRC20)**
-   payment quote is generated (shared wallet address, matched by tx hash).
-3. Customer sends USDT and submits the transaction hash.
+2. A customer buys a cloud-phone plan from their **wallet balance** — `/plans`
+   checkout is wallet-only, not a crypto quote. If they don't have enough,
+   they're sent to fund the wallet first (see "Wallet balance" below); other
+   product types (email accounts, phone numbers, cloud numbers, proxies)
+   still create an **Order** with a **USDT (TRC20)** payment quote directly
+   (shared wallet address, matched by tx hash).
+3. Customer sends USDT and submits the transaction hash (for those other
+   product types — a wallet-funded cloud-phone order skips this, since it's
+   already paid).
 4. `php artisan crypto:verify-payments` (runs every minute via the scheduler)
    checks the tx hash against [TronGrid](https://www.trongrid.io/)'s public API.
    Once confirmed, the order is marked paid and the cloud phone is purchased via
@@ -111,9 +117,11 @@ under **Admin → Settings → Payments**), send the exact amount, paste the tx
 hash. LTC isn't a stablecoin, so its amount is converted from USD at a live
 rate when the quote is created.
 `php artisan wallet:verify-deposits` (every minute, same cron entry) confirms
-it on-chain and credits the balance. At checkout, a customer with any balance
-gets a "Pay from wallet balance" option that skips the crypto quote entirely
-— useful for renewals, since there's no on-chain wait. Admins can also
+it on-chain and credits the balance. **Cloud-phone checkout (`/plans`) is
+wallet-only** — there's no crypto option on that page at all: with a balance,
+the form pays from it automatically (no on-chain wait); with none, the Buy
+Now button is replaced by an "Add funds" button straight to the wallet page.
+Admins can also
 credit/debit a user's balance by hand from their admin user page (refunds,
 goodwill credit); every change, deposit or manual, is recorded in an
 append-only ledger (`wallet_transactions`) visible on both the customer's
