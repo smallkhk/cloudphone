@@ -32,6 +32,7 @@ class SettingsServiceProvider extends ServiceProvider
         'crypto_ltc_address' => 'crypto.ltc_address',
         'crypto_ltc_amount_tolerance_percent' => 'crypto.ltc_amount_tolerance_percent',
         'blockcypher_api_token' => 'crypto.blockcypher_api_token',
+        'crypto_min_deposit_usd' => 'crypto.min_deposit_usd',
 
         'assistant_enabled' => 'assistant.enabled',
         'assistant_provider' => 'assistant.provider',

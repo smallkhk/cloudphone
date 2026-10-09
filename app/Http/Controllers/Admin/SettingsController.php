@@ -59,6 +59,7 @@ class SettingsController extends Controller
             'crypto_ltc_amount_tolerance_percent' => ['nullable', 'numeric', 'min:0', 'max:15'],
             'trongrid_api_key' => ['nullable', 'string', 'max:255'],
             'blockcypher_api_token' => ['nullable', 'string', 'max:255'],
+            'crypto_min_deposit_usd' => ['nullable', 'numeric', 'min:1', 'max:1000'],
         ]);
 
         $this->save($data);

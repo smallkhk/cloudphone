@@ -19,6 +19,7 @@ class WalletController extends Controller
             'balance' => $user->balance,
             'deposits' => $user->walletDeposits()->paginate(10, ['*'], 'deposits'),
             'transactions' => $user->walletTransactions()->paginate(10, ['*'], 'transactions'),
+            'minDeposit' => (float) config('crypto.min_deposit_usd'),
             'networksAvailable' => array_filter([
                 'TRC20' => filled(config('crypto.usdt_trc20_address')),
                 'BEP20' => filled(config('crypto.usdt_bep20_address')),
@@ -30,7 +31,7 @@ class WalletController extends Controller
     public function deposit(Request $request, WalletDepositService $deposits)
     {
         $data = $request->validate([
-            'amount_usd' => ['required', 'numeric', 'min:5', 'max:100000'],
+            'amount_usd' => ['required', 'numeric', 'min:'.config('crypto.min_deposit_usd'), 'max:100000'],
             'network' => ['required', 'in:TRC20,BEP20,LTC'],
         ]);
 

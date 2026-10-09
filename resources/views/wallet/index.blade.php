@@ -74,7 +74,7 @@
                             @csrf
                             <div>
                                 <label class="label" for="amount_usd">Amount (USD)</label>
-                                <input id="amount_usd" name="amount_usd" type="number" min="5" max="100000" step="0.01" class="input" placeholder="50.00" required>
+                                <input id="amount_usd" name="amount_usd" type="number" min="{{ $minDeposit }}" max="100000" step="0.01" class="input" placeholder="50.00" required>
                             </div>
                             <div>
                                 <label class="label" for="network">Network</label>
@@ -86,7 +86,7 @@
                             </div>
                             <button class="btn-primary">Get deposit address</button>
                         </form>
-                        <p class="hint mt-3">Minimum deposit $5. Your balance updates automatically once the transaction is confirmed on-chain.</p>
+                        <p class="hint mt-3">Minimum deposit ${{ number_format($minDeposit, 2) }}. Your balance updates automatically once the transaction is confirmed on-chain.</p>
                     @endif
                 </div>
             @endif

@@ -43,4 +43,7 @@ return [
     // can drift between quote creation and the customer actually paying.
     'ltc_amount_tolerance_percent' => (float) env('CRYPTO_LTC_AMOUNT_TOLERANCE_PERCENT', 3),
 
+    // Smallest wallet top-up a customer can request.
+    'min_deposit_usd' => (float) env('CRYPTO_MIN_DEPOSIT_USD', 5),
+
 ];

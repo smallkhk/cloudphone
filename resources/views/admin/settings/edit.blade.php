@@ -134,6 +134,13 @@
                                        value="{{ old('crypto_amount_tolerance_percent', $settings['crypto_amount_tolerance_percent'] ?? 0.5) }}">
                                 <p class="hint">Accepts slightly short payments from fee rounding.</p>
                             </div>
+
+                            <div>
+                                <label class="label" for="crypto_min_deposit_usd">Minimum wallet deposit (USD)</label>
+                                <input id="crypto_min_deposit_usd" name="crypto_min_deposit_usd" type="number" step="0.01" min="1" max="1000" class="input"
+                                       value="{{ old('crypto_min_deposit_usd', $settings['crypto_min_deposit_usd'] ?? 5) }}">
+                                <p class="hint">Smallest top-up a customer can request on the Wallet page.</p>
+                            </div>
                         </div>
 
                         <div>
