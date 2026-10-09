@@ -1,9 +1,9 @@
 {
-  "name": "modova",
+  "name": "vhonix",
   "version": "1.0.0",
-  "description": "Modova desktop client",
+  "description": "Vhonix desktop client",
   "main": "src/main.js",
-  "author": "Modova",
+  "author": "Vhonix",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
@@ -21,8 +21,8 @@
     "electron-store": "^8.2.0"
   },
   "build": {
-    "appId": "online.eclipselivecam.modova",
-    "productName": "Modova",
+    "appId": "online.eclipselivecam.vhonix",
+    "productName": "Vhonix",
     "directories": {
       "output": "dist"
     },

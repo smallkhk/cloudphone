@@ -22,11 +22,11 @@ form.addEventListener('submit', async (e) => {
   button.disabled = true;
   button.textContent = 'Checking…';
 
-  const result = await window.modova.verify(code);
+  const result = await window.vhonix.verify(code);
 
   if (result.ok) {
     button.textContent = 'Unlocked';
-    await window.modova.launch();
+    await window.vhonix.launch();
     return;
   }
 

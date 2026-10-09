@@ -17,7 +17,7 @@ let mainWindow = null;
 function buildMenu(signOut) {
   const template = [
     {
-      label: 'Modova',
+      label: 'Vhonix',
       submenu: [
         { role: 'about' },
         { type: 'separator' },

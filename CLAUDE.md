@@ -41,25 +41,50 @@ untouched — none of that is user-facing. If a new customer-facing error path
 gets added later, keep following the same rule: never echo a raw upstream
 exception message to a non-admin.
 
-## Desktop app access codes (not yet used by anything)
+## Desktop app access codes + the "Vhonix" Electron app
 
-Added for a **desktop app the owner is building separately** — this repo
-doesn't contain it, only the two things it will call. The website itself has
-**no lock**; it stays reachable at its normal URL for browser visitors. The
-lock is meant to live entirely in the desktop app, which is expected to
-prompt for a code on launch and only navigate to the site once it checks out
-— keeping the actual URL out of the app's visible UI is the desktop app's
-job, not something this repo can enforce.
+The website itself has **no lock**; it stays reachable at its normal URL for
+browser visitors. The lock lives entirely in a small Electron desktop app
+(`desktop-app/`, committed in this repo), which prompts for a code on launch
+and only navigates to the site once it checks out — keeping the actual URL
+out of the app's visible UI (no address bar, no menu bar shown).
 
 - Admin → **Access codes** (`/admin/access-keys`) generates/revokes/deletes
   codes (`App\Models\AccessKey`, format `XXXX-XXXX-XXXX-XXXX`, unambiguous
   charset). Optional label and expiry; reusable (not one-time) until revoked
   or expired.
 - `POST /api/access-keys/verify` (unauthenticated, rate-limited
-  `throttle:20,1`) is what the desktop app is expected to call with
-  `{"code": "..."}`. Returns `{"valid": true}` (200) or `{"valid": false}`
-  (401). Records `used_count`/`last_used_at` on every successful check —
-  purely informational, doesn't limit reuse.
+  `throttle:20,1`) is what the desktop app calls with `{"code": "..."}`.
+  Returns `{"valid": true}` (200) or `{"valid": false}` (401). Records
+  `used_count`/`last_used_at` on every successful check — purely
+  informational, doesn't limit reuse.
+- **The app** (`desktop-app/src/main.js`) hardcodes the live site URL
+  (`cloud.eclipselivecam.online`) and the verify endpoint — on purpose, so
+  the person using it never sees or needs to know the address. On a valid
+  code it saves the code locally (`electron-store`) so launch doesn't ask
+  again, then opens the site full-screen with no browser chrome. "Sign out"
+  (in the app's own menu) clears the saved code and shows the lock screen
+  again.
+- **Branded "Vhonix"**, deliberately different from the site's own "Modova"
+  branding — the app shell's name/title-bar/taskbar label is independent of
+  what the site inside it calls itself. If the owner wants the two to match
+  later, or wants a custom `.ico`/`.icns`, that's a rename in
+  `desktop-app/package.json` (`productName`, `appId`) plus the few
+  `Vhonix`/`vhonix` strings in `src/main.js`, `src/lock.html`, `src/lock.js`,
+  `src/preload.js` — not a rebuild from scratch.
+- **Building it**: local builds are too large to hand over directly (the
+  bundled Electron runtime alone is well over 100MB per platform), so
+  `.github/workflows/desktop-app-release.yml` builds Windows (NSIS
+  installer) and Mac (DMG) installers on GitHub's own runners and publishes
+  them as a GitHub Release. It fires automatically on a push to
+  `claude/vmos-email-phone-verification-2qnaz0`, or manually via
+  `workflow_dispatch`, or by pushing a `desktop-v*` tag. The owner downloads
+  the finished `.exe`/`.dmg` from the repo's **Releases** page and sends that
+  file to customers — nothing about Electron, npm, or building is their
+  problem.
+- Not yet tested against a real customer machine — the lock screen's error
+  states (bad code, expired code, no internet) are written defensively but
+  unverified outside this build.
 
 ## Proxy testing goes through VMOS's checkIP after all
 
