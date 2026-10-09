@@ -12,15 +12,35 @@ permissions:
   contents: write
 
 jobs:
+  # electron-builder's GitHub publisher creates the release as "published"
+  # (see package.json's publish.releaseType), and GitHub's API refuses to
+  # create a *published* release for a tag that doesn't exist yet ("Published
+  # releases must have a valid tag") — only a draft release can defer tag
+  # creation. Pushing the tag here, once, before either platform's build
+  # starts, means electron-builder always finds an existing tag to attach
+  # the release to instead of gambling on auto-creating one.
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: version
+        working-directory: desktop-app
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure the release tag exists
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version.outputs.version }}" || true
+          git push origin "v${{ steps.version.outputs.version }}" || true
+
   build:
+    needs: tag
     strategy:
       fail-fast: false
-      # One at a time, not in parallel: both platforms call electron-builder's
-      # GitHub publish step, and when the release for this version doesn't
-      # exist yet, each job races to create it. Whichever loses gets a 422
-      # ("Published releases must have a valid tag") since the create-release
-      # call isn't idempotent — serializing removes the race entirely.
-      max-parallel: 1
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
