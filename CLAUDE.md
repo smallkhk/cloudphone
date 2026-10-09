@@ -59,7 +59,8 @@ out of the app's visible UI (no address bar, no menu bar shown).
   `used_count`/`last_used_at` on every successful check — purely
   informational, doesn't limit reuse.
 - **The app** (`desktop-app/src/main.js`) hardcodes the live site URL
-  (`cloud.eclipselivecam.online`) and the verify endpoint — on purpose, so
+  (`vhonixcloud.com` — moved here from `cloud.eclipselivecam.online`, see
+  "Live deployment" below) and the verify endpoint — on purpose, so
   the person using it never sees or needs to know the address. On a valid
   code it saves the code locally (`electron-store`) so launch doesn't ask
   again, then opens the site full-screen with no browser chrome. "Sign out"
@@ -607,8 +608,31 @@ makes it certain either way.
 - **App directory:** `~/cloud` on the cPanel host.
   (Moved here from `~/fair-red-whale.198-54-115-5.cpanel.site` — that path is
   dead, don't use it in any command.)
-- **Site:** <https://cloud.eclipselivecam.online>, document root `~/cloud/public`.
-  HTTPS is on and plain HTTP 301s to it.
+- **Site:** <https://vhonixcloud.com>, document root `~/cloud/public`. HTTPS
+  is on and plain HTTP 301s to it. **Update (2026-10): moved from
+  `cloud.eclipselivecam.online`** (the old eclipselivecam.online subdomain) to
+  this dedicated domain, to match the desktop app's "Vhonix" branding — the
+  old domain now 301-redirects here rather than being retired outright, so
+  any link already handed out (or cached by a search engine) keeps working.
+  Three things had to change together for the move, and need re-checking any
+  time the domain comes up again:
+  1. **DNS + cPanel** — `vhonixcloud.com` pointed at the same server and
+     added as the site's domain in cPanel (done by the owner directly,
+     outside this repo).
+  2. **`APP_URL` in `.env`** on the live server — gitignored, so `git pull`
+     never touches it; has to be hand-edited to `https://vhonixcloud.com`.
+  3. **VMOS's registered callback URL**, in the VMOS console under
+     Developer → API — it's tied to the exact domain, so it has to be
+     updated to `https://vhonixcloud.com/api/vmos/callback?token=<same
+     VMOS_WEBHOOK_TOKEN as before>` or webhook-dependent flows (payment
+     confirmations that arrive via callback rather than polling, if any)
+     silently stop arriving.
+  The desktop app's hardcoded `SITE_URL`/`VERIFY_HOST`
+  (`desktop-app/src/main.js`) were updated to the new domain and a new build
+  published — any `.exe`/`.dmg` built before this still points at the old
+  domain's API and will fail to unlock with "Could not reach the server"
+  once/if the old domain's SSL or redirect isn't serving the API correctly;
+  make sure everyone's using the latest release.
 - **Sibling site on the same account:** `eclipselivecam.online`. Unrelated to
   this project and must not be disturbed.
 - **PHP:** the account default is *not* new enough for this app. PHP 8.4 is

@@ -15,6 +15,12 @@ jobs:
   build:
     strategy:
       fail-fast: false
+      # One at a time, not in parallel: both platforms call electron-builder's
+      # GitHub publish step, and when the release for this version doesn't
+      # exist yet, each job races to create it. Whichever loses gets a 422
+      # ("Published releases must have a valid tag") since the create-release
+      # call isn't idempotent — serializing removes the race entirely.
+      max-parallel: 1
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}

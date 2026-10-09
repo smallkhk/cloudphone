@@ -5,8 +5,8 @@ const Store = require('electron-store');
 
 // Hardcoded on purpose — the whole point of this app is that the person
 // using it never sees or needs to know this address.
-const SITE_URL = 'https://cloud.eclipselivecam.online';
-const VERIFY_HOST = 'cloud.eclipselivecam.online';
+const SITE_URL = 'https://vhonixcloud.com';
+const VERIFY_HOST = 'vhonixcloud.com';
 const VERIFY_PATH = '/api/access-keys/verify';
 
 const store = new Store();
