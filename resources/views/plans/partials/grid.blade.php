@@ -270,6 +270,14 @@
                                         </label>
                                     @endif
 
+                                    <p class="mt-2 text-xs text-ink-500">
+                                        <a href="{{ route('wallet.index') }}" target="_blank" class="font-medium text-brand-600 hover:underline">
+                                            {{ auth()->user()->balance > 0 ? 'Top up your wallet balance' : 'Fund your wallet' }}
+                                        </a>
+                                        — opens in a new tab so you don't lose this order. Once topped up, come back and tick
+                                        "Pay from wallet balance" for an instant checkout, no crypto wait.
+                                    </p>
+
                                     @if ($bep20Available || $ltcAvailable)
                                         <div x-show="!payWithBalance" class="mt-2">
                                             <label class="label text-xs" for="payment_network-{{ $sku->id }}">Pay with</label>

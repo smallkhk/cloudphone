@@ -163,6 +163,18 @@ balance moves:
   If provisioning itself then fails, the order stays `paid`/unprovisioned
   exactly like a manually-marked-paid order does — same recovery path,
   Admin → Orders → "Provision now" — nothing new invented for that case.
+  **Update (2026-10):** that checkbox only ever showed up if the customer
+  already had a balance, with no way to *get* one without leaving the
+  checkout form to go find the sidebar's Wallet link (and losing their
+  quantity/region/proxy selections — all local Alpine state — if they
+  navigated there in the same tab). Added a "Top up your wallet" /
+  "Fund your wallet" link right under that checkbox (shown either way, so a
+  customer with zero balance can start funding before ever placing an
+  order), `target="_blank"` specifically so the in-progress checkout form
+  survives. This is cloud-phone checkout (`plans/partials/grid.blade.php`)
+  only — the other product types (email accounts, phone numbers, cloud
+  numbers, proxies) never had a "pay from balance" option at checkout in the
+  first place, so there was nothing to extend there.
 - Regular per-order crypto payment also gained a network choice (TRC20 /
   BEP20 / LTC) at checkout, once a network is configured — reuses the same
   `CryptoPaymentService`/`VerifyCryptoPayments` path, just dispatching to
