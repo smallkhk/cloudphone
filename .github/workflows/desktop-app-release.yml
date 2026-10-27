@@ -37,6 +37,17 @@ jobs:
           git tag "v${{ steps.version.outputs.version }}" || true
           git push origin "v${{ steps.version.outputs.version }}" || true
 
+      # Create the release itself here, once. Otherwise both build jobs find
+      # no release and each create one — GitHub allows two releases on the
+      # same tag, the .exe and .dmg land in different ones, and the public
+      # download link for one of them 404s.
+      - name: Ensure the release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="v${{ steps.version.outputs.version }}"
+          gh release view "$V" >/dev/null 2>&1 || gh release create "$V" --title "${{ steps.version.outputs.version }}" --notes ""
+
   build:
     needs: tag
     strategy:
