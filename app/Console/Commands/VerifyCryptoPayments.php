@@ -4,11 +4,13 @@ namespace App\Console\Commands;
 
 use App\Models\CryptoPayment;
 use App\Models\Order;
+use App\Services\Payments\Bep20AutoMatcher;
 use App\Services\Payments\BscUsdtVerifier;
 use App\Services\Payments\LtcVerifier;
 use App\Services\Payments\TronUsdtVerifier;
 use App\Services\Provisioning\OrderProvisioner;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -18,8 +20,17 @@ class VerifyCryptoPayments extends Command
 
     protected $description = 'Check submitted crypto payments on-chain, confirm them, and provision paid orders';
 
-    public function handle(TronUsdtVerifier $tron, BscUsdtVerifier $bsc, LtcVerifier $ltc, OrderProvisioner $provisioner): int
+    public function handle(Bep20AutoMatcher $matcher, TronUsdtVerifier $tron, BscUsdtVerifier $bsc, LtcVerifier $ltc, OrderProvisioner $provisioner): int
     {
+        // Both verify commands run every minute; the scan only needs doing once.
+        if (Cache::add('bep20-auto-match', true, 50)) {
+            try {
+                $matcher->run();
+            } catch (Throwable $e) {
+                Log::warning('bep20.auto_match_failed', ['error' => $e->getMessage()]);
+            }
+        }
+
         $submitted = CryptoPayment::query()
             ->where('status', CryptoPayment::STATUS_SUBMITTED)
             ->whereIn('network', ['TRC20', 'BEP20', 'LTC'])

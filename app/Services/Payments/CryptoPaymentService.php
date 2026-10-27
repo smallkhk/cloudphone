@@ -5,6 +5,7 @@ namespace App\Services\Payments;
 use App\Exceptions\PaymentsNotConfiguredException;
 use App\Models\CryptoPayment;
 use App\Models\Order;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -49,6 +50,12 @@ class CryptoPaymentService
     {
         if ($payment->status !== CryptoPayment::STATUS_AWAITING_PAYMENT) {
             throw new RuntimeException('This payment is no longer awaiting a transaction hash.');
+        }
+
+        $txHash = TxHash::canonical($txHash, $payment->network);
+
+        if (TxHash::alreadyUsed($txHash, $payment)) {
+            throw ValidationException::withMessages(['tx_hash' => 'That transaction has already been used for another payment.']);
         }
 
         $payment->update([

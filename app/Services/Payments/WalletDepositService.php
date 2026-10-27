@@ -5,6 +5,7 @@ namespace App\Services\Payments;
 use App\Exceptions\PaymentsNotConfiguredException;
 use App\Models\User;
 use App\Models\WalletDeposit;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -46,6 +47,12 @@ class WalletDepositService
     {
         if ($deposit->status !== WalletDeposit::STATUS_AWAITING_PAYMENT) {
             throw new RuntimeException('This deposit is no longer awaiting a transaction hash.');
+        }
+
+        $txHash = TxHash::canonical($txHash, $deposit->network);
+
+        if (TxHash::alreadyUsed($txHash, $deposit)) {
+            throw ValidationException::withMessages(['tx_hash' => 'That transaction has already been used for another payment.']);
         }
 
         $deposit->update([

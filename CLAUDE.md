@@ -252,6 +252,62 @@ same caveat `TronUsdtVerifier` has always carried. Try a real TRC20, BEP20,
 and LTC deposit with a small amount before relying on this for real customer
 funds.
 
+## Fixes from the owner's first real-use report (2026-10-27)
+
+- **PC keyboard did nothing on the live screen.** The H5 SDK
+  (`armcloud-rtc`) only routes typing into the phone through its hidden
+  input when `deviceInfo.keyboard` is `'local'`, or `'pad'` **plus**
+  `allowLocalIMEInCloud: true` (see `syncInputFocusState` in the SDK).
+  `resources/js/live-screen.js` had `'pad'` alone, so the hidden input was
+  never focused. Added `allowLocalIMEInCloud: true` (keeps the phone's own
+  on-screen keyboard too).
+- **No camera/mic in the cloud phone.** `enableCamera`/`enableMicrophone`
+  were hardcoded `false`. Now `true` — the SDK only uses them when an app on
+  the phone actually opens the camera/mic, at which point the browser asks
+  permission and the computer's webcam/mic is streamed in. Needs HTTPS (site
+  has it). The Electron app (`desktop-app/src/main.js`) grants the `media`
+  permission to our own site's origin only, asks macOS for camera/mic access,
+  and `package.json` `mac.extendInfo` carries the required
+  `NSCameraUsageDescription`/`NSMicrophoneUsageDescription` (v1.3.0).
+- **New devices sat on "Provisioning…" after VMOS had finished.** A device
+  only becomes usable once `pad_code` is filled, and the only source is the
+  `userPadList` sync (VMOS's status webhook keys on padCode, so it can't
+  announce a device we don't know the padCode of yet). That ran every **5
+  minutes** and the page never refreshed. Now: sync runs every minute; the
+  logic moved into `CloudInstanceSyncer` and `CloudInstanceController::index`
+  syncs the customer's pending devices immediately on page load (throttled
+  to once per 10s per user); the page auto-reloads every 15s while any device
+  is still setting up; and one failing VMOS call no longer aborts the whole
+  sync for every customer (per-chunk try/catch). Both VMOS responses
+  (`createMoneyOrder` → `data[].equipmentId`, `userPadList` → flat `data[]`
+  with `padCode`/`equipmentId`/`cvmStatus`) were re-checked against VMOS's
+  docs and match the code.
+- **BSC (BEP20) payment didn't verify.** `BscUsdtVerifier` was re-tested
+  against a real live USDT-BEP20 transfer and works — but only once a tx
+  hash is pasted, and a hash pasted **without `0x`** (or as a BscScan link)
+  was rejected by the node, silently leaving the payment unverified forever.
+  Fixed two ways:
+  1. `TxHash::canonical()` normalises any pasted hash per network (BEP20:
+     lowercase with `0x`; TRC20/LTC: lowercase without) at submit time, and
+     the verifier re-normalises stored hashes too (rescues old ones).
+  2. **Auto-detection** (`Bep20AutoMatcher`, run once a minute from the
+     verify commands): scans the last ~10k blocks (~75 min) for USDT
+     transfers *into* our receiving address and attaches each to the one open
+     BEP20 quote it fits (same address, amount within tolerance, quote created
+     before the transfer). Ambiguous (2+ open quotes of the same amount) →
+     left alone for the customer to paste the hash. Binance's own public
+     nodes refuse `eth_getLogs` ("limit exceeded"), so the scan uses a
+     second keyless node, `crypto.bsc_logs_rpc_url` (default
+     `https://bsc-rpc.publicnode.com`, max 50k-block range) — verified live.
+  Also closed a **double-credit hole** found on the way: `wallet_deposits.tx_hash`
+  had no uniqueness check, so one payment's hash could be pasted into two
+  deposit quotes and credited twice (and `0x`/no-`0x` variants could dodge
+  `crypto_payments`' unique index). Submission now rejects any hash already
+  used by any order payment or deposit (`TxHash::alreadyUsed()`).
+  A deposit that already **expired** before this fix (customer paid but never
+  pasted a hash within 30 min) is not revived automatically — credit it by
+  hand from Admin → Users → the customer → manual credit.
+
 ## `auto_renew` already works — VMOS does it, not this app
 
 The `auto_renew` checkbox at checkout is passed straight through to VMOS's

@@ -43,7 +43,9 @@ class BscUsdtVerifier
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'eth_getTransactionReceipt',
-            'params' => [$txHash],
+            // A hash pasted without "0x" (or as a BscScan link) is rejected
+            // by the node outright, and the payment would sit unverified.
+            'params' => [TxHash::canonical($txHash, 'BEP20')],
         ]);
 
         if (! $response->successful()) {
@@ -91,6 +93,55 @@ class BscUsdtVerifier
         }
 
         return false;
+    }
+
+    /**
+     * Recent USDT transfers *into* $payToAddress, so a customer who sends the
+     * exact amount but never pastes a hash still gets matched. Binance's own
+     * public nodes refuse eth_getLogs ("limit exceeded"), so this uses a
+     * separate keyless node that allows it (up to ~50k blocks per call; BSC
+     * produces a block every ~0.45s, so 10k blocks ≈ 75 minutes).
+     *
+     * @return array<int, array{hash: string, amount: float, timestamp: int}>
+     */
+    public function incomingTransfers(string $payToAddress, int $blocks = 10000): array
+    {
+        $rpc = config('crypto.bsc_logs_rpc_url');
+
+        $latest = Http::timeout(20)->post($rpc, ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'eth_blockNumber', 'params' => []])
+            ->json('result');
+
+        if (! $latest) {
+            return [];
+        }
+
+        $response = Http::timeout(30)->post($rpc, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'eth_getLogs',
+            'params' => [[
+                'fromBlock' => '0x'.dechex(max(0, (int) hexdec($latest) - $blocks)),
+                'toBlock' => 'latest',
+                'address' => config('crypto.usdt_bep20_contract'),
+                'topics' => [self::TRANSFER_TOPIC, null, '0x'.str_pad(substr(strtolower($payToAddress), 2), 64, '0', STR_PAD_LEFT)],
+            ]],
+        ]);
+
+        if (! $response->successful() || $response->json('error')) {
+            Log::warning('bsc_rpc.get_logs_failed', ['pay_to_address' => $payToAddress, 'error' => $response->json('error')]);
+
+            return [];
+        }
+
+        return collect($response->json('result') ?? [])
+            ->reject(fn ($log) => $log['removed'] ?? false)
+            ->map(fn ($log) => [
+                'hash' => strtolower($log['transactionHash']),
+                'amount' => $this->hexToDecimal($log['data'] ?? '0x0') / (10 ** self::DECIMALS),
+                'timestamp' => (int) hexdec($log['blockTimestamp'] ?? '0x0'),
+            ])
+            ->values()
+            ->all();
     }
 
     /** hexdec() already returns a float for values beyond PHP_INT_MAX, which is all we need for a tolerance-based comparison. */

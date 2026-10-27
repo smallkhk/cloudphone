@@ -3,10 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\CloudInstance;
-use App\Services\Provisioning\ProxyProvisioner;
-use App\Services\Provisioning\SimProvisioner;
-use App\Services\Vmos\VmosCloudPhoneService;
-use Carbon\Carbon;
+use App\Services\Provisioning\CloudInstanceSyncer;
 use Illuminate\Console\Command;
 
 class SyncCloudInstances extends Command
@@ -15,9 +12,9 @@ class SyncCloudInstances extends Command
 
     protected $description = 'Refresh pad_code/status/expiry for cloud instances from VMOS (fills in padCode once provisioning finishes)';
 
-    public function handle(VmosCloudPhoneService $vmos, ProxyProvisioner $proxies, SimProvisioner $sim): int
+    public function handle(CloudInstanceSyncer $syncer): int
     {
-        $instances = CloudInstance::whereNotNull('equipment_id')->get()->keyBy('equipment_id');
+        $instances = CloudInstance::whereNotNull('equipment_id')->get();
 
         if ($instances->isEmpty()) {
             $this->info('No instances to sync.');
@@ -25,51 +22,7 @@ class SyncCloudInstances extends Command
             return self::SUCCESS;
         }
 
-        $updated = 0;
-
-        foreach ($instances->chunk(100) as $chunk) {
-            $equipmentIds = $chunk->keys()->map(fn ($id) => (int) $id)->all();
-
-            $response = $vmos->listPads(equipmentIds: $equipmentIds);
-
-            foreach ($response['data'] ?? [] as $pad) {
-                $instance = $instances->get((string) ($pad['equipmentId'] ?? ''));
-
-                if (! $instance) {
-                    continue;
-                }
-
-                $justGotPadCode = ! $instance->pad_code && filled($pad['padCode'] ?? null);
-
-                $instance->update([
-                    'pad_code' => $pad['padCode'] ?? $instance->pad_code,
-                    'pad_status' => $pad['cvmStatus'] ?? $instance->pad_status,
-                    'online' => (bool) ($pad['status'] ?? 0),
-                    'screenshot_url' => $pad['screenshotLink'] ?? $instance->screenshot_url,
-                    'expires_at' => isset($pad['signExpirationTimeTamp'])
-                        ? Carbon::createFromTimestampMs($pad['signExpirationTimeTamp'])
-                        : $instance->expires_at,
-                    'last_synced_at' => now(),
-                ]);
-
-                // The checkout region's carrier can only be applied once the
-                // padCode exists — this is the first moment that's true — and
-                // SimProvisioner is idempotent, so only needs the one attempt.
-                if ($justGotPadCode) {
-                    $sim->apply($instance->fresh());
-                }
-
-                // A VMOS proxy purchase is an async task on VMOS's side (can
-                // report PENDING/PROCESSING for a while), so this keeps
-                // retrying on every sync pass until it resolves one way or
-                // the other — apply() itself no-ops once attached or failed.
-                if ($instance->pad_code && $instance->order?->hasProxy()) {
-                    $proxies->apply($instance->fresh());
-                }
-
-                $updated++;
-            }
-        }
+        $updated = $syncer->sync($instances);
 
         $this->info("Synced {$updated} instance(s).");
 

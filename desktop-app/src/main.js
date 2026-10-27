@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, systemPreferences } = require('electron');
 const path = require('path');
 const https = require('https');
 const Store = require('electron-store');
@@ -134,6 +134,23 @@ function createMainWindow() {
   });
 
   Menu.setApplicationMenu(buildMenu(signOut));
+
+  // Let the site use the computer's camera/mic (forwarded into the cloud
+  // phone when an app on it opens them) — only for our own site, nothing else.
+  const siteOrigin = new URL(SITE_URL).origin;
+  const ses = mainWindow.webContents.session;
+  ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const origin = details.requestingUrl ? new URL(details.requestingUrl).origin : '';
+    callback(permission === 'media' && origin === siteOrigin);
+  });
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin) =>
+    permission === 'media' && requestingOrigin === siteOrigin
+  );
+
+  if (process.platform === 'darwin') {
+    systemPreferences.askForMediaAccess('camera').catch(() => {});
+    systemPreferences.askForMediaAccess('microphone').catch(() => {});
+  }
 
   mainWindow.loadURL(SITE_URL);
 

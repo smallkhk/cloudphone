@@ -61,7 +61,11 @@
                                        placeholder="Paste the hash from your wallet" required minlength="10">
                                 <button class="btn-primary flex-none">I've sent the payment</button>
                             </div>
-                            <p class="hint">We verify it on-chain automatically — usually within a couple of minutes.</p>
+                            @if ($payment->network === 'BEP20')
+                                <p class="hint">BEP20 payments of the exact amount are detected automatically within a couple of minutes — pasting the hash is optional, but speeds it up.</p>
+                            @else
+                                <p class="hint">We verify it on-chain automatically — usually within a couple of minutes.</p>
+                            @endif
                         </form>
                     </div>
                 </div>

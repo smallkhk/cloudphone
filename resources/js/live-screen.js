@@ -127,14 +127,19 @@ export default function liveScreen({ tokenUrl, csrf }) {
                 viewId: this.$refs.stage.id,
                 retryCount: 2,
                 retryTime: 2000,
-                enableMicrophone: false,
-                enableCamera: false,
+                // Only used when an app on the phone actually opens the camera
+                // or mic — the SDK then asks the browser for permission and
+                // streams the computer's own webcam/mic into the phone.
+                enableMicrophone: true,
+                enableCamera: true,
                 deviceInfo: {
                     padCode: session.padCode,
                     userId: session.userId,
-                    // 'pad' routes typing to the phone's own keyboard, which is
-                    // what people expect when they tap a text field on screen.
+                    // 'pad' shows the phone's own on-screen keyboard; without
+                    // allowLocalIMEInCloud the SDK never focuses its hidden
+                    // input, so typing on the computer's keyboard did nothing.
                     keyboard: 'pad',
+                    allowLocalIMEInCloud: true,
                     saveCloudClipboard: true,
                     autoRecoveryTime: 300,
                 },

@@ -4,11 +4,13 @@ namespace App\Console\Commands;
 
 use App\Models\WalletDeposit;
 use App\Models\WalletTransaction;
+use App\Services\Payments\Bep20AutoMatcher;
 use App\Services\Payments\BscUsdtVerifier;
 use App\Services\Payments\LtcVerifier;
 use App\Services\Payments\TronUsdtVerifier;
 use App\Services\Wallet\WalletService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -18,8 +20,17 @@ class VerifyWalletDeposits extends Command
 
     protected $description = 'Check submitted wallet deposits on-chain and credit confirmed ones to the customer\'s balance';
 
-    public function handle(TronUsdtVerifier $tron, BscUsdtVerifier $bsc, LtcVerifier $ltc, WalletService $wallet): int
+    public function handle(Bep20AutoMatcher $matcher, TronUsdtVerifier $tron, BscUsdtVerifier $bsc, LtcVerifier $ltc, WalletService $wallet): int
     {
+        // Both verify commands run every minute; the scan only needs doing once.
+        if (Cache::add('bep20-auto-match', true, 50)) {
+            try {
+                $matcher->run();
+            } catch (Throwable $e) {
+                Log::warning('bep20.auto_match_failed', ['error' => $e->getMessage()]);
+            }
+        }
+
         $submitted = WalletDeposit::query()
             ->where('status', WalletDeposit::STATUS_SUBMITTED)
             ->whereIn('network', ['TRC20', 'BEP20', 'LTC'])

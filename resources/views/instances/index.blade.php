@@ -106,12 +106,16 @@
                             </div>
                         @else
                             <p class="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                Provisioning in progress — controls appear once your device is ready.
+                                Setting up your device — this page refreshes on its own and controls appear as soon as it's ready.
                             </p>
                         @endif
                     </div>
                 </div>
             @endforeach
         </div>
+    @endif
+
+    @if ($hasPending ?? false)
+        <script>setTimeout(() => location.reload(), 15000);</script>
     @endif
 </x-app-layout>

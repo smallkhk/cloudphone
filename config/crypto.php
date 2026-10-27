@@ -21,6 +21,10 @@ return [
     // A public BSC RPC node — no API key needed, unlike BscScan's API.
     'bsc_rpc_url' => env('BSC_RPC_URL', 'https://bsc-dataseed.binance.org'),
 
+    // A second keyless BSC node, used to *find* incoming payments by
+    // recipient (eth_getLogs) — Binance's own public nodes refuse that call.
+    'bsc_logs_rpc_url' => env('BSC_LOGS_RPC_URL', 'https://bsc-rpc.publicnode.com'),
+
     // Wallet address customers pay native LTC to.
     'ltc_address' => env('CRYPTO_LTC_ADDRESS'),
 
