@@ -269,6 +269,13 @@ funds.
   permission to our own site's origin only, asks macOS for camera/mic access,
   and `package.json` `mac.extendInfo` carries the required
   `NSCameraUsageDescription`/`NSMicrophoneUsageDescription` (v1.3.0).
+  **Camera picker** (added same day — the SDK otherwise uses the default/
+  "user"-facing camera, so OBS Virtual Camera etc. couldn't be chosen): the
+  live-screen tab has a "Choose camera" control that lists the computer's
+  cameras (`enumerateDevices`, after one `getUserMedia` probe so the browser
+  reveals their names), remembers the pick in `localStorage`, passes it as
+  `deviceInfo.videoDeviceId`, and switches live via `engine.setVideoDeviceId()`.
+  Lives in the website, so the desktop app didn't need a rebuild.
 - **New devices sat on "Provisioning…" after VMOS had finished.** A device
   only becomes usable once `pad_code` is filled, and the only source is the
   `userPadList` sync (VMOS's status webhook keys on padCode, so it can't

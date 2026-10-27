@@ -22,6 +22,11 @@ export default function liveScreen({ tokenUrl, csrf }) {
         // fails. Without it a stalled handshake is just a spinner forever.
         log: [],
         showLog: false,
+        // Which computer camera feeds the phone (real webcam, OBS Virtual
+        // Camera, etc). Empty = the browser's default. Remembered per browser.
+        cameras: [],
+        cameraId: (() => { try { return localStorage.getItem('liveScreen.cameraId') || ''; } catch { return ''; } })(),
+        cameraError: '',
 
         note(message) {
             const at = new Date().toLocaleTimeString();
@@ -140,6 +145,7 @@ export default function liveScreen({ tokenUrl, csrf }) {
                     // input, so typing on the computer's keyboard did nothing.
                     keyboard: 'pad',
                     allowLocalIMEInCloud: true,
+                    videoDeviceId: this.cameraId || undefined,
                     saveCloudClipboard: true,
                     autoRecoveryTime: 300,
                 },
@@ -307,6 +313,57 @@ export default function liveScreen({ tokenUrl, csrf }) {
             const stage = this.$refs.stage;
             if (this.engine && stage) {
                 this.engine.setViewSize(stage.clientWidth, stage.clientHeight);
+            }
+        },
+
+        /**
+         * Lists the computer's cameras. Browsers hide camera names until the
+         * site has camera permission once, so ask for it first (this is the
+         * permission prompt), then release the camera straight away.
+         */
+        async loadCameras() {
+            this.cameraError = '';
+
+            if (!navigator.mediaDevices?.enumerateDevices) {
+                this.cameraError = 'This browser can\'t list cameras.';
+                return;
+            }
+
+            try {
+                let devices = await navigator.mediaDevices.enumerateDevices();
+
+                if (!devices.some(d => d.kind === 'videoinput' && d.label)) {
+                    const probe = await navigator.mediaDevices.getUserMedia({ video: true });
+                    probe.getTracks().forEach(t => t.stop());
+                    devices = await navigator.mediaDevices.enumerateDevices();
+                }
+
+                this.cameras = devices
+                    .filter(d => d.kind === 'videoinput')
+                    .map((d, i) => ({ id: d.deviceId, label: d.label || `Camera ${i + 1}` }));
+
+                if (!this.cameras.length) this.cameraError = 'No camera found on this computer.';
+
+                // A remembered camera that's since been unplugged falls back to default.
+                if (this.cameraId && !this.cameras.some(c => c.id === this.cameraId)) this.cameraId = '';
+            } catch (e) {
+                this.cameraError = e?.name === 'NotAllowedError'
+                    ? 'Camera permission was blocked — allow it in your browser\'s site settings, then try again.'
+                    : 'Couldn\'t list cameras.';
+            }
+        },
+
+        async chooseCamera(id) {
+            this.cameraId = id;
+            try { localStorage.setItem('liveScreen.cameraId', id); } catch {}
+
+            // Switches the feed straight away if an app on the phone already has
+            // the camera open; otherwise it's used next time one opens it.
+            try {
+                await this.engine?.setVideoDeviceId(id);
+                this.note(`camera set to ${this.cameras.find(c => c.id === id)?.label || 'default'}`);
+            } catch (e) {
+                this.note(`camera switch failed: ${e?.message || e}`);
             }
         },
 

@@ -195,6 +195,27 @@
                         <button @click="pressRecents()" class="btn-secondary btn-sm" title="Recent apps">▢ Recents</button>
                     </div>
 
+                    {{-- Camera picker: which computer camera the phone's apps see --}}
+                    <div class="flex flex-wrap items-center gap-2 border-t border-ink-100 px-4 py-3">
+                        <span class="text-xs font-medium text-ink-700">Camera</span>
+                        <template x-if="!cameras.length">
+                            <button @click="loadCameras()" class="btn-secondary btn-sm">Choose camera</button>
+                        </template>
+                        <template x-if="cameras.length">
+                            <div class="flex items-center gap-2">
+                                <select class="input py-1 text-xs" :value="cameraId" @change="chooseCamera($event.target.value)">
+                                    <option value="">Default camera</option>
+                                    <template x-for="cam in cameras" :key="cam.id">
+                                        <option :value="cam.id" x-text="cam.label" :selected="cam.id === cameraId"></option>
+                                    </template>
+                                </select>
+                                <button @click="loadCameras()" class="text-xs text-ink-500 hover:text-ink-900" title="Refresh list">↻</button>
+                            </div>
+                        </template>
+                        <p x-show="cameraError" x-text="cameraError" x-cloak class="w-full text-xs text-red-600"></p>
+                        <p class="w-full text-xs text-ink-500">Virtual cameras (like OBS Virtual Camera) show up here once they're started on your computer.</p>
+                    </div>
+
                     <p class="border-t border-ink-100 px-4 py-3 text-xs leading-relaxed text-ink-500">
                         The screen streams straight from the cloud to your browser. Leaving this tab disconnects it —
                         the phone keeps running either way.
