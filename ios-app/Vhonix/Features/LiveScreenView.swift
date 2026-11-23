@@ -15,6 +15,9 @@ struct LiveScreenView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model = LiveScreenModel()
+    @State private var showLinkPrompt = false
+    @State private var linkDraft = ""
+    @State private var linkError: String?
 
     var body: some View {
         ZStack {
@@ -46,6 +49,21 @@ struct LiveScreenView: View {
         .onDisappear { model.teardown() }
         .onChange(of: model.state) { state in
             if state == "live" { Haptics.success() } else if state == "error" { Haptics.error() }
+        }
+        .alert("Virtual camera", isPresented: $showLinkPrompt) {
+            TextField("https://…", text: $linkDraft)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+            Button("Save") {
+                if let problem = model.saveVirtualCamera(linkDraft) { linkError = problem }
+            }
+            if !model.virtualCamURL.isEmpty {
+                Button("Remove link", role: .destructive) { _ = model.saveVirtualCamera("") }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Paste your video link. Apps on the cloud phone will see this video as the camera. Works with HLS (.m3u8), MP4, WebRTC (WHEP) and MJPEG links that start with https://.")
         }
     }
 
@@ -90,6 +108,11 @@ struct LiveScreenView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 12)
         .padding(.top, 4)
+        .alert("Can't use that link", isPresented: Binding(get: { linkError != nil }, set: { if !$0 { linkError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(linkError ?? "")
+        }
     }
 
     private var overlay: some View {
@@ -152,9 +175,21 @@ struct LiveScreenView: View {
                 }
                 Divider()
                 Button {
-                    model.call("loadCameras()")
+                    model.findCameras()
                 } label: {
                     Label("Find cameras", systemImage: "arrow.clockwise")
+                }
+                Section {
+                    Button {
+                        linkDraft = model.virtualCamURL
+                        showLinkPrompt = true
+                    } label: {
+                        Label(model.virtualCamURL.isEmpty ? "Set up virtual camera…" : "Change virtual camera link…",
+                              systemImage: "video.badge.plus")
+                    }
+                    if !model.virtualCamURL.isEmpty, let status = model.virtualCamStatus {
+                        Text(status)
+                    }
                 }
             } label: {
                 toolLabel("camera.fill", "Camera")
@@ -216,6 +251,8 @@ final class LiveScreenModel: ObservableObject {
     @Published var cameraError: String?
     @Published var muted = true
     @Published var hasConnectedOnce = false
+    @Published var virtualCamURL = VirtualCamera.url
+    @Published var virtualCamStatus: String?
 
     weak var webView: WKWebView?
     /// True once the loaded page has reported in — i.e. `window.vhonixLive` exists.
@@ -255,6 +292,38 @@ final class LiveScreenModel: ObservableObject {
     func call(_ js: String) {
         let script = "(function(){ var v = window.vhonixLive; if (v) { v.\(js); } })();"
         webView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
+    /// Runs a script on the page as-is (not through `window.vhonixLive`).
+    func run(_ js: String) {
+        webView?.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    /// Lists cameras, asking iOS for the real cameras' names if needed.
+    func findCameras() {
+        run("window.vhonixVirtualCam && (window.vhonixVirtualCam.probeNext = true);")
+        call("loadCameras()")
+    }
+
+    /// Saves (or with "" removes) the virtual camera link and switches to it.
+    /// Returns why the link can't be used, or nil when saved.
+    func saveVirtualCamera(_ link: String) -> String? {
+        let clean = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let problem = VirtualCamera.problem(with: clean) { return problem }
+
+        VirtualCamera.url = clean
+        virtualCamURL = clean
+        virtualCamStatus = clean.isEmpty ? nil : "Virtual camera: waiting for an app to open the camera"
+        let encoded = (try? JSONEncoder().encode(clean)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+        run("window.vhonixVirtualCam && window.vhonixVirtualCam.setUrl(\(encoded));")
+        call("loadCameras()")
+
+        if !clean.isEmpty {
+            chooseCamera(VirtualCamera.deviceId)
+        } else if selectedCamera == VirtualCamera.deviceId {
+            chooseCamera("")
+        }
+        return nil
     }
 
     func chooseCamera(_ id: String) {
@@ -300,6 +369,14 @@ final class LiveScreenModel: ObservableObject {
             error = (msg["error"] as? String)?.nonEmpty
             hint = (msg["hint"] as? String)?.nonEmpty
             if state == "live" { hasConnectedOnce = true }
+        case "virtualCam":
+            let message = (msg["message"] as? String)?.nonEmpty
+            switch msg["status"] as? String {
+            case "live": virtualCamStatus = "Virtual camera: playing your video"
+            case "connecting": virtualCamStatus = "Virtual camera: connecting…"
+            case "error": virtualCamStatus = message ?? "Virtual camera: can't play the link"
+            default: virtualCamStatus = message
+            }
         case "cameras":
             let list = msg["cameras"] as? [[String: Any]] ?? []
             cameras = list.compactMap { item in
@@ -327,6 +404,11 @@ struct LiveWebView: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.add(context.coordinator, name: "vhonix")
+        // Adds the "Vhonix virtual camera" before the page's own scripts run.
+        config.userContentController.addUserScript(WKUserScript(
+            source: VirtualCamera.script(url: VirtualCamera.url),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true))
 
         let web = WKWebView(frame: .zero, configuration: config)
         web.isOpaque = false

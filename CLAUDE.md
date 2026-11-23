@@ -372,6 +372,20 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   playing audio, so this only holds while the live screen's sound is on —
   muted, iOS may still pause it after a short while. That's an iOS rule, not
   something the app can override.
+- **Virtual camera (1.6.0)** — `Features/VirtualCamera.swift`. The owner
+  pastes a video link (HLS `.m3u8`, MP4, WebRTC/WHEP, MJPEG or a refreshing
+  snapshot `.jpg`; https only — RTMP/RTSP can't play in WebKit) via Camera
+  menu → "Set up virtual camera…" (one link for all phones, `UserDefaults`).
+  A `WKUserScript` injected at document start patches
+  `navigator.mediaDevices`: `enumerateDevices` gains a "Vhonix virtual
+  camera" (`deviceId` `vhonix-virtual-camera`), and `getUserMedia` for that
+  id returns a track from a hidden canvas (`captureStream(30)`) painted from
+  the link — so the streaming SDK sends that video to the cloud phone as its
+  camera. **No website change**: the page's own camera picker just lists it.
+  The video server **must send CORS headers** (`Access-Control-Allow-Origin`)
+  or the canvas can't read it; the camera then shows an error card instead.
+  Tested in headless Chromium (CORS → video plays; no CORS → error card);
+  not yet on a real iPhone.
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app
