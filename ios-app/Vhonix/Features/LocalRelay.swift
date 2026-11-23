@@ -241,6 +241,7 @@ private final class ReadyFlag: @unchecked Sendable {
 final class LocalFramePump {
     weak var webView: WKWebView?
     private var task: Task<Void, Never>?
+    private var audioTask: Task<Void, Never>?
 
     private let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -258,6 +259,12 @@ final class LocalFramePump {
                   let host = url.host, LocalRelay.isLocal(host) else { return }
             self.webView = webView
             start(url)
+            if msg["audio"] as? Bool == true,
+               let a = (msg["audioUrl"] as? String).flatMap(URL.init(string:)),
+               let st = (msg["statusUrl"] as? String).flatMap(URL.init(string:)),
+               a.host.map(LocalRelay.isLocal) == true {
+                startAudio(a, status: st)
+            }
         case "stop":
             stop()
         default:
@@ -300,6 +307,45 @@ final class LocalFramePump {
     func stop() {
         task?.cancel()
         task = nil
+        audioTask?.cancel()
+        audioTask = nil
+    }
+
+    /// Pulls each new changed-voice chunk from `/audio?after=N` and hands it to the page.
+    /// Starts from the newest chunk (via `/status`) so old phrases aren't replayed.
+    private func startAudio(_ audioURL: URL, status statusURL: URL) {
+        audioTask?.cancel()
+        audioTask = Task { [weak self] in
+            var after = 0
+            if let session = self?.session,
+               let result = try? await session.data(from: statusURL),
+               let json = try? JSONSerialization.jsonObject(with: result.0) as? [String: Any],
+               let seq = json["audioSeq"] as? Int {
+                after = max(0, seq - 1)
+            }
+            while !Task.isCancelled {
+                var got = false
+                if var comps = URLComponents(url: audioURL, resolvingAgainstBaseURL: false) {
+                    comps.queryItems = [URLQueryItem(name: "after", value: String(after))]
+                    if let url = comps.url, let session = self?.session,
+                       let result = try? await session.data(from: url),
+                       let http = result.1 as? HTTPURLResponse {
+                        let data = result.0
+                        if Task.isCancelled { break }
+                        let seq = Int(http.value(forHTTPHeaderField: "X-Seq") ?? "") ?? 0
+                        if http.statusCode == 200, !data.isEmpty {
+                            let rate = Int(http.value(forHTTPHeaderField: "X-Rate") ?? "") ?? 24000
+                            after = seq > after ? seq : after + 1
+                            self?.call("pushAudio('\(data.base64EncodedString())', \(rate))")
+                            got = true
+                        } else if seq < after {
+                            after = seq   // EclipseLiveCam restarted its stream: follow its new count
+                        }
+                    }
+                }
+                if !got { try? await Task.sleep(nanoseconds: 150_000_000) }
+            }
+        }
     }
 
     private func call(_ js: String) {

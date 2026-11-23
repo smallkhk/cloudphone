@@ -2,6 +2,10 @@
 
 Download each version from GitHub → Releases → `ios-v<version>`, sign with ESign.
 
+## 1.9.2
+- Sound for EclipseLiveCam's on-phone link: the changed voice now goes to the cloud phone's microphone.
+  Needs the EclipseLiveCam iPhone build from the same day (its on-phone server now shares the voice).
+
 ## 1.9.1
 - Fix: EclipseLiveCam's on-phone link (http://127.0.0.1:8723/) worked in Safari but not in Vhonix. Vhonix now fetches the picture itself instead of through its web view.
 - Fix: the Virtual camera preview could stay a black box with a ▶ button. It now shows the picture directly, and Hear sound plays without needing a tap.

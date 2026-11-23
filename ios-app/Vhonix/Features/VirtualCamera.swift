@@ -482,8 +482,9 @@ enum VirtualCamera {
       if (this.hasApp()) {
         // In the app: Vhonix itself fetches the frames (no web restrictions on
         // plain http) and hands each one to pushFrame() below.
-        this.pump = { share: share, misses: 0 };
-        post({ type: 'virtualCamPump', action: 'start', url: origin + '/view' });
+        this.pump = { share: share, misses: 0, next: 0 };
+        post({ type: 'virtualCamPump', action: 'start', url: origin + '/view', audio: this.audio,
+               audioUrl: origin + '/audio', statusUrl: origin + '/status' });
         return;
       }
       this.pollFrames(share, function () { return self.address(origin + '/view?t=' + Date.now()); }, 66, this.localText);
@@ -502,6 +503,15 @@ enum VirtualCamera {
         if (self.status !== 'live') self.setStatus('live', '');
       };
       im.src = 'data:image/jpeg;base64,' + b64;
+    },
+
+    /** One chunk of the changed voice (16-bit mono PCM, base64) for the microphone. */
+    pushAudio: function (b64, rate) {
+      var pump = this.pump;
+      if (!pump || pump.share.stopped || !this.audio) return;
+      var bin = atob(b64), n = bin.length, bytes = new Uint8Array(n);
+      for (var i = 0; i < n; i++) bytes[i] = bin.charCodeAt(i);
+      pump.next = this.playPcm(bytes.buffer, rate || 24000, pump.next);
     },
 
     pumpMiss: function () {

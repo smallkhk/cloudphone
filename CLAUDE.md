@@ -441,6 +441,14 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   the camera's own canvas to the page instead of a `<video>`, and "Hear
   sound" routes through Web Audio (`mix` → `adest` + `monitor` gain →
   speakers; `cam.listen(on)`) instead of unmuting a video element.
+  **1.9.2: sound for the on-phone link.** EclipseLiveCam's `LocalServer.swift`
+  (commit on its `desktop-virtual-cam` branch, same session) now also serves
+  `/audio?after=N` (next changed-voice chunk, 24 kHz s16le mono, `X-Seq`/
+  `X-Rate`, 204 when none) and `/status` (`{live, audioSeq}`); `Output.swift`
+  `addVoice` feeds it alongside the share link. Only the **voice changer's**
+  output exists as audio there — no voice selected, no sound. Vhonix's
+  `LocalFramePump.startAudio` polls it natively (starting at `audioSeq-1`) and
+  calls `pushAudio(base64, rate)` → `playPcm` into the microphone mix.
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app
