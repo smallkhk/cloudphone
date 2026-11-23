@@ -244,6 +244,8 @@ enum VirtualCamera {
 
     kind: function (u) {
       if (/live\.php\?(?:.*&)?s=[a-f0-9]{20}/i.test(u)) return 'share';
+      // EclipseLiveCam's on-phone preview page: http://127.0.0.1:<port>/ (or /index.html, /view)
+      if (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?(index\.html|view)?([?#].*)?$/i.test(u)) return 'localview';
       if (/whep/i.test(u)) return 'whep';
       if (/mjpe?g|\.cgi(\?|$)|action=stream/i.test(u)) return 'mjpeg';
       if (/\.(jpe?g|png|gif|webp)(\?|$)/i.test(u)) return 'snapshot';
@@ -267,6 +269,7 @@ enum VirtualCamera {
       this.setStatus('connecting', 'Connecting to your video…');
 
       if (k === 'share') { this.startShare(u); return; }
+      if (k === 'localview') { this.startLocalView(); return; }
 
       if (k === 'mjpeg' || k === 'snapshot') {
         var img = new Image();
@@ -361,44 +364,11 @@ enum VirtualCamera {
       function q(action, extra) { return base + '?action=' + action + '&s=' + token + '&v=' + vid + (extra || '') + '&_=' + Date.now(); }
 
       // Picture: fetch the newest frame about 10 times a second.
-      (async function () {
-        var misses = 0;
-        while (!share.stopped) {
-          var t0 = Date.now();
-          try {
-            var r = await fetch(q('view'), { cache: 'no-store' });
-            if (share.stopped) break;
-            if (r.status === 200) {
-              var blob = await r.blob();
-              var url = URL.createObjectURL(blob);
-              var im = new Image();
-              await new Promise(function (res) { im.onload = res; im.onerror = res; im.src = url; });
-              URL.revokeObjectURL(url);
-              if (share.stopped) break;
-              if (im.naturalWidth) {
-                self.img = im;
-                misses = 0;
-                if (self.status !== 'live') self.setStatus('live', '');
-              }
-            } else if (r.status === 404) {
-              self.img = null;
-              self.setStatus('error', 'This camera share link isn\'t active. Open the camera site, start sharing, then try again.');
-              await sleep(4000);
-            } else {
-              // 204: the share exists but no fresh frame (the camera isn't sending right now).
-              if (++misses >= 5) {
-                self.img = null;
-                if (self.status !== 'connecting' || !self.message) self.setStatus('connecting', 'Waiting for your camera — start sharing on the camera site.');
-              }
-            }
-          } catch (e) {
-            if (share.stopped) break;
-            self.setStatus('error', 'Can\'t reach your camera share. If it keeps happening, the camera site needs the small CORS update.');
-            await sleep(3000);
-          }
-          await sleep(Math.max(15, 100 - (Date.now() - t0)));
-        }
-      })();
+      this.pollFrames(share, function () { return q('view'); }, 100, {
+        gone: 'This camera share link isn\'t active. Open the camera site, start sharing, then try again.',
+        waiting: 'Waiting for your camera — start sharing on the camera site.',
+        unreachable: 'Can\'t reach your camera share. If it keeps happening, the camera site needs the small CORS update.'
+      });
 
       if (!this.audio) return;
 
@@ -425,6 +395,66 @@ enum VirtualCamera {
           await sleep(150);
         }
       })();
+    },
+
+    /**
+     * Shows the newest JPEG from frameUrl() over and over (200 = a frame,
+     * 204 = nothing live right now, 404 = link not active).
+     */
+    pollFrames: function (share, frameUrl, everyMs, text) {
+      var self = this;
+      function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+      (async function () {
+        var misses = 0;
+        while (!share.stopped) {
+          var t0 = Date.now();
+          try {
+            var r = await fetch(frameUrl(), { cache: 'no-store' });
+            if (share.stopped) break;
+            if (r.status === 200) {
+              var blob = await r.blob();
+              var url = URL.createObjectURL(blob);
+              var im = new Image();
+              await new Promise(function (res) { im.onload = res; im.onerror = res; im.src = url; });
+              URL.revokeObjectURL(url);
+              if (share.stopped) break;
+              if (im.naturalWidth) {
+                self.img = im;
+                misses = 0;
+                if (self.status !== 'live') self.setStatus('live', '');
+              }
+            } else if (r.status === 404) {
+              self.img = null;
+              self.setStatus('error', text.gone);
+              await sleep(4000);
+            } else {
+              if (++misses >= 5) {
+                self.img = null;
+                if (self.status !== 'connecting' || self.message !== text.waiting) self.setStatus('connecting', text.waiting);
+              }
+            }
+          } catch (e) {
+            if (share.stopped) break;
+            self.setStatus('error', text.unreachable);
+            await sleep(3000);
+          }
+          await sleep(Math.max(15, everyMs - (Date.now() - t0)));
+        }
+      })();
+    },
+
+    // ---- EclipseLiveCam's on-phone preview (http://127.0.0.1:8723/): JPEG frames at /view, no sound ----
+
+    startLocalView: function () {
+      var self = this;
+      var origin = this.url.match(/^http:\/\/[^\/?#]+/i)[0];
+      var share = { stopped: false };
+      this.share = share;
+      this.pollFrames(share, function () { return self.address(origin + '/view?t=' + Date.now()); }, 66, {
+        gone: 'This address has no live preview. Check the port number shown in EclipseLiveCam.',
+        waiting: 'Waiting for EclipseLiveCam — start a stream in that app (keep it open with Picture-in-Picture).',
+        unreachable: 'Can\'t reach EclipseLiveCam on this iPhone. Open it, start a stream, keep it running with Picture-in-Picture, and check the port number.'
+      });
     },
 
     /** Plays one chunk of 16-bit mono PCM right after the previous one. Returns when the next should start. */

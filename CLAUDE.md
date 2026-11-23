@@ -421,6 +421,13 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   `NSAllowsLocalNetworking`. Relay logic tested with a Python stand-in; the
   Swift relay itself and WebKit's treatment of http://127.0.0.1 inside an
   https page are unverified on a real iPhone.
+  **EclipseLiveCam's on-phone preview** (`http://127.0.0.1:<8723–8743>/`, from
+  `smallkhk/eclipselivecam` branch `desktop-virtual-cam`,
+  `ios/EclipseLiveCam/Live/LocalServer.swift`): `/` is an HTML page, `/view`
+  is the latest JPEG (204 when not streaming), no audio, no CORS. Pasting that
+  root link is detected as kind `localview` and polled at `/view` ~15×/s
+  through the relay (`startLocalView` → shared `pollFrames`). Works only while
+  EclipseLiveCam stays alive (its PiP / background audio).
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app
