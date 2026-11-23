@@ -69,6 +69,7 @@ struct ShopView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var android = ""
+    @State private var spec = ""
     @State private var tier = ""
     @State private var query = ""
     @State private var sort: ShopSort = .recommended
@@ -80,8 +81,14 @@ struct ShopView: View {
         Array(Set(allModels.compactMap(\.android))).sorted { $0.localizedStandardCompare($1) == .orderedDescending }
     }
 
+    // Step 2 options depend on step 1; step 3 on steps 1 and 2.
+    private var specs: [String] {
+        let inAndroid = allModels.filter { android.isEmpty || $0.android == android }
+        return Array(Set(inAndroid.compactMap { $0.spec?.nonEmpty })).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     private var hasBothTiers: Bool {
-        let models = allModels.filter { android.isEmpty || $0.android == android }
+        let models = allModels.filter { (android.isEmpty || $0.android == android) && (spec.isEmpty || $0.spec == spec) }
         return models.contains { $0.isPro } && models.contains { !$0.isPro }
     }
 
@@ -89,6 +96,7 @@ struct ShopView: View {
         let q = query.trimmingCharacters(in: .whitespaces)
         let list = allModels.filter { m in
             (android.isEmpty || m.android == android)
+                && (spec.isEmpty || m.spec == spec)
                 && (tier.isEmpty || (tier == "pro" ? m.isPro : !m.isPro))
                 && (q.isEmpty || m.name.localizedCaseInsensitiveContains(q) || (m.spec?.localizedCaseInsensitiveContains(q) ?? false))
         }
@@ -109,7 +117,7 @@ struct ShopView: View {
         }
     }
 
-    private var filtersActive: Bool { !android.isEmpty || !tier.isEmpty || !query.isEmpty }
+    private var filtersActive: Bool { !android.isEmpty || !spec.isEmpty || !tier.isEmpty || !query.isEmpty }
 
     var body: some View {
         LoadingView(isLoading: loading && catalog == nil, error: catalog == nil ? error : nil, retry: load) {
@@ -161,6 +169,10 @@ struct ShopView: View {
         .refreshable { await load() }
         .task { await load() }
         .onChange(of: android) { _ in
+            if !spec.isEmpty && !specs.contains(spec) { spec = "" }
+            if !hasBothTiers { tier = "" }
+        }
+        .onChange(of: spec) { _ in
             if !hasBothTiers { tier = "" }
         }
         .sheet(item: $buying) { model in
@@ -211,12 +223,20 @@ struct ShopView: View {
             }
 
             if versions.count > 1 {
-                PillPicker(options: [PickOption(id: "", title: "All Android")] + versions.map { PickOption(id: $0, title: "Android \($0)") },
+                step(1, "Android version")
+                PillPicker(options: [PickOption(id: "", title: "Any")] + versions.map { PickOption(id: $0, title: "Android \($0)") },
                            selection: $android, scrollable: true)
             }
 
+            if specs.count > 1 {
+                step(2, "Model")
+                PillPicker(options: [PickOption(id: "", title: "Any")] + specs.map { PickOption(id: $0, title: $0) },
+                           selection: $spec, scrollable: true)
+            }
+
             if hasBothTiers {
-                PillPicker(options: [PickOption(id: "", title: "All tiers"), PickOption(id: "standard", title: "Standard"), PickOption(id: "pro", title: "Pro")],
+                step(3, "Tier")
+                PillPicker(options: [PickOption(id: "", title: "Any"), PickOption(id: "pro", title: "High-end (Pro)"), PickOption(id: "standard", title: "Standard")],
                            selection: $tier)
             }
 
@@ -237,9 +257,24 @@ struct ShopView: View {
         .entrance(2)
     }
 
+    private func step(_ number: Int, _ title: String) -> some View {
+        HStack(spacing: 8) {
+            Text("\(number)")
+                .font(Typo.rounded(.caption, .bold))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(Theme.gradient))
+            Text(title).font(Typo.rounded(.subheadline, .semibold)).foregroundStyle(Palette.text2)
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 2)
+        .accessibilityElement(children: .combine)
+    }
+
     private func clearFilters() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
             android = ""
+            spec = ""
             tier = ""
             query = ""
         }
