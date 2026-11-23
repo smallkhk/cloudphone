@@ -12,11 +12,37 @@ import Foundation
 enum VirtualCamera {
     static let deviceId = "vhonix-virtual-camera"
     private static let key = "virtualCamera.url"
+    private static let enabledKey = "virtualCamera.enabled"
+    private static let audioKey = "virtualCamera.audio"
 
     /// The saved link ("" = none). One link for every phone.
     static var url: String {
         get { UserDefaults.standard.string(forKey: key) ?? "" }
         set { UserDefaults.standard.set(newValue, forKey: key) }
+    }
+
+    /// Off = the cloud phones don't see the virtual camera (the link is kept).
+    static var enabled: Bool {
+        get { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: enabledKey) }
+    }
+
+    /// On = the video's sound is what apps on the cloud phone hear as the microphone.
+    static var audio: Bool {
+        get { UserDefaults.standard.object(forKey: audioKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: audioKey) }
+    }
+
+    struct Settings: Encodable {
+        var url: String
+        var enabled: Bool
+        var audio: Bool
+    }
+
+    static var current: Settings { Settings(url: url, enabled: enabled, audio: audio) }
+
+    static func json(_ settings: Settings) -> String {
+        (try? JSONEncoder().encode(settings)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
 
     /// Why a link can't be used, or nil if it's fine (an empty link is fine: it removes the camera).
@@ -36,12 +62,11 @@ enum VirtualCamera {
         return nil
     }
 
-    /// The script injected at document start. `url` is the link to start with.
-    static func script(url: String) -> String {
-        let encoded = (try? JSONEncoder().encode(url)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-        return template
+    /// The script injected at document start, starting with these settings.
+    static func script(_ settings: Settings = current) -> String {
+        template
             .replacingOccurrences(of: "__VID__", with: "\"\(deviceId)\"")
-            .replacingOccurrences(of: "__URL__", with: encoded)
+            .replacingOccurrences(of: "__CONFIG__", with: json(settings))
     }
 
     private static let template = #"""
@@ -50,28 +75,100 @@ enum VirtualCamera {
   var VID = __VID__;
   var LABEL = 'Vhonix virtual camera';
   var md = navigator.mediaDevices;
-  if (!md || !md.getUserMedia) return;
-  var origEnum = md.enumerateDevices ? md.enumerateDevices.bind(md) : null;
-  var origGUM = md.getUserMedia.bind(md);
+  var CFG = __CONFIG__;
+  var origEnum = md && md.enumerateDevices ? md.enumerateDevices.bind(md) : null;
+  var origGUM = md && md.getUserMedia ? md.getUserMedia.bind(md) : null;
   function post(m) { try { window.webkit.messageHandlers.vhonix.postMessage(m); } catch (e) {} }
 
   var cam = {
-    id: VID, url: __URL__, probeNext: false,
+    id: VID, url: (CFG.url || '').trim(), enabled: CFG.enabled !== false, audio: CFG.audio !== false,
+    probeNext: false,
     canvas: null, ctx: null, base: null, clones: [], timer: null, watch: null,
     video: null, img: null, pc: null, retry: null, snapTimer: null,
+    actx: null, adest: null, anodes: [],
     status: 'off', message: '', tainted: false, checked: false,
+
+    /** True when the cloud phone should be offered the virtual camera. */
+    active: function () { return this.enabled && !!this.url; },
+
+    setConfig: function (cfg) {
+      cfg = cfg || {};
+      var audioChanged = (cfg.audio !== false) !== this.audio;
+      this.url = (cfg.url || '').trim();
+      this.enabled = cfg.enabled !== false;
+      this.audio = cfg.audio !== false;
+      if (this.base) {
+        this.stopSource();
+        if (this.url) this.startSource(); else this.setStatus('off', 'No link set.');
+      }
+      if (audioChanged && !this.audio) this.unhookAudio();
+    },
 
     setStatus: function (s, msg) {
       this.status = s; this.message = msg || '';
       post({ type: 'virtualCam', status: s, message: this.message });
     },
 
-    setUrl: function (u) {
-      this.url = (u || '').trim();
-      if (this.base) {
-        this.stopSource();
-        if (this.url) this.startSource(); else this.setStatus('off', 'No link set.');
+    setUrl: function (u) { this.setConfig({ url: u, enabled: this.enabled, audio: this.audio }); },
+
+    // ---- Sound: the video's audio, as a microphone track ----
+
+    audioContext: function () {
+      if (!this.actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        this.actx = new AC();
+        this.adest = this.actx.createMediaStreamDestination();
       }
+      if (this.actx.state !== 'running' && this.actx.resume) { var r = this.actx.resume(); if (r && r.catch) r.catch(function () {}); }
+      return this.actx;
+    },
+
+    /** A new audio track carrying the video's sound (silent until the video plays). */
+    audioTrack: function () {
+      if (!this.base || this.base.readyState === 'ended') this.startPipeline();
+      var ctx = this.audioContext();
+      if (!ctx) return null;
+      var t = this.adest.stream.getAudioTracks()[0].clone();
+      this.clones.push(t);
+      return t;
+    },
+
+    hookElement: function (el) {
+      if (!this.audio) return;
+      var ctx = this.audioContext();
+      if (!ctx) return;
+      try {
+        var n = ctx.createMediaElementSource(el);
+        n.connect(this.adest);
+        this.anodes.push(n);
+        // Its sound now goes only to the cloud phone (not this iPhone's speaker).
+        el.muted = false; el.defaultMuted = false; el.removeAttribute('muted');
+      } catch (e) {}
+    },
+
+    hookStream: function (track) {
+      if (!this.audio) return;
+      var ctx = this.audioContext();
+      if (!ctx) return;
+      try {
+        var stream = new MediaStream([track]);
+        // WebRTC audio only flows into Web Audio while some element is playing it.
+        var sink = new Audio(); sink.muted = true; sink.srcObject = stream;
+        var p = sink.play(); if (p && p.catch) p.catch(function () {});
+        var n = ctx.createMediaStreamSource(stream);
+        n.connect(this.adest);
+        n._sink = sink;
+        this.anodes.push(n);
+      } catch (e) {}
+    },
+
+    unhookAudio: function () {
+      this.anodes.forEach(function (n) {
+        try { n.disconnect(); } catch (e) {}
+        if (n._sink) { try { n._sink.pause(); n._sink.srcObject = null; } catch (e) {} }
+      });
+      this.anodes = [];
     },
 
     /** A new video track for whoever asked for the camera. */
@@ -122,6 +219,7 @@ enum VirtualCamera {
       this.base = null;
       if (this.canvas && this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
       this.canvas = this.ctx = null;
+      if (this.actx && this.actx.suspend) { var r = this.actx.suspend(); if (r && r.catch) r.catch(function () {}); }
     },
 
     kind: function (u) {
@@ -159,11 +257,16 @@ enum VirtualCamera {
       v.muted = true; v.defaultMuted = true; v.autoplay = true; v.playsInline = true;
       v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
       v.crossOrigin = 'anonymous';
-      v.onplaying = function () { if (self.video === v) self.setStatus('live', ''); };
+      v.onplaying = function () {
+        if (self.video !== v) return;
+        self.setStatus('live', '');
+        if (self.actx && self.actx.state !== 'running') self.audioContext();
+      };
       v.onerror = function () { if (self.video === v) self.fail('Couldn\'t play the video. Check the link is live, and that your video server allows cross-origin access (CORS).'); };
       v.onended = function () { if (self.video === v) self.fail('The video ended. Reconnecting…'); };
       this.video = v;
       this.box().appendChild(v);
+      if (k !== 'whep') this.hookElement(v);
 
       if (k === 'whep') {
         this.whep(u, v).catch(function (e) {
@@ -183,6 +286,7 @@ enum VirtualCamera {
       pc.addTransceiver('video', { direction: 'recvonly' });
       pc.addTransceiver('audio', { direction: 'recvonly' });
       pc.ontrack = function (e) {
+        if (e.track.kind === 'audio') { if (self.pc === pc) self.hookStream(e.track); return; }
         if (e.track.kind !== 'video') return;
         v.srcObject = new MediaStream([e.track]);
         var p = v.play(); if (p && p.catch) p.catch(function () {});
@@ -216,6 +320,7 @@ enum VirtualCamera {
 
     stopSource: function () {
       clearTimeout(this.retry); clearTimeout(this.snapTimer);
+      this.unhookAudio();
       if (this.video) {
         var v = this.video; this.video = null;
         v.onplaying = v.onerror = v.onended = null;
@@ -271,7 +376,7 @@ enum VirtualCamera {
 
   window.vhonixVirtualCam = cam;
 
-  if (origEnum) {
+  if (md && origEnum) {
     md.enumerateDevices = async function () {
       var list = [];
       try { list = Array.prototype.slice.call(await origEnum()); } catch (e) {}
@@ -286,7 +391,7 @@ enum VirtualCamera {
           } catch (e) {}
         }
       }
-      if (cam.url) {
+      if (cam.active()) {
         var info = { deviceId: VID, groupId: VID, kind: 'videoinput', label: LABEL };
         info.toJSON = function () { return { deviceId: VID, groupId: VID, kind: 'videoinput', label: LABEL }; };
         list.push(info);
@@ -295,21 +400,31 @@ enum VirtualCamera {
     };
   }
 
-  md.getUserMedia = async function (c) {
+  if (md && origGUM) md.getUserMedia = async function (c) {
     c = c || {};
     var wantsVirtual = false;
     try { wantsVirtual = !!c.video && JSON.stringify(c.video).indexOf(VID) >= 0; } catch (e) {}
-    if (!wantsVirtual) return origGUM(c);
-    if (!cam.url) {
-      // The virtual camera was picked but its link was removed: use the normal camera.
-      var plain = {}; for (var k in c) plain[k] = c[k];
-      plain.video = true;
-      return origGUM(plain);
+    // The video's sound replaces the microphone while the virtual camera is on.
+    var virtualAudio = !!c.audio && cam.active() && cam.audio;
+    if (!wantsVirtual && !virtualAudio) return origGUM(c);
+
+    var tracks = [];
+    if (c.video) {
+      if (wantsVirtual && cam.active()) {
+        tracks.push(cam.track());
+      } else {
+        // Picked the virtual camera but it's turned off / has no link: use the normal camera.
+        var v = await origGUM({ video: wantsVirtual ? true : c.video });
+        v.getVideoTracks().forEach(function (t) { tracks.push(t); });
+      }
     }
-    var tracks = [cam.track()];
     if (c.audio) {
-      var a = await origGUM({ audio: c.audio });
-      a.getAudioTracks().forEach(function (t) { tracks.push(t); });
+      var at = virtualAudio ? cam.audioTrack() : null;
+      if (at) tracks.push(at);
+      else {
+        var a = await origGUM({ audio: c.audio });
+        a.getAudioTracks().forEach(function (t) { tracks.push(t); });
+      }
     }
     return new MediaStream(tracks);
   };

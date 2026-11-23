@@ -143,6 +143,17 @@ struct MoreView: View {
                 tile("Cloud Drive", "Files & backups", "art-drive", Palette.indigo, 5) { CloudDriveView() }
             }
 
+            SectionTitle(title: "Tools")
+            NavigationLink {
+                VirtualCameraView()
+            } label: {
+                MenuRow(icon: "video.fill", colors: TileColors.pink, title: "Virtual camera",
+                        subtitle: "Use a video link as your cloud phones' camera",
+                        value: VirtualCamera.url.isEmpty ? "Set up" : (VirtualCamera.enabled ? "On" : "Off"))
+                    .glassCard(padding: 12)
+            }
+            .buttonStyle(.pressable)
+
             SectionTitle(title: "Account")
             VStack(spacing: 4) {
                 Link(destination: Config.siteURL) {

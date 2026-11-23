@@ -386,6 +386,17 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   or the canvas can't read it; the camera then shows an error card instead.
   Tested in headless Chromium (CORS → video plays; no CORS → error card);
   not yet on a real iPhone.
+  **1.7.0:** More → Tools → **Virtual camera** page (`VirtualCameraView.swift`)
+  to set the link any time, with a live **preview** that runs the very same
+  injected script in a small WKWebView loaded with `baseURL` = the site (so
+  CORS behaves exactly as on the live screen), a Test/Stop button, "Hear
+  sound", and switches for **Use on my cloud phones** (`virtualCamera.enabled`)
+  and **Send the video's sound** (`virtualCamera.audio`). With sound on, every
+  `getUserMedia` audio request (the SDK's microphone) gets the video's audio
+  instead of the iPhone mic — via Web Audio (`createMediaElementSource` →
+  `MediaStreamDestination`; WebRTC audio via `createMediaStreamSource`). Also
+  needs CORS, or the sound is silent. The script takes a settings object
+  (`setConfig({url, enabled, audio})`), not just a URL.
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app

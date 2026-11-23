@@ -312,10 +312,10 @@ final class LiveScreenModel: ObservableObject {
         if let problem = VirtualCamera.problem(with: clean) { return problem }
 
         VirtualCamera.url = clean
+        if !clean.isEmpty { VirtualCamera.enabled = true }
         virtualCamURL = clean
         virtualCamStatus = clean.isEmpty ? nil : "Virtual camera: waiting for an app to open the camera"
-        let encoded = (try? JSONEncoder().encode(clean)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
-        run("window.vhonixVirtualCam && window.vhonixVirtualCam.setUrl(\(encoded));")
+        run("window.vhonixVirtualCam && window.vhonixVirtualCam.setConfig(\(VirtualCamera.json(VirtualCamera.current)));")
         call("loadCameras()")
 
         if !clean.isEmpty {
@@ -406,7 +406,7 @@ struct LiveWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "vhonix")
         // Adds the "Vhonix virtual camera" before the page's own scripts run.
         config.userContentController.addUserScript(WKUserScript(
-            source: VirtualCamera.script(url: VirtualCamera.url),
+            source: VirtualCamera.script(),
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true))
 
