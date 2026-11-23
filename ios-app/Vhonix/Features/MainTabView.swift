@@ -27,7 +27,6 @@ struct MainTabView: View {
 
 struct MoreView: View {
     @EnvironmentObject private var app: AppState
-    @State private var confirmLock = false
 
     var body: some View {
         List {
@@ -59,11 +58,6 @@ struct MoreView: View {
                 } label: {
                     Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
                 }
-                Button(role: .destructive) {
-                    confirmLock = true
-                } label: {
-                    Label("Sign out and remove access code", systemImage: "lock")
-                }
             }
 
             Section {
@@ -73,8 +67,5 @@ struct MoreView: View {
         }
         .navigationTitle("More")
         .refreshable { await app.refreshUser() }
-        .confirmationDialog("Remove the access code from this iPhone? You'll need to enter it again.", isPresented: $confirmLock, titleVisibility: .visible) {
-            Button("Remove and lock", role: .destructive) { Task { await app.lockApp() } }
-        }
     }
 }

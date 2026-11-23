@@ -7,7 +7,6 @@ struct RootView: View {
     var body: some View {
         ZStack(alignment: .top) {
             switch app.phase {
-            case .locked: AccessCodeView()
             case .signedOut: AuthView()
             case .signedIn: MainTabView()
             }
@@ -19,7 +18,6 @@ struct RootView: View {
                     .zIndex(1)
             }
         }
-        .task { await app.recheckAccessCode() }
         .onChange(of: scenePhase) { phase in
             if phase == .active, app.phase == .signedIn {
                 Task { await app.refreshUser() }

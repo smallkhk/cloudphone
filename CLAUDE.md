@@ -41,51 +41,34 @@ untouched — none of that is user-facing. If a new customer-facing error path
 gets added later, keep following the same rule: never echo a raw upstream
 exception message to a non-admin.
 
-## Desktop app access codes + the "Vhonix" Electron app
+## The "Vhonix" Electron desktop app (access codes retired 2026-11)
 
-The website itself has **no lock**; it stays reachable at its normal URL for
-browser visitors. The lock lives entirely in a small Electron desktop app
-(`desktop-app/`, committed in this repo), which prompts for a code on launch
-and only navigates to the site once it checks out — keeping the actual URL
-out of the app's visible UI (no address bar, no menu bar shown).
+The site, the desktop app and the iPhone app are **open to anyone** — no
+access code anywhere. Access codes used to gate the desktop app; the owner
+retired them (2026-11). What's left of that, on purpose:
 
-- Admin → **Access codes** (`/admin/access-keys`) generates/revokes/deletes
-  codes (`App\Models\AccessKey`, format `XXXX-XXXX-XXXX-XXXX`, unambiguous
-  charset). Optional label and expiry; reusable (not one-time) until revoked
-  or expired.
-- `POST /api/access-keys/verify` (unauthenticated, rate-limited
-  `throttle:20,1`) is what the desktop app calls with `{"code": "..."}`.
-  Returns `{"valid": true}` (200) or `{"valid": false}` (401). Records
-  `used_count`/`last_used_at` on every successful check — purely
-  informational, doesn't limit reuse.
-- **The app** (`desktop-app/src/main.js`) hardcodes the live site URL
-  (`vhonixcloud.com` — moved here from `cloud.eclipselivecam.online`, see
-  "Live deployment" below) and the verify endpoint — on purpose, so
-  the person using it never sees or needs to know the address. On a valid
-  code it saves the code locally (`electron-store`) so launch doesn't ask
-  again, then opens the site full-screen with no browser chrome. "Sign out"
-  (in the app's own menu) clears the saved code and shows the lock screen
-  again.
+- `POST /api/access-keys/verify` still exists but **always answers
+  `{"valid": true}`** for any code — older desktop builds (≤1.3.1) still show
+  a code screen and call it, so this makes them open for anyone without
+  everyone having to reinstall. The admin "Access codes" page, its routes and
+  controller were deleted. The `access_keys` table and `AccessKey` model were
+  left in place (dropping a table with data in it wasn't worth the risk); they
+  are unused now.
+- **The app** (`desktop-app/src/main.js`, v1.4.0+) opens straight to the
+  hardcoded live site URL (`vhonixcloud.com`) full-screen with no browser
+  chrome. It keeps running at full speed in the background (Chromium
+  background/occlusion throttling disabled, `backgroundThrottling: false`,
+  `powerSaveBlocker('prevent-app-suspension')`) so a live screen doesn't stall
+  when minimized. Camera/mic are granted to our own site's origin only.
 - **Branded "Vhonix"**, deliberately different from the site's own "Modova"
-  branding — the app shell's name/title-bar/taskbar label is independent of
-  what the site inside it calls itself. If the owner wants the two to match
-  later, or wants a custom `.ico`/`.icns`, that's a rename in
-  `desktop-app/package.json` (`productName`, `appId`) plus the few
-  `Vhonix`/`vhonix` strings in `src/main.js`, `src/lock.html`, `src/lock.js`,
-  `src/preload.js` — not a rebuild from scratch.
-- **Building it**: local builds are too large to hand over directly (the
-  bundled Electron runtime alone is well over 100MB per platform), so
-  `.github/workflows/desktop-app-release.yml` builds Windows (NSIS
-  installer) and Mac (DMG) installers on GitHub's own runners and publishes
-  them as a GitHub Release. It fires automatically on a push to
-  `claude/vmos-email-phone-verification-2qnaz0`, or manually via
-  `workflow_dispatch`, or by pushing a `desktop-v*` tag. The owner downloads
-  the finished `.exe`/`.dmg` from the repo's **Releases** page and sends that
-  file to customers — nothing about Electron, npm, or building is their
-  problem.
-- Not yet tested against a real customer machine — the lock screen's error
-  states (bad code, expired code, no internet) are written defensively but
-  unverified outside this build.
+  branding. Renaming is `desktop-app/package.json` (`productName`, `appId`)
+  plus the `Vhonix` strings in `src/main.js`.
+- **Building**: `.github/workflows/desktop-app-release.yml` builds Windows
+  (NSIS) and Mac (DMG) installers on GitHub's runners and publishes them as a
+  GitHub Release, on a push to `claude/vmos-email-phone-verification-2qnaz0`
+  that touches `desktop-app/**`, on `workflow_dispatch`, or on a `desktop-v*`
+  tag. Bump `desktop-app/package.json` *and* `package-lock.json` version for a
+  new release. The owner downloads the `.exe`/`.dmg` from **Releases**.
 
 ## Proxy testing goes through VMOS's checkIP after all
 
@@ -320,7 +303,7 @@ funds.
 `ios-app/` is a real native SwiftUI app (not a web wrapper), branded **Vhonix**
 like the desktop app, distributed as an **unsigned `.ipa`** that the owner
 signs themselves with ESign. Every screen the website has for customers is
-native: access code → sign in / register / email code → Phones (list, detail,
+native: sign in / register / email code (no access code — retired 2026-11) → Phones (list, detail,
 SIM, GPS, language/timezone, proxy, apps, ADB, restart/reset/new identity),
 Shop (wallet-only cloud-phone checkout incl. proxy add-on), Wallet (top-up with
 QR + tx hash, history), Orders (with crypto payment for non-phone products),
@@ -357,6 +340,12 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   touches `ios-app/**`. Bump `ios-app/VERSION` for a new release number
   (same version re-uploads over the old `.ipa`). The desktop workflow now has
   a matching `paths:` filter so app/site commits don't rebuild the desktop app.
+- **Background**: `UIBackgroundModes: audio` + a `.playback`/`.mixWithOthers`
+  audio session, so an open live screen keeps streaming when the user
+  switches apps. iOS only keeps a background app alive while it's actually
+  playing audio, so this only holds while the live screen's sound is on —
+  muted, iOS may still pause it after a short while. That's an iOS rule, not
+  something the app can override.
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app

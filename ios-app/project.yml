@@ -35,6 +35,9 @@ targets:
         NSCameraUsageDescription: Lets apps on your cloud phone use this iPhone's camera.
         NSMicrophoneUsageDescription: Lets apps on your cloud phone use this iPhone's microphone.
         ITSAppUsesNonExemptEncryption: false
+        # Lets the live screen keep streaming (with sound) when you switch apps.
+        UIBackgroundModes:
+          - audio
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vhonixcloud.app

@@ -12,7 +12,7 @@ struct Banner: Identifiable, Equatable {
 
 @MainActor
 final class AppState: ObservableObject {
-    enum Phase { case locked, signedOut, signedIn }
+    enum Phase { case signedOut, signedIn }
 
     @Published var phase: Phase
     @Published var user: User?
@@ -24,45 +24,11 @@ final class AppState: ObservableObject {
     init() {
         let api = APIClient.shared
 
-        if Keychain.get("access_code") == nil {
-            phase = .locked
-        } else {
-            phase = api.token == nil ? .signedOut : .signedIn
-        }
+        phase = api.token == nil ? .signedOut : .signedIn
 
         api.onUnauthorized = { [weak self] in
             self?.forgetSignIn()
         }
-    }
-
-    // MARK: Access code
-
-    func unlock(with code: String) async throws {
-        let clean = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-
-        guard try await APIClient.shared.verifyAccessCode(clean) else {
-            throw APIError(message: "That code isn't valid. Check it and try again.")
-        }
-
-        Keychain.set(clean, for: "access_code")
-        phase = APIClient.shared.token == nil ? .signedOut : .signedIn
-    }
-
-    /// A code that's been revoked or expired locks the app again on next launch.
-    func recheckAccessCode() async {
-        guard let code = Keychain.get("access_code") else { return }
-
-        if let valid = try? await APIClient.shared.verifyAccessCode(code), !valid {
-            Keychain.set(nil, for: "access_code")
-            phase = .locked
-            show("Your access code is no longer valid. Enter a new one.", error: true)
-        }
-    }
-
-    func lockApp() async {
-        await signOut()
-        Keychain.set(nil, for: "access_code")
-        phase = .locked
     }
 
     // MARK: Sign in

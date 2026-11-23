@@ -65,25 +65,6 @@ final class APIClient {
         try await request(method, path, body: body)
     }
 
-    /// Checks an access code against the website (same check the desktop app does).
-    func verifyAccessCode(_ code: String) async throws -> Bool {
-        var req = URLRequest(url: Config.accessVerifyURL)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["code": code])
-
-        let (data, response) = try await perform(req)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-
-        if status == 200 { return true }
-        if status == 401 || status == 422 { return false }
-        if status == 429 { throw APIError(message: "Too many attempts — wait a minute and try again.", status: status) }
-
-        _ = data
-        throw APIError(message: "Couldn't check the code right now. Please try again.", status: status)
-    }
-
     private func perform(_ req: URLRequest) async throws -> (Data, URLResponse) {
         do {
             return try await session.data(for: req)
