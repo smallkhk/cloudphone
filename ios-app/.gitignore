@@ -1,0 +1,6 @@
+Vhonix.xcodeproj/
+Vhonix/Info.plist
+build/
+Payload/
+*.ipa
+build.log

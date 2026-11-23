@@ -315,6 +315,50 @@ funds.
   pasted a hash within 30 min) is not revived automatically — credit it by
   hand from Admin → Users → the customer → manual credit.
 
+## iPhone app — native SwiftUI "Vhonix" (added 2026-11, NOT yet tested on a real iPhone)
+
+`ios-app/` is a real native SwiftUI app (not a web wrapper), branded **Vhonix**
+like the desktop app, distributed as an **unsigned `.ipa`** that the owner
+signs themselves with ESign. Every screen the website has for customers is
+native: access code → sign in / register / email code → Phones (list, detail,
+SIM, GPS, language/timezone, proxy, apps, ADB, restart/reset/new identity),
+Shop (wallet-only cloud-phone checkout incl. proxy add-on), Wallet (top-up with
+QR + tx hash, history), Orders (with crypto payment for non-phone products),
+Email accounts, Phone numbers, Cloud numbers (bind/auto-renew/SMS/release),
+Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
+
+- **Server side** — `routes/api.php` `mobile/v1/*`. Auth is a small custom
+  bearer-token table (`api_tokens`, `App\Models\ApiToken`, SHA-256 hashed,
+  middleware `auth.app`) — Sanctum was skipped so the server never needs a
+  composer change. Login/register/OTP mirror the website exactly (unverified
+  accounts get a code, never a token; 5 wrong codes burn the code).
+  **Reads** are new code (`Api\Mobile\DataController`, JSON shapes all in
+  `MobileResources`), but **every action** (buy, restart, bind, top-up...)
+  goes through the *website's own controllers* via the `mobile.action`
+  middleware (`MobileActionResponse`), which turns their redirect+flash into
+  `{ok, message, data, location}` JSON (flashed `error` → 422). So business
+  rules can't drift between site and app — change a rule on the site and the
+  app follows. Tests: `tests/Feature/MobileApiTest.php`.
+- **Live screen** — the streaming provider only publishes Android/PC/H5 SDKs,
+  no iOS one, so the video runs in an embedded WKWebView of
+  `GET mobile/v1/live/{id}` (signed, 10-min link from `POST devices/{id}/live`;
+  the page's own token endpoint is signed for 8h). Everything around it is
+  native: Back/Home/Recents, Keyboard, Camera picker, Sound — Swift calls
+  `window.vhonixLive.*` (the same Alpine `liveScreen` component the site uses)
+  and the page posts state back via `webkit.messageHandlers.vhonix`. The
+  keyboard button works because `KeyboardFocusFix` swizzles WebKit's
+  private `_elementDidFocus:...` so programmatic focus raises the keyboard —
+  private API, fine for a sideloaded app, would need removing for the App Store.
+- **Building** — no Mac needed: `.github/workflows/ios-app-release.yml`
+  generates the Xcode project with XcodeGen (`ios-app/project.yml`; no
+  `.xcodeproj` is committed), builds unsigned on GitHub's macOS runner, and
+  publishes `Vhonix-<version>.ipa` to the GitHub Release `ios-v<version>`.
+  Runs on any push to `claude/vmos-email-phone-verification-2qnaz0` that
+  touches `ios-app/**`. Bump `ios-app/VERSION` for a new release number
+  (same version re-uploads over the old `.ipa`). The desktop workflow now has
+  a matching `paths:` filter so app/site commits don't rebuild the desktop app.
+- **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
+
 ## `auto_renew` already works — VMOS does it, not this app
 
 The `auto_renew` checkbox at checkout is passed straight through to VMOS's

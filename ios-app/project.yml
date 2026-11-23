@@ -1,0 +1,45 @@
+# XcodeGen spec — the Xcode project is generated from this on the build
+# machine (see .github/workflows/ios-app-release.yml), so no .xcodeproj is
+# committed. Version comes from ios-app/VERSION.
+name: Vhonix
+options:
+  bundleIdPrefix: com.vhonixcloud
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Vhonix:
+    type: application
+    platform: iOS
+    sources:
+      - path: Vhonix
+    info:
+      path: Vhonix/Info.plist
+      properties:
+        CFBundleDisplayName: Vhonix
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: AccentColor
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSCameraUsageDescription: Lets apps on your cloud phone use this iPhone's camera.
+        NSMicrophoneUsageDescription: Lets apps on your cloud phone use this iPhone's microphone.
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vhonixcloud.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_BITCODE: NO

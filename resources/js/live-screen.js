@@ -367,6 +367,18 @@ export default function liveScreen({ tokenUrl, csrf }) {
             }
         },
 
+        /** Opens the device's keyboard (the iPhone app's keyboard button) by focusing the SDK's hidden input. */
+        showKeyboard() {
+            const input = this.$refs.stage?.querySelector('.play-text-input') || document.querySelector('.play-text-input');
+            input?.focus();
+
+            return !! input;
+        },
+
+        hideKeyboard() {
+            document.activeElement?.blur?.();
+        },
+
         // Hardware keys, sent as Android keycodes.
         pressBack() { this.engine?.triggerKeyboardShortcut(0, 4); },
         pressHome() { this.engine?.triggerKeyboardShortcut(0, 3); },

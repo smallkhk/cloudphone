@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\MobileActionResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,7 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['admin' => EnsureUserIsAdmin::class]);
+        $middleware->alias([
+            'admin' => EnsureUserIsAdmin::class,
+            'auth.app' => AuthenticateApiToken::class,
+            'mobile.action' => MobileActionResponse::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // The chat widget and the checkout proxy tester both talk to their

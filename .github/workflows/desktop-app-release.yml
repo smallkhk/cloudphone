@@ -7,6 +7,10 @@ on:
       - 'desktop-v*'
     branches:
       - 'claude/vmos-email-phone-verification-2qnaz0'
+    # Only rebuild the desktop app when the desktop app actually changed.
+    paths:
+      - 'desktop-app/**'
+      - '.github/workflows/desktop-app-release.yml'
 
 permissions:
   contents: write
