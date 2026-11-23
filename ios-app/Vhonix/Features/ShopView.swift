@@ -1,33 +1,115 @@
 import SwiftUI
 
+/// One phone model (name + Android version + spec) with its plans, duplicates
+/// collapsed to the cheapest per duration.
+struct PhoneModel: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let android: String?
+    let spec: String?
+    let tier: String?
+    let plans: [Sku]
+
+    var isPro: Bool { (tier ?? "").contains("high") }
+    var cheapest: Sku? { plans.filter { $0.soldOut != true }.min { $0.price < $1.price } ?? plans.first }
+    var bestPerDay: Double? { plans.filter { $0.soldOut != true }.compactMap(PhoneModel.perDay).min() }
+    var soldOut: Bool { plans.allSatisfy { $0.soldOut == true } }
+    var androidNumber: Double { Double(android ?? "") ?? 0 }
+
+    static func days(_ sku: Sku) -> Double? {
+        guard let m = sku.durationMinutes, m > 0 else { return nil }
+        return Double(m) / 1440
+    }
+
+    static func perDay(_ sku: Sku) -> Double? {
+        guard let d = days(sku), d > 0 else { return nil }
+        return sku.price / d
+    }
+
+    static func build(from skus: [Sku]) -> [PhoneModel] {
+        var order: [String] = []
+        var groups: [String: [Sku]] = [:]
+        for s in skus {
+            let key = [s.name, s.androidVersion ?? "", s.model ?? ""].joined(separator: "|")
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(s)
+        }
+        return order.compactMap { key in
+            guard let list = groups[key], let first = list.first else { return nil }
+            // Same duration listed twice → keep the cheapest available one.
+            var byDuration: [Int: Sku] = [:]
+            for s in list {
+                let d = s.durationMinutes ?? 0
+                if let current = byDuration[d] {
+                    let better = (current.soldOut == true && s.soldOut != true) || (s.soldOut == current.soldOut && s.price < current.price)
+                    if better { byDuration[d] = s }
+                } else {
+                    byDuration[d] = s
+                }
+            }
+            let plans = byDuration.values.sorted { ($0.durationMinutes ?? 0) < ($1.durationMinutes ?? 0) }
+            return PhoneModel(id: key, name: first.name, android: first.androidVersion, spec: first.model, tier: first.tier, plans: plans)
+        }
+    }
+}
+
+enum ShopSort: String, CaseIterable, Identifiable {
+    case recommended = "Recommended"
+    case priceLow = "Price: low to high"
+    case priceHigh = "Price: high to low"
+    case newest = "Newest Android"
+    case name = "Name A–Z"
+
+    var id: String { rawValue }
+}
+
 struct ShopView: View {
     @EnvironmentObject private var app: AppState
     @State private var catalog: Catalog?
     @State private var loading = true
     @State private var error: String?
     @State private var android = ""
-    @State private var buying: Sku?
+    @State private var tier = ""
+    @State private var query = ""
+    @State private var sort: ShopSort = .recommended
+    @State private var buying: PhoneModel?
+
+    private var allModels: [PhoneModel] { PhoneModel.build(from: catalog?.plans ?? []) }
 
     private var versions: [String] {
-        Array(Set((catalog?.plans ?? []).compactMap(\.androidVersion))).sorted { $0.localizedStandardCompare($1) == .orderedDescending }
+        Array(Set(allModels.compactMap(\.android))).sorted { $0.localizedStandardCompare($1) == .orderedDescending }
     }
 
-    private struct ModelGroup: Identifiable {
-        let name: String
-        let skus: [Sku]
-        var id: String { name }
+    private var hasBothTiers: Bool {
+        let models = allModels.filter { android.isEmpty || $0.android == android }
+        return models.contains { $0.isPro } && models.contains { !$0.isPro }
     }
 
-    private var groups: [ModelGroup] {
-        let plans = (catalog?.plans ?? []).filter { android.isEmpty || $0.androidVersion == android }
-        var order: [String] = []
-        var byName: [String: [Sku]] = [:]
-        for p in plans {
-            if byName[p.name] == nil { order.append(p.name) }
-            byName[p.name, default: []].append(p)
+    private var filtered: [PhoneModel] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        let list = allModels.filter { m in
+            (android.isEmpty || m.android == android)
+                && (tier.isEmpty || (tier == "pro" ? m.isPro : !m.isPro))
+                && (q.isEmpty || m.name.localizedCaseInsensitiveContains(q) || (m.spec?.localizedCaseInsensitiveContains(q) ?? false))
         }
-        return order.map { ModelGroup(name: $0, skus: byName[$0] ?? []) }
+        let price: (PhoneModel) -> Double = { $0.cheapest?.price ?? .greatestFiniteMagnitude }
+        switch sort {
+        case .recommended:
+            // In stock first, then newest Android, Pro before Standard, then cheapest.
+            return list.sorted {
+                if $0.soldOut != $1.soldOut { return !$0.soldOut }
+                if $0.androidNumber != $1.androidNumber { return $0.androidNumber > $1.androidNumber }
+                if $0.isPro != $1.isPro { return $0.isPro }
+                return price($0) < price($1)
+            }
+        case .priceLow: return list.sorted { price($0) < price($1) }
+        case .priceHigh: return list.sorted { price($0) > price($1) }
+        case .newest: return list.sorted { $0.androidNumber != $1.androidNumber ? $0.androidNumber > $1.androidNumber : price($0) < price($1) }
+        case .name: return list.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
     }
+
+    private var filtersActive: Bool { !android.isEmpty || !tier.isEmpty || !query.isEmpty }
 
     var body: some View {
         LoadingView(isLoading: loading && catalog == nil, error: catalog == nil ? error : nil, retry: load) {
@@ -51,29 +133,115 @@ struct ShopView: View {
 
                 balanceBanner.entrance(1)
 
-                if versions.count > 1 {
-                    PillPicker(options: [PickOption(id: "", title: "All")] + versions.map { PickOption(id: $0, title: "Android \($0)") },
-                               selection: $android, scrollable: true)
-                }
+                filterBar
 
-                if groups.isEmpty {
-                    EmptyStateView(icon: "bag.fill", title: "No phones available right now", message: "Check back in a little while.")
+                if filtered.isEmpty {
+                    EmptyStateView(icon: "magnifyingglass", title: allModels.isEmpty ? "No phones available right now" : "No phones match",
+                                   message: allModels.isEmpty ? "Check back in a little while." : "Try another Android version or tier.",
+                                   actionTitle: filtersActive ? "Clear filters" : nil, colors: TileColors.pink) { clearFilters() }
                         .glassCard()
-                }
-
-                ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
-                    ModelCard(name: group.name, skus: group.skus) { buying = $0 }
-                        .entrance(index + 2)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 12)], spacing: 12) {
+                        ForEach(Array(filtered.enumerated()), id: \.element.id) { index, model in
+                            Button {
+                                Haptics.tap()
+                                buying = model
+                            } label: {
+                                ModelTile(model: model)
+                            }
+                            .buttonStyle(.pressable)
+                            .disabled(model.soldOut)
+                            .entrance(min(index, 6) + 2)
+                        }
+                    }
                 }
             }
         }
         .navigationTitle("Shop")
         .refreshable { await load() }
         .task { await load() }
-        .sheet(item: $buying) { sku in
+        .onChange(of: android) { _ in
+            if !hasBothTiers { tier = "" }
+        }
+        .sheet(item: $buying) { model in
             if let catalog {
-                BuyPlanView(sku: sku, catalog: catalog) { await load() }
+                BuyPlanView(model: model, catalog: catalog) { await load() }
             }
+        }
+    }
+
+    private var filterBar: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Palette.text3)
+                    TextField("", text: $query, prompt: Text("Search models").foregroundColor(Palette.text3))
+                        .foregroundStyle(Palette.text)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    if !query.isEmpty {
+                        Button { query = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.text3)
+                        }
+                        .accessibilityLabel("Clear search")
+                    }
+                }
+                .padding(.horizontal, 14)
+                .frame(minHeight: 46)
+                .background(Capsule().fill(Palette.surface))
+                .overlay(Capsule().strokeBorder(Palette.stroke, lineWidth: 1))
+
+                Menu {
+                    Picker("Sort by", selection: $sort) {
+                        ForEach(ShopSort.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text(sort == .recommended ? "Sort" : sort.rawValue).lineLimit(1)
+                    }
+                    .font(Typo.rounded(.subheadline, .semibold))
+                    .foregroundStyle(sort == .recommended ? Palette.text : Palette.accentText)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 46)
+                    .background(Capsule().fill(Palette.surface))
+                    .overlay(Capsule().strokeBorder(Palette.stroke, lineWidth: 1))
+                }
+                .accessibilityLabel("Sort phones")
+            }
+
+            if versions.count > 1 {
+                PillPicker(options: [PickOption(id: "", title: "All Android")] + versions.map { PickOption(id: $0, title: "Android \($0)") },
+                           selection: $android, scrollable: true)
+            }
+
+            if hasBothTiers {
+                PillPicker(options: [PickOption(id: "", title: "All tiers"), PickOption(id: "standard", title: "Standard"), PickOption(id: "pro", title: "Pro")],
+                           selection: $tier)
+            }
+
+            HStack {
+                Text("\(filtered.count) phone\(filtered.count == 1 ? "" : "s")")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.text3)
+                Spacer()
+                if filtersActive {
+                    Button("Clear filters") { clearFilters() }
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Palette.accentText)
+                        .frame(minHeight: 44)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+        .entrance(2)
+    }
+
+    private func clearFilters() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            android = ""
+            tier = ""
+            query = ""
         }
     }
 
@@ -111,81 +279,67 @@ struct ShopView: View {
     }
 }
 
-/// One phone model with its plan options.
-private struct ModelCard: View {
-    let name: String
-    let skus: [Sku]
-    let select: (Sku) -> Void
-
-    private var first: Sku? { skus.first }
-    private var highEnd: Bool { first?.tier == "high_end" || first?.tier == "high-end" || (first?.tier?.contains("high") ?? false) }
+/// One phone in the shop grid — no durations here; those are picked at checkout.
+private struct ModelTile: View {
+    let model: PhoneModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(highEnd ? Theme.tile(TileColors.gold.0, TileColors.gold.1) : Theme.brand)
-                        .frame(width: 52, height: 52)
-                    Image(systemName: "iphone.gen3").font(.system(size: 24, weight: .semibold)).foregroundStyle(.white)
-                }
-                .shadow(color: (highEnd ? TileColors.gold.0 : Palette.indigo).opacity(0.4), radius: 10, y: 4)
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(model.isPro ? Theme.tile(TileColors.gold.0, TileColors.gold.1) : Theme.tile(Palette.indigo, Palette.violet))
+                    .frame(width: 74, height: 92)
+                Image("art-phone")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 104, height: 104)
+                    .accessibilityHidden(true)
+            }
+            .frame(width: 74, height: 92)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(name).font(Typo.rounded(.title3, .bold)).foregroundStyle(Palette.text)
-                    HStack(spacing: 6) {
-                        if let v = first?.androidVersion { StatusPill(text: "Android \(v)", color: Palette.accentText) }
-                        if highEnd { StatusPill(text: "Pro", color: TileColors.gold.0) }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.name)
+                    .font(Typo.rounded(.headline, .bold))
+                    .foregroundStyle(Palette.text)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    if let v = model.android { StatusPill(text: "Android \(v)", color: Palette.accentText) }
+                    StatusPill(text: model.isPro ? "Pro" : "Standard", color: model.isPro ? TileColors.gold.0 : Palette.text2)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    if model.soldOut {
+                        Text("Sold out").font(Typo.rounded(.subheadline, .bold)).foregroundStyle(Palette.danger)
+                    } else {
+                        Text("from").font(.caption).foregroundStyle(Palette.text3)
+                        Text(Format.money(model.cheapest?.price)).font(Typo.rounded(.title3, .bold)).foregroundStyle(Theme.brandText)
                     }
                 }
-                Spacer()
-                if let from = skus.map(\.price).min() {
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text("from").font(.caption2).foregroundStyle(Palette.text3)
-                        Text(Format.money(from)).font(Typo.rounded(.headline, .bold)).foregroundStyle(Theme.brandText)
-                    }
-                }
+                Text(subtitle).font(.caption).foregroundStyle(Palette.text3).lineLimit(1)
             }
 
-            VStack(spacing: 8) {
-                ForEach(skus) { sku in
-                    Button {
-                        Haptics.tap()
-                        select(sku)
-                    } label: {
-                        HStack {
-                            Image(systemName: "clock").font(.footnote).foregroundStyle(Palette.text3)
-                            Text(sku.durationLabel ?? "Plan").font(Typo.rounded(.body, .semibold)).foregroundStyle(Palette.text)
-                            Spacer()
-                            if sku.soldOut == true {
-                                StatusPill(text: "Sold out", color: Palette.danger)
-                            } else {
-                                Text(Format.money(sku.price)).font(Typo.rounded(.body, .bold)).foregroundStyle(Palette.text)
-                                Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Palette.text3)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 50)
-                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Palette.surface))
-                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.stroke, lineWidth: 1))
-                    }
-                    .buttonStyle(.pressable)
-                    .disabled(sku.soldOut == true)
-                }
-            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right").font(.footnote.weight(.bold)).foregroundStyle(Palette.text3)
         }
-        .glassCard(padding: 16)
+        .glassCard(padding: 14, tint: model.isPro ? TileColors.gold.0 : nil)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var subtitle: String {
+        var parts = ["\(model.plans.count) plan\(model.plans.count == 1 ? "" : "s")"]
+        if let d = model.bestPerDay { parts.append("as low as \(Format.money(d))/day") }
+        return parts.joined(separator: " · ")
     }
 }
 
 struct BuyPlanView: View {
-    let sku: Sku
+    let model: PhoneModel
     let catalog: Catalog
     let reload: () async -> Void
 
     @EnvironmentObject private var app: AppState
     @Environment(\.dismiss) private var dismiss
 
+    @State private var selectedId: Int?
     @State private var quantity = 1
     @State private var region = ""
     @State private var autoRenew = false
@@ -199,6 +353,14 @@ struct BuyPlanView: View {
     @State private var protocolName = "socks5"
     @State private var mode = "proxy"
     @State private var busy = false
+
+    /// The chosen plan (defaults to the cheapest available).
+    private var sku: Sku {
+        model.plans.first { $0.id == selectedId } ?? model.cheapest ?? model.plans[0]
+    }
+
+    /// Highest per-day rate among the plans — the baseline for "Save X%".
+    private var worstPerDay: Double? { model.plans.compactMap(PhoneModel.perDay).max() }
 
     private var proxyPrice: Double {
         proxyMode == "vmos" ? (catalog.proxyProducts.first { String($0.id) == proxyProduct }?.price ?? 0) : 0
@@ -224,16 +386,27 @@ struct BuyPlanView: View {
     var body: some View {
         SheetScaffold(title: "Checkout") {
             HStack(spacing: 14) {
-                IconTile(symbol: "iphone.gen3", colors: TileColors.indigo, size: 54)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(sku.name).font(Typo.rounded(.title3, .bold)).foregroundStyle(Palette.text)
-                    Text([sku.durationLabel, sku.androidVersion.map { "Android \($0)" }].compactMap { $0 }.joined(separator: " · "))
-                        .font(.subheadline).foregroundStyle(Palette.text2)
+                IconTile(symbol: "iphone.gen3", colors: model.isPro ? TileColors.gold : TileColors.indigo, size: 54)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.name).font(Typo.rounded(.title3, .bold)).foregroundStyle(Palette.text)
+                    HStack(spacing: 6) {
+                        if let v = model.android { StatusPill(text: "Android \(v)", color: Palette.accentText) }
+                        StatusPill(text: model.isPro ? "Pro" : "Standard", color: model.isPro ? TileColors.gold.0 : Palette.text2)
+                    }
                 }
                 Spacer()
-                Text(Format.money(sku.price)).font(Typo.rounded(.headline, .bold)).foregroundStyle(Theme.brandText)
             }
             .glassCard(highlight: true)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Choose a plan").font(Typo.rounded(.headline, .bold)).foregroundStyle(Palette.text)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
+                    ForEach(model.plans) { plan in
+                        planOption(plan)
+                    }
+                }
+            }
+            .glassCard(padding: 18)
 
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
@@ -303,13 +476,63 @@ struct BuyPlanView: View {
                     }
                 }
                 .buttonStyle(.primary)
-                .disabled(busy || !canSubmit)
+                .disabled(busy || !canSubmit || sku.soldOut == true)
                 NoteView(text: "Your phone starts setting up right away and appears under Phones.", icon: "bolt.fill")
             }
         }
         .onAppear {
+            if selectedId == nil { selectedId = model.cheapest?.id }
             if catalog.proxyProducts.count == 1 { proxyProduct = String(catalog.proxyProducts[0].id) }
         }
+    }
+
+    private func planOption(_ plan: Sku) -> some View {
+        let selected = plan.id == sku.id
+        let perDay = PhoneModel.perDay(plan)
+        let saving: Int? = {
+            guard let p = perDay, let worst = worstPerDay, worst > 0 else { return nil }
+            let pct = Int(((worst - p) / worst * 100).rounded())
+            return pct >= 5 ? pct : nil
+        }()
+
+        return Button {
+            Haptics.select()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { selectedId = plan.id }
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(plan.durationLabel ?? "Plan").font(Typo.rounded(.headline, .bold)).foregroundStyle(Palette.text)
+                    Spacer(minLength: 4)
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(selected ? Palette.accentText : Palette.text3)
+                }
+                Text(Format.money(plan.price)).font(Typo.rounded(.title3, .bold)).foregroundStyle(selected ? AnyShapeStyle(Theme.brandText) : AnyShapeStyle(Palette.text))
+                HStack(spacing: 6) {
+                    if let perDay { Text("\(Format.money(perDay))/day").font(.caption).foregroundStyle(Palette.text3) }
+                    if let saving {
+                        Text("Save \(saving)%")
+                            .font(Typo.rounded(.caption2, .bold))
+                            .foregroundStyle(Palette.success)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Capsule().fill(Palette.success.opacity(0.15)))
+                    }
+                }
+                if plan.soldOut == true {
+                    Text("Sold out").font(.caption.weight(.semibold)).foregroundStyle(Palette.danger)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(selected ? Palette.indigo.opacity(0.22) : Palette.surface))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(selected ? AnyShapeStyle(Theme.brand) : AnyShapeStyle(Palette.stroke), lineWidth: selected ? 2 : 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.pressable)
+        .disabled(plan.soldOut == true)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func buy() async {
