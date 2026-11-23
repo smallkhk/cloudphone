@@ -222,6 +222,7 @@ final class VirtualCameraPreview: ObservableObject {
     @Published var soundOn = false
 
     weak var webView: WKWebView?
+    let framePump = LocalFramePump()
 
     func start() {
         guard !VirtualCamera.url.isEmpty else { return }
@@ -233,6 +234,7 @@ final class VirtualCameraPreview: ObservableObject {
     }
 
     func stop() {
+        framePump.stop()
         webView?.evaluateJavaScript("window.vhonixVirtualCam && window.vhonixVirtualCam.stopPipeline();", completionHandler: nil)
         running = false
         soundOn = false
@@ -244,7 +246,12 @@ final class VirtualCameraPreview: ObservableObject {
     }
 
     func receive(_ body: Any) {
-        guard let msg = body as? [String: Any], msg["type"] as? String == "virtualCam" else { return }
+        guard let msg = body as? [String: Any] else { return }
+        if msg["type"] as? String == "virtualCamPump" {
+            framePump.handle(msg, from: webView)
+            return
+        }
+        guard msg["type"] as? String == "virtualCam" else { return }
         status = msg["status"] as? String ?? status
         message = (msg["message"] as? String)?.nonEmpty
     }

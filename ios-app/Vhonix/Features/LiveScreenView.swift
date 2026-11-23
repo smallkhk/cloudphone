@@ -255,6 +255,7 @@ final class LiveScreenModel: ObservableObject {
     @Published var virtualCamStatus: String?
 
     weak var webView: WKWebView?
+    let framePump = LocalFramePump()
     /// True once the loaded page has reported in — i.e. `window.vhonixLive` exists.
     var pageReady = false
     private var deviceId: Int?
@@ -356,6 +357,7 @@ final class LiveScreenModel: ObservableObject {
     }
 
     func teardown() {
+        framePump.stop()
         call("destroy()")
     }
 
@@ -363,6 +365,8 @@ final class LiveScreenModel: ObservableObject {
         guard let msg = body as? [String: Any], let type = msg["type"] as? String else { return }
 
         switch type {
+        case "virtualCamPump":
+            framePump.handle(msg, from: webView)
         case "state":
             pageReady = true
             state = msg["state"] as? String ?? state

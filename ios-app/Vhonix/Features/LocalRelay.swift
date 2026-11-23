@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import WebKit
 
 /// Lets the virtual camera use plain-http links on the local network
 /// (http://192.168.x.x, http://localhost, http://name.local).
@@ -230,4 +231,78 @@ private final class ReadyFlag: @unchecked Sendable {
     private var value = false
     func set() { lock.lock(); value = true; lock.unlock() }
     var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+}
+
+/// Fetches frames from an on-phone camera server (EclipseLiveCam's
+/// http://127.0.0.1:<port>/view) natively and hands each JPEG to the
+/// virtual-camera script. Done outside the web view on purpose: WebKit may
+/// refuse plain-http requests from the https live page, URLSession doesn't.
+@MainActor
+final class LocalFramePump {
+    weak var webView: WKWebView?
+    private var task: Task<Void, Never>?
+
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 4
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.urlCache = nil
+        return URLSession(configuration: config)
+    }()
+
+    /// Handles a {type: "virtualCamPump", action: "start"/"stop", url} message from the page.
+    func handle(_ msg: [String: Any], from webView: WKWebView?) {
+        switch msg["action"] as? String {
+        case "start":
+            guard let s = msg["url"] as? String, let url = URL(string: s),
+                  let host = url.host, LocalRelay.isLocal(host) else { return }
+            self.webView = webView
+            start(url)
+        case "stop":
+            stop()
+        default:
+            break
+        }
+    }
+
+    func start(_ url: URL) {
+        stop()
+        task = Task { [weak self] in
+            var failures = 0
+            while !Task.isCancelled {
+                let started = Date()
+                do {
+                    let (data, response) = try await self?.session.data(from: url) ?? (Data(), URLResponse())
+                    if Task.isCancelled { break }
+                    let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    failures = 0
+                    if code == 200, !data.isEmpty {
+                        self?.call("pushFrame('\(data.base64EncodedString())')")
+                    } else if code == 404 {
+                        self?.call("pumpGone()")
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    } else {
+                        self?.call("pumpMiss()")
+                    }
+                } catch {
+                    if Task.isCancelled { break }
+                    failures += 1
+                    if failures >= 2 { self?.call("pumpError()") }
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                }
+                // About 12 frames a second.
+                let wait = 0.08 - Date().timeIntervalSince(started)
+                if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+            }
+        }
+    }
+
+    func stop() {
+        task?.cancel()
+        task = nil
+    }
+
+    private func call(_ js: String) {
+        webView?.evaluateJavaScript("window.vhonixVirtualCam && window.vhonixVirtualCam.\(js);", completionHandler: nil)
+    }
 }

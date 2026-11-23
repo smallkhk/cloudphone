@@ -426,8 +426,16 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   `ios/EclipseLiveCam/Live/LocalServer.swift`): `/` is an HTML page, `/view`
   is the latest JPEG (204 when not streaming), no audio, no CORS. Pasting that
   root link is detected as kind `localview` and polled at `/view` ~15×/s
-  through the relay (`startLocalView` → shared `pollFrames`). Works only while
-  EclipseLiveCam stays alive (its PiP / background audio).
+  (`startLocalView`). Works only while EclipseLiveCam stays alive (its PiP /
+  background audio). **1.9.1:** owner reported the link worked in Safari but
+  not in Vhonix (1.9.0 polled it from the web view through the relay — likely
+  WebKit refusing http://127.0.0.1 from the https page). Inside the app the
+  script now posts `{type:'virtualCamPump', action:'start', url}` and the
+  native `LocalFramePump` (in `LocalRelay.swift`, held by `LiveScreenModel`
+  and `VirtualCameraPreview`) fetches `/view` with URLSession ~12×/s and calls
+  `pushFrame(base64)` / `pumpMiss()` / `pumpGone()` / `pumpError()`; the
+  page never touches http for this. The web-view polling path remains as the
+  browser fallback only.
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app

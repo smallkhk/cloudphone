@@ -262,6 +262,11 @@ enum VirtualCamera {
       var self = this, k = this.kind(this.url), u = this.address(this.url);
       clearTimeout(this.retry);
       if (!u) { this.setStatus('off', 'No link set.'); return; }
+      if (k === 'localview' && this.hasApp()) {
+        this.setStatus('connecting', 'Connecting to EclipseLiveCam…');
+        this.startLocalView();
+        return;
+      }
       if (/^http:\/\//i.test(this.url) && !this.relay) {
         this.fail('Local link: the app couldn\'t start its local relay. Close and reopen this screen, then try again.');
         return;
@@ -445,17 +450,57 @@ enum VirtualCamera {
 
     // ---- EclipseLiveCam's on-phone preview (http://127.0.0.1:8723/): JPEG frames at /view, no sound ----
 
+    hasApp: function () {
+      return !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.vhonix);
+    },
+
+    localText: {
+      gone: 'This address has no live preview. Check the port number shown in EclipseLiveCam.',
+      waiting: 'Waiting for EclipseLiveCam — start a stream in that app (keep it open with Picture-in-Picture).',
+      unreachable: 'Can\'t reach EclipseLiveCam on this iPhone. Open it, start a stream, keep it running with Picture-in-Picture, and check the port number.'
+    },
+
     startLocalView: function () {
       var self = this;
       var origin = this.url.match(/^http:\/\/[^\/?#]+/i)[0];
       var share = { stopped: false };
       this.share = share;
-      this.pollFrames(share, function () { return self.address(origin + '/view?t=' + Date.now()); }, 66, {
-        gone: 'This address has no live preview. Check the port number shown in EclipseLiveCam.',
-        waiting: 'Waiting for EclipseLiveCam — start a stream in that app (keep it open with Picture-in-Picture).',
-        unreachable: 'Can\'t reach EclipseLiveCam on this iPhone. Open it, start a stream, keep it running with Picture-in-Picture, and check the port number.'
-      });
+      if (this.hasApp()) {
+        // In the app: Vhonix itself fetches the frames (no web restrictions on
+        // plain http) and hands each one to pushFrame() below.
+        this.pump = { share: share, misses: 0 };
+        post({ type: 'virtualCamPump', action: 'start', url: origin + '/view' });
+        return;
+      }
+      this.pollFrames(share, function () { return self.address(origin + '/view?t=' + Date.now()); }, 66, this.localText);
     },
+
+    // ---- Called by the app's frame pump ----
+
+    pushFrame: function (b64) {
+      var self = this, pump = this.pump;
+      if (!pump || pump.share.stopped) return;
+      var im = new Image();
+      im.onload = function () {
+        if (self.pump !== pump || pump.share.stopped) return;
+        self.img = im;
+        pump.misses = 0;
+        if (self.status !== 'live') self.setStatus('live', '');
+      };
+      im.src = 'data:image/jpeg;base64,' + b64;
+    },
+
+    pumpMiss: function () {
+      var pump = this.pump;
+      if (!pump || pump.share.stopped) return;
+      if (++pump.misses >= 5) {
+        this.img = null;
+        if (this.status !== 'connecting' || this.message !== this.localText.waiting) this.setStatus('connecting', this.localText.waiting);
+      }
+    },
+
+    pumpGone: function () { if (this.pump) { this.img = null; this.setStatus('error', this.localText.gone); } },
+    pumpError: function () { if (this.pump) { this.img = null; this.setStatus('error', this.localText.unreachable); } },
 
     /** Plays one chunk of 16-bit mono PCM right after the previous one. Returns when the next should start. */
     playPcm: function (buf, rate, next) {
@@ -485,6 +530,7 @@ enum VirtualCamera {
       clearTimeout(this.retry); clearTimeout(this.snapTimer);
       this.unhookAudio();
       if (this.share) { this.share.stopped = true; this.share = null; }
+      if (this.pump) { this.pump = null; post({ type: 'virtualCamPump', action: 'stop' }); }
       if (this.video) {
         var v = this.video; this.video = null;
         v.onplaying = v.onerror = v.onended = null;
