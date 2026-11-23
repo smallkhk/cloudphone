@@ -259,20 +259,20 @@ final class VirtualCameraPreview: ObservableObject {
     static let page = """
     <!doctype html><html><head>
     <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-    <style>html,body{margin:0;height:100%;background:#000;overflow:hidden}video{width:100%;height:100%;object-fit:contain;background:#000}</style>
-    </head><body><video id="v" autoplay playsinline muted></video><script>
+    <style>html,body{margin:0;height:100%;background:#000;overflow:hidden}
+    canvas{position:fixed;left:0;top:0;width:100%!important;height:100%!important;object-fit:contain;opacity:1!important;background:#000}</style>
+    </head><body><script>
     (function () {
-      var cam = window.vhonixVirtualCam, v = document.getElementById('v');
+      var cam = window.vhonixVirtualCam;
       if (!cam) return;
-      var tracks = [cam.track()];
-      if (cam.audio) { var a = cam.audioTrack(); if (a) tracks.push(a); }
-      v.srcObject = new MediaStream(tracks);
-      var p = v.play(); if (p && p.catch) p.catch(function () {});
-      window.setSound = function (on) {
-        v.muted = !on;
-        if (cam.actx && cam.actx.resume) cam.actx.resume();
-        var q = v.play(); if (q && q.catch) q.catch(function () {});
-      };
+      // Start the camera exactly as a cloud phone would (picture track + sound track)...
+      var keep = [cam.track()];
+      if (cam.audio) { var a = cam.audioTrack(); if (a) keep.push(a); }
+      window.__vhonixTracks = keep;
+      // ...and show the very canvas that feeds it. Shown directly rather than
+      // through a <video>, which iPhone may refuse to start without a tap.
+      document.body.appendChild(cam.canvas);
+      window.setSound = function (on) { cam.listen(on); };
     })();
     </script></body></html>
     """

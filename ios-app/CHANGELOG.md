@@ -4,6 +4,7 @@ Download each version from GitHub → Releases → `ios-v<version>`, sign with E
 
 ## 1.9.1
 - Fix: EclipseLiveCam's on-phone link (http://127.0.0.1:8723/) worked in Safari but not in Vhonix. Vhonix now fetches the picture itself instead of through its web view.
+- Fix: the Virtual camera preview could stay a black box with a ▶ button. It now shows the picture directly, and Hear sound plays without needing a tap.
 
 ## 1.9.0
 - Local links work in the virtual camera: http://192.168.x.x, http://localhost and .local addresses on your Wi-Fi.

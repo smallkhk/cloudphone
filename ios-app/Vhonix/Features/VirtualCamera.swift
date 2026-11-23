@@ -139,6 +139,14 @@ enum VirtualCamera {
         if (!AC) return null;
         this.actx = new AC();
         this.adest = this.actx.createMediaStreamDestination();
+        // Everything the camera hears goes through "mix": to the microphone
+        // track always, and to this iPhone's speaker only when the preview asks.
+        this.mix = this.actx.createGain();
+        this.mix.connect(this.adest);
+        this.monitor = this.actx.createGain();
+        this.monitor.gain.value = 0;
+        this.mix.connect(this.monitor);
+        this.monitor.connect(this.actx.destination);
       }
       if (this.actx.state !== 'running' && this.actx.resume) { var r = this.actx.resume(); if (r && r.catch) r.catch(function () {}); }
       return this.actx;
@@ -160,7 +168,7 @@ enum VirtualCamera {
       if (!ctx) return;
       try {
         var n = ctx.createMediaElementSource(el);
-        n.connect(this.adest);
+        n.connect(this.mix);
         this.anodes.push(n);
         // Its sound now goes only to the cloud phone (not this iPhone's speaker).
         el.muted = false; el.defaultMuted = false; el.removeAttribute('muted');
@@ -177,10 +185,16 @@ enum VirtualCamera {
         var sink = new Audio(); sink.muted = true; sink.srcObject = stream;
         var p = sink.play(); if (p && p.catch) p.catch(function () {});
         var n = ctx.createMediaStreamSource(stream);
-        n.connect(this.adest);
+        n.connect(this.mix);
         n._sink = sink;
         this.anodes.push(n);
       } catch (e) {}
+    },
+
+    /** Preview only: play the camera's sound on this iPhone's speaker too. */
+    listen: function (on) {
+      var ctx = this.audioContext();
+      if (ctx && this.monitor) this.monitor.gain.value = on ? 1 : 0;
     },
 
     unhookAudio: function () {
@@ -511,7 +525,7 @@ enum VirtualCamera {
       for (var i = 0; i < n; i++) ch[i] = dv.getInt16(i * 2, true) / 32768;
       var src = ctx.createBufferSource();
       src.buffer = ab;
-      src.connect(this.adest);
+      src.connect(this.mix);
       var now = ctx.currentTime;
       // Fell behind (gap) or drifted too far ahead (delay): restart just ahead of now.
       if (next < now + 0.03 || next > now + 1.5) next = now + 0.25;

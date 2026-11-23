@@ -436,6 +436,11 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   `pushFrame(base64)` / `pumpMiss()` / `pumpGone()` / `pumpError()`; the
   page never touches http for this. The web-view polling path remains as the
   browser fallback only.
+  Same release: the preview page showed a black `<video>` with a ▶ glyph on
+  the owner's iPhone (WebKit didn't autoplay it), so the preview now appends
+  the camera's own canvas to the page instead of a `<video>`, and "Hear
+  sound" routes through Web Audio (`mix` → `adest` + `monitor` gain →
+  speakers; `cam.listen(on)`) instead of unmuting a video element.
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app
