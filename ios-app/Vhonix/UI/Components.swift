@@ -5,7 +5,7 @@ import CoreImage.CIFilterBuiltins
 
 /// Scrollable screen made of stacked cards.
 struct Screen<Content: View>: View {
-    var animatedBackground = false
+    var backdrop: Backdrop = .indigo
     var spacing: CGFloat = 18
     @ViewBuilder let content: () -> Content
 
@@ -18,7 +18,7 @@ struct Screen<Content: View>: View {
             .padding(.top, 6)
             .padding(.bottom, 28)
         }
-        .screenBackground(animated: animatedBackground)
+        .screenBackground(backdrop)
     }
 }
 
@@ -502,7 +502,7 @@ struct StatusPill: View {
 
     static func forStatus(_ raw: String?) -> StatusPill {
         let c = color(for: raw)
-        return StatusPill(text: Format.status(raw), color: c, pulse: c == Palette.success)
+        return StatusPill(text: Format.status(raw), color: c)
     }
 }
 
@@ -581,15 +581,21 @@ struct EmptyStateView: View {
     var message: String? = nil
     var actionTitle: String? = nil
     var colors: (Color, Color) = TileColors.indigo
+    var art: String? = nil
     var action: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 16) {
-            ZStack {
-                Circle().fill(Theme.tile(colors.0, colors.1)).frame(width: 110, height: 110).blur(radius: 30).opacity(0.45)
-                IconTile(symbol: icon, colors: colors, size: 76)
+            if let art {
+                ArtImage(name: art, size: 170)
+                    .padding(.vertical, -18)
+            } else {
+                ZStack {
+                    Circle().fill(Theme.tile(colors.0, colors.1)).frame(width: 110, height: 110).blur(radius: 30).opacity(0.45)
+                    IconTile(symbol: icon, colors: colors, size: 76)
+                }
+                .padding(.bottom, 4)
             }
-            .padding(.bottom, 4)
             Text(title).font(Typo.rounded(.title3, .bold)).foregroundStyle(Palette.text).multilineTextAlignment(.center)
             if let message {
                 Text(message).font(.subheadline).foregroundStyle(Palette.text2).multilineTextAlignment(.center)
@@ -776,12 +782,13 @@ extension View {
 /// Standard sheet chrome: dark, background, Close button.
 struct SheetScaffold<Content: View>: View {
     let title: String
+    var backdrop: Backdrop = .violet
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            Screen { content() }
+            Screen(backdrop: backdrop) { content() }
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {

@@ -22,9 +22,9 @@ struct ProxiesView: View {
 
     var body: some View {
         LoadingView(isLoading: store.loading && store.owned.isEmpty && store.products.isEmpty, error: store.products.isEmpty && store.owned.isEmpty ? store.error : nil, retry: store.load) {
-            Screen {
+            Screen(backdrop: .pink) {
                 ProductHero(icon: "network", colors: TileColors.orange, title: "Proxies",
-                            text: "Residential IPs you can move between your phones — or add your own.")
+                            text: "Residential IPs you can move between your phones — or add your own.", art: "art-globe")
 
                 SectionTitle(title: "Your proxies", trailing: AnyView(
                     Button { adding = true } label: { Label("Add own", systemImage: "plus") }
@@ -83,7 +83,7 @@ struct ProxiesView: View {
                 }
                 Spacer()
                 if p.attachedPadCode != nil {
-                    StatusPill(text: "In use", color: Palette.success, pulse: true)
+                    StatusPill(text: "In use", color: Palette.success)
                 } else if !p.delivered {
                     StatusPill.forStatus(p.purchaseStatus ?? "processing")
                 } else {

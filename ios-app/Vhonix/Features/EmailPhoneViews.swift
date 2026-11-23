@@ -6,16 +6,25 @@ struct ProductHero: View {
     let colors: (Color, Color)
     let title: String
     let text: String
+    var art: String? = nil
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            IconTile(symbol: icon, colors: colors, size: 56)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(Typo.rounded(.title3, .bold)).foregroundStyle(Palette.text)
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).font(Typo.rounded(.title2, .bold)).foregroundStyle(Palette.text)
                 Text(text).font(.subheadline).foregroundStyle(Palette.text2).fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
+            if let art {
+                ArtImage(name: art, size: 120)
+                    .padding(.vertical, -18)
+                    .padding(.trailing, -10)
+            } else {
+                IconTile(symbol: icon, colors: colors, size: 56)
+            }
         }
-        .glassCard(padding: 18, highlight: true)
+        .glassCard(padding: 18, highlight: true, tint: colors.0)
+        .entrance(0)
     }
 }
 
@@ -27,9 +36,9 @@ struct EmailAccountsView: View {
 
     var body: some View {
         LoadingView(isLoading: store.loading && store.owned.isEmpty && store.products.isEmpty, error: store.products.isEmpty && store.owned.isEmpty ? store.error : nil, retry: store.load) {
-            Screen {
+            Screen(backdrop: .blue) {
                 ProductHero(icon: "envelope.fill", colors: TileColors.cyan, title: "Email accounts",
-                            text: "Ready-made inboxes that receive verification codes for sign-ups.")
+                            text: "Ready-made inboxes that receive verification codes for sign-ups.", art: "art-email")
                 if !store.owned.isEmpty {
                     SectionTitle(title: "My inboxes")
                     ForEach(store.owned) { account in
@@ -124,9 +133,9 @@ struct PhoneNumbersView: View {
 
     var body: some View {
         LoadingView(isLoading: store.loading && store.owned.isEmpty && store.products.isEmpty, error: store.products.isEmpty && store.owned.isEmpty ? store.error : nil, retry: store.load) {
-            Screen {
+            Screen(backdrop: .emerald) {
                 ProductHero(icon: "phone.fill", colors: TileColors.green, title: "Verification numbers",
-                            text: "A number that receives the SMS code for an app sign-up.")
+                            text: "A number that receives the SMS code for an app sign-up.", art: "art-sms")
                 if !store.owned.isEmpty {
                     SectionTitle(title: "My numbers")
                     ForEach(store.owned) { number in

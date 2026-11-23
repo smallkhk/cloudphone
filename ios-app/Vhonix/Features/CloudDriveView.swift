@@ -13,7 +13,7 @@ struct CloudDriveView: View {
     var body: some View {
         LoadingView(isLoading: loading && drive == nil, error: drive == nil ? error : nil, retry: load) {
             if let drive {
-                Screen {
+                Screen(backdrop: .indigo) {
                     storageCard(drive.storage)
 
                     SectionTitle(title: "Upload from a link", subtitle: "Shared by all your cloud phones")
@@ -126,9 +126,12 @@ struct CloudDriveView: View {
                     Text("Not available right now").font(.subheadline).foregroundStyle(Palette.text2)
                 }
             }
-            Spacer()
+            Spacer(minLength: 0)
+            ArtImage(name: "art-drive", size: 96)
+                .padding(.vertical, -16)
         }
-        .glassCard(padding: 18, highlight: true)
+        .glassCard(padding: 18, highlight: true, tint: Palette.indigo)
+        .entrance(0)
         .accessibilityElement(children: .combine)
     }
 
@@ -154,6 +157,10 @@ struct CloudDriveView: View {
     }
 
     private func load() async {
+        if drive == nil, let saved: CloudDrive = APIClient.shared.cached("cloud-drive") {
+            drive = saved
+            loading = false
+        }
         do {
             let d: CloudDrive = try await APIClient.shared.get("cloud-drive")
             withAnimation(.easeOut(duration: 0.25)) { drive = d }

@@ -15,30 +15,48 @@ struct DevicesView: View {
 
     var body: some View {
         LoadingView(isLoading: loading && devices.isEmpty, error: devices.isEmpty ? error : nil, retry: load) {
-            Screen(animatedBackground: true) {
-                Text(greeting)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Palette.text2)
-                    .padding(.horizontal, 4)
+            Screen(backdrop: .indigo) {
+                HStack(alignment: .center, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(greeting)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Palette.text2)
+                        Text(devices.isEmpty ? "Your cloud,\nyour phones" : "\(devices.count) cloud phone\(devices.count == 1 ? "" : "s")")
+                            .font(Typo.rounded(.title2, .bold))
+                            .foregroundStyle(Palette.text)
+                        Text("Real Android, in your pocket")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.brandText)
+                    }
+                    Spacer(minLength: 0)
+                    ArtImage(name: "art-phone", size: 132)
+                        .padding(.vertical, -22)
+                        .padding(.trailing, -10)
+                }
+                .glassCard(padding: 18, highlight: true, tint: Palette.indigo)
+                .entrance(0)
 
                 if devices.isEmpty {
                     EmptyStateView(icon: "iphone.gen3", title: "No cloud phones yet",
                                    message: "Get a real Android phone in the cloud — ready in minutes, controlled right here.",
                                    actionTitle: "Browse phones", colors: TileColors.indigo) { app.tab = .shop }
                         .glassCard()
-                        .padding(.top, 20)
+                        .entrance(1)
                 } else {
-                    stats
+                    stats.entrance(1)
 
                     SectionTitle(title: "Your phones", subtitle: "\(devices.count) device\(devices.count == 1 ? "" : "s")")
 
-                    ForEach(devices) { device in
-                        if device.ready {
-                            NavigationLink(value: device) { DeviceCard(device: device) }
-                                .buttonStyle(.pressable)
-                        } else {
-                            DeviceCard(device: device)
+                    ForEach(Array(devices.enumerated()), id: \.element.id) { index, device in
+                        Group {
+                            if device.ready {
+                                NavigationLink(value: device) { DeviceCard(device: device) }
+                                    .buttonStyle(.pressable)
+                            } else {
+                                DeviceCard(device: device)
+                            }
                         }
+                        .entrance(index + 2)
                     }
 
                     Button { app.tab = .shop } label: {
@@ -90,6 +108,10 @@ struct DevicesView: View {
     }
 
     private func load() async {
+        if devices.isEmpty, let saved: DevicesResponse = APIClient.shared.cached("devices") {
+            devices = saved.devices
+            loading = false
+        }
         do {
             let response: DevicesResponse = try await APIClient.shared.get("devices")
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { devices = response.devices }

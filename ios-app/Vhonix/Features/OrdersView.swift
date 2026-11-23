@@ -7,9 +7,9 @@ struct OrdersView: View {
 
     var body: some View {
         LoadingView(isLoading: loading && orders.isEmpty, error: orders.isEmpty ? error : nil, retry: load) {
-            Screen {
+            Screen(backdrop: .blue) {
                 if orders.isEmpty {
-                    EmptyStateView(icon: "doc.text.fill", title: "No orders yet", message: "Everything you buy shows up here.", colors: TileColors.slate)
+                    EmptyStateView(icon: "doc.text.fill", title: "No orders yet", message: "Everything you buy shows up here.", colors: TileColors.slate, art: "art-orders")
                         .glassCard()
                 }
                 ForEach(orders) { order in
@@ -41,6 +41,10 @@ struct OrdersView: View {
     }
 
     private func load() async {
+        if orders.isEmpty, let saved: OrdersResponse = APIClient.shared.cached("orders") {
+            orders = saved.orders
+            loading = false
+        }
         do {
             let r: OrdersResponse = try await APIClient.shared.get("orders")
             withAnimation { orders = r.orders }
@@ -87,7 +91,7 @@ struct OrderDetailView: View {
     var body: some View {
         LoadingView(isLoading: loading && order == nil, error: order == nil ? error : nil, retry: load) {
             if let order {
-                Screen {
+                Screen(backdrop: .violet) {
                     VStack(spacing: 14) {
                         IconTile(symbol: productIcon(for: order.productType), colors: productColors(for: order.productType), size: 60)
                         Text(order.product ?? "Order").font(Typo.rounded(.title2, .bold)).foregroundStyle(Palette.text).multilineTextAlignment(.center)
@@ -172,6 +176,10 @@ struct OrderDetailView: View {
     }
 
     private func load() async {
+        if order == nil, let saved: OrderResponse = APIClient.shared.cached("orders/\(orderId)") {
+            order = saved.order
+            loading = false
+        }
         do {
             let r: OrderResponse = try await APIClient.shared.get("orders/\(orderId)")
             withAnimation { order = r.order }

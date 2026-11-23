@@ -20,9 +20,9 @@ struct CloudNumbersView: View {
 
     var body: some View {
         LoadingView(isLoading: store.loading && store.owned.isEmpty && store.products.isEmpty, error: store.products.isEmpty && store.owned.isEmpty ? store.error : nil, retry: store.load) {
-            Screen {
+            Screen(backdrop: .pink) {
                 ProductHero(icon: "antenna.radiowaves.left.and.right", colors: TileColors.pink, title: "Cloud numbers",
-                            text: "Rent a real number that stays yours. Bind it to a cloud phone to receive SMS there.")
+                            text: "Rent a real number that stays yours. Bind it to a cloud phone to receive SMS there.", art: "art-number")
 
                 if !store.owned.isEmpty {
                     SectionTitle(title: "My numbers")

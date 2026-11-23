@@ -31,8 +31,25 @@ struct ShopView: View {
 
     var body: some View {
         LoadingView(isLoading: loading && catalog == nil, error: catalog == nil ? error : nil, retry: load) {
-            Screen(animatedBackground: true) {
-                balanceBanner
+            Screen(backdrop: .pink) {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Get a cloud phone")
+                            .font(Typo.rounded(.title2, .bold))
+                            .foregroundStyle(Palette.text)
+                        Text("Real Android devices, ready in minutes. Pay from your wallet.")
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.text2)
+                    }
+                    Spacer(minLength: 0)
+                    ArtImage(name: "art-shop", size: 128)
+                        .padding(.vertical, -20)
+                        .padding(.trailing, -10)
+                }
+                .glassCard(padding: 18, highlight: true, tint: Palette.pink)
+                .entrance(0)
+
+                balanceBanner.entrance(1)
 
                 if versions.count > 1 {
                     PillPicker(options: [PickOption(id: "", title: "All")] + versions.map { PickOption(id: $0, title: "Android \($0)") },
@@ -44,8 +61,9 @@ struct ShopView: View {
                         .glassCard()
                 }
 
-                ForEach(groups) { group in
+                ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
                     ModelCard(name: group.name, skus: group.skus) { buying = $0 }
+                        .entrance(index + 2)
                 }
             }
         }
@@ -78,6 +96,10 @@ struct ShopView: View {
     }
 
     private func load() async {
+        if catalog == nil, let saved: Catalog = APIClient.shared.cached("catalog") {
+            catalog = saved
+            loading = false
+        }
         do {
             let c: Catalog = try await APIClient.shared.get("catalog")
             withAnimation(.easeOut(duration: 0.25)) { catalog = c }

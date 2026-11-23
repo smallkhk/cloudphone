@@ -19,9 +19,10 @@ struct AuthView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 26) {
-                    VStack(spacing: 18) {
-                        BrandMark(size: 84, showName: false)
-                            .padding(.top, 36)
+                    VStack(spacing: 10) {
+                        FloatingArt(name: "art-phone", size: 250)
+                            .padding(.top, 6)
+                            .padding(.bottom, -30)
                         VStack(spacing: 8) {
                             Text(registering ? "Create your account" : "Welcome back")
                                 .font(Typo.rounded(.largeTitle, .bold))
@@ -83,7 +84,7 @@ struct AuthView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 40)
             }
-            .screenBackground(animated: true)
+            .screenBackground(.violet)
             .navigationDestination(isPresented: $showOtp) {
                 OtpView(email: otpEmail)
             }
@@ -148,11 +149,9 @@ struct OtpView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 26) {
-                ZStack {
-                    Circle().fill(Theme.brand).frame(width: 120, height: 120).blur(radius: 34).opacity(0.5)
-                    IconTile(symbol: "envelope.open.fill", colors: TileColors.indigo, size: 78)
-                }
-                .padding(.top, 30)
+                FloatingArt(name: "art-email", size: 210)
+                    .padding(.top, 4)
+                    .padding(.bottom, -24)
 
                 VStack(spacing: 8) {
                     Text("Check your inbox").font(Typo.rounded(.largeTitle, .bold)).foregroundStyle(Palette.text)
@@ -224,7 +223,7 @@ struct OtpView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 40)
         }
-        .screenBackground(animated: true)
+        .screenBackground(.violet)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { focused = true }
     }
@@ -276,5 +275,23 @@ struct ShakeEffect: GeometryEffect {
 
     func effectValue(size: CGSize) -> ProjectionTransform {
         ProjectionTransform(CGAffineTransform(translationX: 10 * sin(amount * .pi * 4), y: 0))
+    }
+}
+
+/// Hero illustration that gently floats. Only used on the sign-in screen.
+struct FloatingArt: View {
+    let name: String
+    var size: CGFloat = 220
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var up = false
+
+    var body: some View {
+        ArtImage(name: name, size: size)
+            .offset(y: up ? -8 : 8)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) { up = true }
+            }
     }
 }

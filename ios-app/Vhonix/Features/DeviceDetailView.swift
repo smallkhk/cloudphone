@@ -18,7 +18,7 @@ struct DeviceDetailView: View {
     var body: some View {
         LoadingView(isLoading: loading && data == nil, error: data == nil ? error : nil, retry: load) {
             if let data {
-                Screen {
+                Screen(backdrop: .violet) {
                     hero(data.device)
                     quickActions
                     settings(data)
@@ -188,6 +188,10 @@ struct DeviceDetailView: View {
     }
 
     private func load() async {
+        if data == nil, let saved: DeviceDetailResponse = APIClient.shared.cached(path) {
+            data = saved
+            loading = false
+        }
         do {
             let response: DeviceDetailResponse = try await APIClient.shared.get(path)
             withAnimation(.easeOut(duration: 0.25)) { data = response }

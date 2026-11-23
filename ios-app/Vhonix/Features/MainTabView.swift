@@ -102,7 +102,7 @@ struct MoreView: View {
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     var body: some View {
-        Screen(animatedBackground: true) {
+        Screen(backdrop: .blue) {
             if let user = app.user {
                 HStack(spacing: 14) {
                     Text(String(user.name.prefix(1)).uppercased())
@@ -117,7 +117,8 @@ struct MoreView: View {
                     }
                     Spacer()
                 }
-                .glassCard(padding: 18, highlight: true)
+                .glassCard(padding: 18, highlight: true, tint: Palette.indigo)
+                .entrance(0)
 
                 Button { app.tab = .wallet } label: {
                     HStack {
@@ -136,12 +137,12 @@ struct MoreView: View {
 
             SectionTitle(title: "Your products")
             LazyVGrid(columns: columns, spacing: 12) {
-                tile("Orders", "Receipts & payments", "doc.text.fill", TileColors.slate) { OrdersView() }
-                tile("Email accounts", "Inboxes & codes", "envelope.fill", TileColors.cyan) { EmailAccountsView() }
-                tile("Phone numbers", "Verification SMS", "phone.fill", TileColors.green) { PhoneNumbersView() }
-                tile("Cloud numbers", "Rent a real number", "antenna.radiowaves.left.and.right", TileColors.pink) { CloudNumbersView() }
-                tile("Proxies", "Residential IPs", "network", TileColors.orange) { ProxiesView() }
-                tile("Cloud Drive", "Files & backups", "externaldrive.fill", TileColors.indigo) { CloudDriveView() }
+                tile("Orders", "Receipts & payments", "art-orders", Palette.text2, 0) { OrdersView() }
+                tile("Email accounts", "Inboxes & codes", "art-email", Palette.cyan, 1) { EmailAccountsView() }
+                tile("Phone numbers", "Verification SMS", "art-sms", Palette.success, 2) { PhoneNumbersView() }
+                tile("Cloud numbers", "Rent a real number", "art-number", Palette.pink, 3) { CloudNumbersView() }
+                tile("Proxies", "Residential IPs", "art-globe", Color(hex: 0xFF9F43), 4) { ProxiesView() }
+                tile("Cloud Drive", "Files & backups", "art-drive", Palette.indigo, 5) { CloudDriveView() }
             }
 
             SectionTitle(title: "Account")
@@ -169,20 +170,24 @@ struct MoreView: View {
         }
     }
 
-    private func tile<D: View>(_ title: String, _ subtitle: String, _ icon: String, _ colors: (Color, Color), @ViewBuilder destination: @escaping () -> D) -> some View {
+    private func tile<D: View>(_ title: String, _ subtitle: String, _ art: String, _ tint: Color, _ index: Int, @ViewBuilder destination: @escaping () -> D) -> some View {
         NavigationLink {
             destination()
         } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                IconTile(symbol: icon, colors: colors, size: 44)
+            VStack(alignment: .leading, spacing: 6) {
+                ArtImage(name: art, size: 92)
+                    .padding(.top, -14)
+                    .padding(.leading, -16)
+                    .padding(.bottom, -10)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(Typo.rounded(.headline, .bold)).foregroundStyle(Palette.text)
                     Text(subtitle).font(.caption).foregroundStyle(Palette.text3).lineLimit(1)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
-            .glassCard()
+            .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
+            .glassCard(tint: tint)
         }
         .buttonStyle(.pressable)
+        .entrance(index + 2)
     }
 }

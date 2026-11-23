@@ -34,6 +34,7 @@ final class AppState: ObservableObject {
     // MARK: Sign in
 
     func didSignIn(token: String, user: User?) {
+        DataCache.clear()
         APIClient.shared.token = token
         self.user = user
         tab = .devices
@@ -41,6 +42,9 @@ final class AppState: ObservableObject {
     }
 
     func refreshUser() async {
+        if user == nil, let cached: MeResponse = APIClient.shared.cached("me") {
+            user = cached.user
+        }
         if let me: MeResponse = try? await APIClient.shared.get("me") {
             user = me.user
         }
@@ -54,6 +58,7 @@ final class AppState: ObservableObject {
     }
 
     private func forgetSignIn() {
+        DataCache.clear()
         APIClient.shared.token = nil
         user = nil
         if phase == .signedIn { phase = .signedOut }

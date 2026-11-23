@@ -42,7 +42,9 @@ final class APIClient {
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 60
+        config.timeoutIntervalForRequest = 30
+        config.waitsForConnectivity = false
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false
         session = URLSession(configuration: config)
@@ -55,6 +57,12 @@ final class APIClient {
 
     func get<T: Decodable>(_ path: String, as type: T.Type = T.self) async throws -> T {
         try await request("GET", path, body: nil)
+    }
+
+    /// The last good response for a GET, straight from the phone — no network.
+    func cached<T: Decodable>(_ path: String, as type: T.Type = T.self) -> T? {
+        guard let data = DataCache.load(path) else { return nil }
+        return try? decoder.decode(T.self, from: data)
     }
 
     func send<T: Decodable>(_ method: String, _ path: String, body: [String: Any]? = nil, as type: T.Type = T.self) async throws -> T {
@@ -104,7 +112,9 @@ final class APIClient {
         }
 
         do {
-            return try decoder.decode(T.self, from: data)
+            let value = try decoder.decode(T.self, from: data)
+            if method == "GET" { DataCache.store(data, for: path) }
+            return value
         } catch {
             #if DEBUG
             print("Decode error for \(path):", error)

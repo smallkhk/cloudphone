@@ -14,6 +14,12 @@ final class ProductStore<Owned: Decodable>: ObservableObject {
     init(type: String) { self.type = type }
 
     func load() async {
+        if products.isEmpty && owned.isEmpty, let saved: ProductsResponse<Owned> = APIClient.shared.cached("products/\(type)") {
+            products = saved.products
+            owned = saved.owned
+            devices = saved.devices
+            loading = false
+        }
         do {
             let r: ProductsResponse<Owned> = try await APIClient.shared.get("products/\(type)")
             withAnimation(.easeOut(duration: 0.25)) {

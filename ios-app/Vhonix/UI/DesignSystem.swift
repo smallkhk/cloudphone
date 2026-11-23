@@ -107,32 +107,27 @@ enum Appearance {
 
 // MARK: - Background
 
-/// Deep background with slow-drifting colour light. Stays still with Reduce Motion.
+/// Colour themes for the built-in background art (Resources/bg-*.jpg).
+enum Backdrop: String {
+    case indigo, pink, emerald, blue, violet
+}
+
+/// Pre-rendered background image shipped inside the app. Static on purpose:
+/// glass cards blur what's behind them, and a still image keeps that cheap.
 struct AppBackground: View {
-    var animated = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var drift = false
+    var backdrop: Backdrop = .indigo
 
     var body: some View {
-        ZStack {
-            Palette.bg
-            Circle().fill(Palette.indigo.opacity(0.32))
-                .frame(width: 440, height: 440).blur(radius: 120)
-                .offset(x: drift ? -150 : -70, y: drift ? -330 : -270)
-            Circle().fill(Palette.violet.opacity(0.20))
-                .frame(width: 380, height: 380).blur(radius: 130)
-                .offset(x: drift ? 170 : 120, y: drift ? -60 : -150)
-            Circle().fill(Palette.cyan.opacity(0.10))
-                .frame(width: 380, height: 380).blur(radius: 140)
-                .offset(x: drift ? -30 : 60, y: drift ? 440 : 360)
+        GeometryReader { geo in
+            Image("bg-\(backdrop.rawValue)")
+                .resizable()
+                .scaledToFill()
+                .frame(width: geo.size.width, height: geo.size.height)
+                .clipped()
         }
-        .drawingGroup()
+        .background(Palette.bg)
         .ignoresSafeArea()
         .accessibilityHidden(true)
-        .onAppear {
-            guard animated, !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 16).repeatForever(autoreverses: true)) { drift = true }
-        }
     }
 }
 
@@ -142,37 +137,54 @@ struct GlassCard: ViewModifier {
     var padding: CGFloat = 16
     var radius: CGFloat = 22
     var highlight = false
+    var tint: Color? = nil
 
     func body(content: Content) -> some View {
-        content
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                shape
                     .fill(.ultraThinMaterial)
-                    .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Palette.surface))
+                    .overlay(
+                        shape.fill(LinearGradient(
+                            colors: [(tint ?? .white).opacity(tint == nil ? 0.10 : 0.22), (tint ?? .white).opacity(0.02)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                    )
+                    .overlay(alignment: .top) {
+                        // Light catching the top edge of the glass.
+                        LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 36)
+                            .clipShape(shape)
+                    }
+                    .shadow(color: (tint ?? .black).opacity(tint == nil ? 0.28 : 0.30), radius: 18, y: 10)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(colors: [Color.white.opacity(highlight ? 0.30 : 0.14), Color.white.opacity(0.03)],
-                                       startPoint: .top, endPoint: .bottom),
-                        lineWidth: 1)
+                shape.strokeBorder(
+                    LinearGradient(colors: [Color.white.opacity(highlight ? 0.42 : 0.24), Color.white.opacity(0.04), Color.white.opacity(highlight ? 0.14 : 0.06)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                    lineWidth: 1)
             )
     }
 }
 
 extension View {
-    func glassCard(padding: CGFloat = 16, radius: CGFloat = 22, highlight: Bool = false) -> some View {
-        modifier(GlassCard(padding: padding, radius: radius, highlight: highlight))
+    func glassCard(padding: CGFloat = 16, radius: CGFloat = 22, highlight: Bool = false, tint: Color? = nil) -> some View {
+        modifier(GlassCard(padding: padding, radius: radius, highlight: highlight, tint: tint))
     }
 
-    /// Standard screen chrome: background, hidden indicators, keyboard dismissal.
-    func screenBackground(animated: Bool = false) -> some View {
+    /// Standard screen chrome: background art, hidden indicators, keyboard dismissal.
+    func screenBackground(_ backdrop: Backdrop = .indigo) -> some View {
         self
             .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
-            .background(AppBackground(animated: animated))
+            .background(AppBackground(backdrop: backdrop))
+    }
+
+    /// Glides a view in once, the first time it appears (staggered by index).
+    func entrance(_ index: Int = 0) -> some View {
+        modifier(Entrance(index: index))
     }
 }
 
@@ -277,34 +289,23 @@ extension ButtonStyle where Self == PressableStyle {
 struct BrandMark: View {
     var size: CGFloat = 88
     var showName = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var spin = false
 
     var body: some View {
         VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(AngularGradient(colors: [Palette.indigo, Palette.violet, Palette.cyan, Palette.indigo], center: .center))
-                    .frame(width: size * 1.25, height: size * 1.25)
-                    .blur(radius: 26)
-                    .opacity(0.55)
-                    .rotationEffect(.degrees(spin ? 360 : 0))
-
-                RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                    .fill(Theme.brand)
-                    .frame(width: size, height: size)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
-                    )
-                    .overlay(
-                        Text("V")
-                            .font(.system(size: size * 0.52, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
-                    )
-                    .shadow(color: Palette.violet.opacity(0.5), radius: 24, y: 10)
-            }
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(Theme.brand)
+                .frame(width: size, height: size)
+                .overlay(
+                    RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+                )
+                .overlay(
+                    Text("V")
+                        .font(.system(size: size * 0.52, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+                )
+                .shadow(color: Palette.violet.opacity(0.55), radius: 24, y: 10)
             if showName {
                 Text(Config.appName)
                     .font(Typo.rounded(.largeTitle, .bold))
@@ -313,10 +314,39 @@ struct BrandMark: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Config.appName)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.linear(duration: 18).repeatForever(autoreverses: false)) { spin = true }
-        }
+    }
+}
+
+/// Built-in illustration (Resources/art-*.png).
+struct ArtImage: View {
+    let name: String
+    var size: CGFloat = 120
+
+    var body: some View {
+        Image(name)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
+/// One-time staggered entrance. Skipped with Reduce Motion.
+struct Entrance: ViewModifier {
+    let index: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown || reduceMotion ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 18)
+            .scaleEffect(shown || reduceMotion ? 1 : 0.98)
+            .onAppear {
+                guard !shown else { return }
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.85).delay(Double(min(index, 8)) * 0.05)) { shown = true }
+            }
     }
 }
 

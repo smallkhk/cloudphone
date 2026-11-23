@@ -18,8 +18,9 @@ struct WalletView: View {
     var body: some View {
         LoadingView(isLoading: loading && wallet == nil, error: wallet == nil ? error : nil, retry: load) {
             if let wallet {
-                Screen(animatedBackground: true) {
+                Screen(backdrop: .emerald) {
                     BalanceCard(balance: wallet.balance, name: app.user?.name)
+                        .entrance(0)
 
                     if !pending.isEmpty {
                         SectionTitle(title: "Waiting for payment")
@@ -34,7 +35,7 @@ struct WalletView: View {
                     SectionTitle(title: "Activity")
                     if wallet.transactions.isEmpty {
                         EmptyStateView(icon: "list.bullet.rectangle.portrait.fill", title: "No activity yet",
-                                       message: "Top-ups and purchases will show up here.", colors: TileColors.slate)
+                                       message: "Top-ups and purchases will show up here.", colors: TileColors.slate, art: "art-wallet")
                             .glassCard()
                     } else {
                         VStack(spacing: 4) {
@@ -78,7 +79,12 @@ struct WalletView: View {
 
     @ViewBuilder
     private func topUp(_ wallet: Wallet) -> some View {
-        SectionTitle(title: "Add funds", subtitle: "Pay with crypto — credited automatically")
+        HStack(spacing: 8) {
+            SectionTitle(title: "Add funds", subtitle: "Pay with crypto — credited automatically")
+            Spacer(minLength: 0)
+            ArtImage(name: "art-wallet", size: 84)
+                .padding(.vertical, -18)
+        }
 
         if wallet.networks.isEmpty {
             NoteView(text: "Top-ups aren't available right now. Please contact support.", icon: "exclamationmark.triangle", tint: Palette.warning)
@@ -130,7 +136,8 @@ struct WalletView: View {
                 .buttonStyle(.primary)
                 .disabled(amountValue < wallet.minDeposit || network.isEmpty)
             }
-            .glassCard(padding: 18, highlight: true)
+            .glassCard(padding: 18, highlight: true, tint: Palette.success)
+            .entrance(1)
         }
     }
 
@@ -146,6 +153,11 @@ struct WalletView: View {
     }
 
     private func load() async {
+        if wallet == nil, let saved: Wallet = APIClient.shared.cached("wallet") {
+            wallet = saved
+            if network.isEmpty { network = saved.networks.first?.code ?? "" }
+            loading = false
+        }
         do {
             let w: Wallet = try await APIClient.shared.get("wallet")
             withAnimation(.easeOut(duration: 0.25)) { wallet = w }
@@ -168,7 +180,42 @@ struct BalanceCard: View {
     let balance: Double
     let name: String?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var tilt: CGSize = .zero
+    @State private var shine: CGFloat = -1
+
     var body: some View {
+        card
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(colors: [.clear, Color.white.opacity(0.35), .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: geo.size.width * 0.45)
+                        .rotationEffect(.degrees(20))
+                        .offset(x: shine * geo.size.width * 1.3)
+                        .blendMode(.plusLighter)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .allowsHitTesting(false)
+            )
+            .rotation3DEffect(.degrees(Double(tilt.width) / 14), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
+            // Simultaneous so a vertical swipe on the card still scrolls the page.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { value in
+                        guard !reduceMotion else { return }
+                        tilt = CGSize(width: max(-120, min(120, value.translation.width)), height: 0)
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) { tilt = .zero }
+                    }
+            )
+            .onAppear {
+                guard !reduceMotion, shine < 0 else { return }
+                withAnimation(.easeInOut(duration: 1.4).delay(0.3)) { shine = 1.2 }
+            }
+    }
+
+    private var card: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .fill(LinearGradient(colors: [Color(hex: 0x4A3BD6), Color(hex: 0x7B3FD9), Color(hex: 0x2A8FD6)],
