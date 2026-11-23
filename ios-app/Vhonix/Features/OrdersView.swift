@@ -7,27 +7,31 @@ struct OrdersView: View {
 
     var body: some View {
         LoadingView(isLoading: loading && orders.isEmpty, error: orders.isEmpty ? error : nil, retry: load) {
-            List {
+            Screen {
                 if orders.isEmpty {
-                    EmptyStateView(icon: "list.bullet.rectangle", title: "No orders yet")
+                    EmptyStateView(icon: "doc.text.fill", title: "No orders yet", message: "Everything you buy shows up here.", colors: TileColors.slate)
+                        .glassCard()
                 }
                 ForEach(orders) { order in
                     NavigationLink {
                         OrderDetailView(orderId: order.id)
                     } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(order.product ?? "Order").font(.subheadline.weight(.semibold))
+                        HStack(spacing: 14) {
+                            IconTile(symbol: productIcon(for: order.productType), colors: productColors(for: order.productType), size: 42)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(order.product ?? "Order").font(Typo.rounded(.subheadline, .bold)).foregroundStyle(Palette.text).lineLimit(1)
                                 Text("\(order.reference ?? "#\(order.id)") · \(Format.when(order.createdAt))")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(Palette.text3).lineLimit(1)
                             }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text(Format.money(order.total)).font(.subheadline)
+                            Spacer(minLength: 6)
+                            VStack(alignment: .trailing, spacing: 6) {
+                                Text(Format.money(order.total)).font(Typo.rounded(.subheadline, .bold)).foregroundStyle(Palette.text)
                                 StatusPill.forStatus(order.status)
                             }
                         }
+                        .glassCard(padding: 14)
                     }
+                    .buttonStyle(.pressable)
                 }
             }
         }
@@ -39,12 +43,32 @@ struct OrdersView: View {
     private func load() async {
         do {
             let r: OrdersResponse = try await APIClient.shared.get("orders")
-            orders = r.orders
+            withAnimation { orders = r.orders }
             error = nil
         } catch {
             self.error = (error as? APIError)?.message ?? error.localizedDescription
         }
         loading = false
+    }
+}
+
+func productIcon(for productType: String?) -> String {
+    switch productType {
+    case "email_account": return "envelope.fill"
+    case "phone_number": return "phone.fill"
+    case "cloud_number": return "antenna.radiowaves.left.and.right"
+    case "proxy": return "network"
+    default: return "iphone.gen3"
+    }
+}
+
+func productColors(for productType: String?) -> (Color, Color) {
+    switch productType {
+    case "email_account": return TileColors.cyan
+    case "phone_number": return TileColors.green
+    case "cloud_number": return TileColors.pink
+    case "proxy": return TileColors.orange
+    default: return TileColors.indigo
     }
 }
 
@@ -63,20 +87,32 @@ struct OrderDetailView: View {
     var body: some View {
         LoadingView(isLoading: loading && order == nil, error: order == nil ? error : nil, retry: load) {
             if let order {
-                List {
-                    Section {
-                        LabeledContent("Product", value: order.product ?? "—")
-                        LabeledContent("Quantity", value: "\(order.quantity ?? 1)")
-                        LabeledContent("Total", value: Format.money(order.total))
-                        LabeledContent("Status") { StatusPill.forStatus(order.status) }
-                        LabeledContent("Placed", value: Format.when(order.createdAt))
-                        if let e = order.error { Text(e).foregroundStyle(.red).font(.footnote) }
-                        if let e = order.proxyError?.nonEmpty { Text("Proxy: \(e)").foregroundStyle(.orange).font(.footnote) }
-                    } header: {
-                        Text(order.reference ?? "Order #\(order.id)")
+                Screen {
+                    VStack(spacing: 14) {
+                        IconTile(symbol: productIcon(for: order.productType), colors: productColors(for: order.productType), size: 60)
+                        Text(order.product ?? "Order").font(Typo.rounded(.title2, .bold)).foregroundStyle(Palette.text).multilineTextAlignment(.center)
+                        Text(Format.money(order.total)).font(.system(size: 36, weight: .bold, design: .rounded)).foregroundStyle(Theme.brandText)
+                        StatusPill.forStatus(order.status)
                     }
+                    .frame(maxWidth: .infinity)
+                    .glassCard(padding: 22, highlight: true)
+
+                    VStack(spacing: 12) {
+                        InfoRow(label: "Order", value: order.reference ?? "#\(order.id)")
+                        InfoRow(label: "Quantity", value: "\(order.quantity ?? 1)")
+                        InfoRow(label: "Placed", value: Format.when(order.createdAt))
+                        if let paid = order.paidAt { InfoRow(label: "Paid", value: Format.when(paid)) }
+                        if let e = order.error {
+                            NoteView(text: e, icon: "exclamationmark.triangle.fill", tint: Palette.danger)
+                        }
+                        if let e = order.proxyError?.nonEmpty {
+                            NoteView(text: "Proxy: \(e)", icon: "network", tint: Palette.warning)
+                        }
+                    }
+                    .glassCard(padding: 18)
 
                     if let p = order.payment, order.status == "pending_payment" {
+                        SectionTitle(title: "Complete your payment")
                         CryptoPaymentCard(
                             network: p.network, currency: p.currency, address: p.address,
                             amountCrypto: p.amountCrypto, amountUsd: p.amountUsd, expiresAt: p.expiresAt,
@@ -89,29 +125,34 @@ struct OrderDetailView: View {
                     }
 
                     if let devices = order.devices, !devices.isEmpty {
-                        Section("Cloud phones") {
-                            ForEach(devices) { d in DeviceRow(device: d) }
-                        }
+                        SectionTitle(title: "Cloud phones")
+                        ForEach(devices) { d in DeviceCard(device: d) }
                     }
                     if let items = order.emailAccounts, !items.isEmpty {
-                        Section("Email accounts") { ForEach(items) { EmailAccountCard(account: $0, refresh: nil) } }
+                        SectionTitle(title: "Email accounts")
+                        ForEach(items) { EmailAccountCard(account: $0, refresh: nil) }
                     }
                     if let items = order.phoneNumbers, !items.isEmpty {
-                        Section("Phone numbers") { ForEach(items) { PhoneNumberCard(number: $0, refresh: nil) } }
+                        SectionTitle(title: "Phone numbers")
+                        ForEach(items) { PhoneNumberCard(number: $0, refresh: nil) }
                     }
                     if let items = order.cloudNumbers, !items.isEmpty {
-                        Section("Cloud numbers") {
+                        SectionTitle(title: "Cloud numbers")
+                        VStack(spacing: 10) {
                             ForEach(items) { n in
                                 CopyRow(label: n.countryName ?? "Number", value: n.number ?? Format.status(n.purchaseStatus), monospaced: true)
                             }
                         }
+                        .glassCard()
                     }
                     if let items = order.proxies, !items.isEmpty {
-                        Section("Proxies") {
+                        SectionTitle(title: "Proxies")
+                        VStack(spacing: 10) {
                             ForEach(items) { p in
                                 CopyRow(label: p.title, value: p.host.map { "\($0):\(p.port.map { String($0) } ?? "")" } ?? Format.status(p.purchaseStatus), monospaced: true)
                             }
                         }
+                        .glassCard()
                     }
                 }
             }
@@ -133,7 +174,7 @@ struct OrderDetailView: View {
     private func load() async {
         do {
             let r: OrderResponse = try await APIClient.shared.get("orders/\(orderId)")
-            order = r.order
+            withAnimation { order = r.order }
             error = nil
         } catch {
             self.error = (error as? APIError)?.message ?? error.localizedDescription

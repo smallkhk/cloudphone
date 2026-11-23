@@ -13,24 +13,14 @@ struct CloudDriveView: View {
     var body: some View {
         LoadingView(isLoading: loading && drive == nil, error: drive == nil ? error : nil, retry: load) {
             if let drive {
-                List {
-                    Section("Storage") {
-                        if let s = drive.storage, s.totalBytes > 0 {
-                            VStack(alignment: .leading, spacing: 6) {
-                                ProgressView(value: Double(s.usedBytes), total: Double(max(s.totalBytes, 1)))
-                                Text("\(Format.bytes(s.usedBytes)) of \(Format.bytes(s.totalBytes)) used")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        } else {
-                            Text("Storage details aren't available right now.").foregroundStyle(.secondary)
-                        }
-                    }
+                Screen {
+                    storageCard(drive.storage)
 
-                    Section {
-                        TextField("Link to the file", text: $fileURL)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                        TextField("File name (optional)", text: $fileName)
-                        AsyncButton("Upload") {
+                    SectionTitle(title: "Upload from a link", subtitle: "Shared by all your cloud phones")
+                    VStack(alignment: .leading, spacing: 14) {
+                        GlassField(label: "File link", text: $fileURL, prompt: "https://…", keyboard: .URL)
+                        GlassField(label: "File name (optional)", text: $fileName, prompt: "my-file.apk", capitalization: .never)
+                        AsyncButton {
                             var body: [String: Any] = ["url": fileURL.trimmingCharacters(in: .whitespaces)]
                             if let n = fileName.nonEmpty { body["file_name"] = n }
                             if await app.act("cloud-drive/upload", body: body) != nil {
@@ -38,49 +28,47 @@ struct CloudDriveView: View {
                                 fileName = ""
                                 await load()
                             }
-                        }
+                        } label: { Label("Upload", systemImage: "icloud.and.arrow.up.fill") }
+                        .buttonStyle(.primary)
                         .disabled(URL(string: fileURL)?.scheme == nil)
-                    } header: {
-                        Text("Upload from a link")
-                    } footer: {
-                        Text("Shared by all your cloud phones.")
                     }
+                    .glassCard(padding: 18)
 
-                    Section("Files") {
-                        if drive.files.isEmpty {
-                            Text("No files yet.").foregroundStyle(.secondary)
-                        }
-                        ForEach(drive.files) { f in
-                            HStack {
-                                Image(systemName: "doc").foregroundStyle(Theme.accent)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(f.name).lineLimit(1)
-                                    Text([f.sizeBytes > 0 ? Format.bytes(f.sizeBytes) : nil, f.createdAt].compactMap { $0 }.joined(separator: " · "))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            .swipeActions {
-                                Button("Delete", role: .destructive) { deleting = f }
+                    SectionTitle(title: "Files", subtitle: "\(drive.files.count) item\(drive.files.count == 1 ? "" : "s")")
+                    if drive.files.isEmpty {
+                        EmptyStateView(icon: "folder.fill", title: "No files yet", message: "Upload one above.", colors: TileColors.cyan)
+                            .glassCard()
+                    } else {
+                        VStack(spacing: 4) {
+                            ForEach(Array(drive.files.enumerated()), id: \.element.id) { index, f in
+                                if index > 0 { CardDivider() }
+                                fileRow(f)
                             }
                         }
+                        .glassCard(padding: 12)
                     }
 
-                    Section {
+                    SectionTitle(title: "Backups", subtitle: "Snapshot a whole phone")
+                    VStack(alignment: .leading, spacing: 14) {
                         if drive.devices.isEmpty {
-                            Text("You need a ready cloud phone to make a backup.").foregroundStyle(.secondary)
+                            NoteView(text: "You need a ready cloud phone to make a backup.", icon: "iphone.slash", tint: Palette.warning)
                         } else {
                             DevicePicker(devices: drive.devices, padCode: $backupDevice)
-                            AsyncButton("Back up this phone") {
+                            AsyncButton {
                                 if await app.act("cloud-drive/backup", body: ["pad_code": backupDevice]) != nil { await load() }
-                            }
+                            } label: { Label("Back up this phone", systemImage: "externaldrive.badge.timemachine") }
+                            .buttonStyle(.primary)
                             .disabled(backupDevice.isEmpty)
                         }
+
                         ForEach(drive.backups) { b in
-                            HStack {
+                            CardDivider()
+                            HStack(spacing: 12) {
+                                IconTile(symbol: "clock.arrow.circlepath", colors: TileColors.indigo, size: 36)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(b.device ?? "Backup").font(.subheadline)
+                                    Text(b.device ?? "Backup").font(Typo.rounded(.subheadline, .semibold)).foregroundStyle(Palette.text)
                                     Text(Format.when(b.createdAt) + (b.progress.map { " · \($0)%" } ?? ""))
-                                        .font(.caption).foregroundStyle(.secondary)
+                                        .font(.caption).foregroundStyle(Palette.text3)
                                 }
                                 Spacer()
                                 StatusPill.forStatus(b.status)
@@ -88,17 +76,20 @@ struct CloudDriveView: View {
                                     if await app.act("cloud-drive/backup/\(b.id)/progress") != nil { await load() }
                                 } label: {
                                     Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Palette.accentText)
+                                        .frame(width: 44, height: 44)
                                 }
-                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Refresh backup progress")
                             }
                         }
-                    } header: {
-                        Text("Backups")
                     }
+                    .glassCard(padding: 18)
                 }
             }
         }
         .navigationTitle("Cloud Drive")
+        .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task { await load() }
         .confirmationDialog("Delete \(deleting?.name ?? "this file")?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
@@ -112,9 +103,60 @@ struct CloudDriveView: View {
         }
     }
 
+    private func storageCard(_ s: DriveStorage?) -> some View {
+        let fraction = s.map { $0.totalBytes > 0 ? min(1, Double($0.usedBytes) / Double($0.totalBytes)) : 0 } ?? 0
+
+        return HStack(spacing: 20) {
+            ZStack {
+                Circle().stroke(Palette.surfaceStrong, lineWidth: 10)
+                Circle().trim(from: 0, to: fraction)
+                    .stroke(Theme.brand, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.8), value: fraction)
+                Text("\(Int(fraction * 100))%").font(Typo.rounded(.headline, .bold)).foregroundStyle(Palette.text)
+            }
+            .frame(width: 86, height: 86)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Storage").font(.caption.weight(.semibold)).foregroundStyle(Palette.text3)
+                if let s, s.totalBytes > 0 {
+                    Text(Format.bytes(s.usedBytes)).font(Typo.rounded(.title2, .bold)).foregroundStyle(Palette.text)
+                    Text("of \(Format.bytes(s.totalBytes)) used").font(.subheadline).foregroundStyle(Palette.text2)
+                } else {
+                    Text("Not available right now").font(.subheadline).foregroundStyle(Palette.text2)
+                }
+            }
+            Spacer()
+        }
+        .glassCard(padding: 18, highlight: true)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func fileRow(_ f: DriveFile) -> some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: f.name.lowercased().hasSuffix(".apk") ? "shippingbox.fill" : "doc.fill",
+                     colors: f.name.lowercased().hasSuffix(".apk") ? TileColors.green : TileColors.cyan, size: 38)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(f.name).font(Typo.rounded(.subheadline, .semibold)).foregroundStyle(Palette.text).lineLimit(1)
+                Text([f.sizeBytes > 0 ? Format.bytes(f.sizeBytes) : nil, f.createdAt].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(Palette.text3)
+            }
+            Spacer()
+            Button { deleting = f } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Palette.danger)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Delete \(f.name)")
+        }
+        .frame(minHeight: 50)
+    }
+
     private func load() async {
         do {
-            drive = try await APIClient.shared.get("cloud-drive")
+            let d: CloudDrive = try await APIClient.shared.get("cloud-drive")
+            withAnimation(.easeOut(duration: 0.25)) { drive = d }
             error = nil
         } catch {
             self.error = (error as? APIError)?.message ?? error.localizedDescription

@@ -45,13 +45,13 @@ struct DeviceRef: Decodable, Identifiable, Hashable {
     let padCode: String
 }
 
-struct InfoRow: Decodable, Hashable {
+struct InfoRowData: Decodable, Hashable {
     let label: String
     let value: String
 }
 
 struct DeviceDetails: Decodable {
-    let rows: [InfoRow]
+    let rows: [InfoRowData]
     let simCountry: String?
     let timezone: String?
     let latitude: Double?

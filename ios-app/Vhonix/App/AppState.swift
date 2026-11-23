@@ -63,12 +63,13 @@ final class AppState: ObservableObject {
 
     func show(_ text: String, error: Bool = false) {
         bannerTask?.cancel()
-        withAnimation { banner = Banner(text: text, isError: error) }
+        error ? Haptics.error() : Haptics.success()
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { banner = Banner(text: text, isError: error) }
 
         bannerTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(error ? 6 : 4) * 1_000_000_000)
             guard !Task.isCancelled else { return }
-            withAnimation { self?.banner = nil }
+            withAnimation(.easeInOut(duration: 0.3)) { self?.banner = nil }
         }
     }
 

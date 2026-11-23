@@ -10,13 +10,15 @@ struct VhonixApp: App {
         // goes to the background, without stopping music from other apps.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
+        Appearance.apply()
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(app)
-                .tint(Theme.accent)
+                .tint(Palette.accentText)
+                .preferredColorScheme(.dark)
         }
     }
 }

@@ -16,9 +16,11 @@ final class ProductStore<Owned: Decodable>: ObservableObject {
     func load() async {
         do {
             let r: ProductsResponse<Owned> = try await APIClient.shared.get("products/\(type)")
-            products = r.products
-            owned = r.owned
-            devices = r.devices
+            withAnimation(.easeOut(duration: 0.25)) {
+                products = r.products
+                owned = r.owned
+                devices = r.devices
+            }
             error = nil
         } catch {
             self.error = (error as? APIError)?.message ?? error.localizedDescription
@@ -43,40 +45,51 @@ struct BuyProductView: View {
     @State private var busy = false
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    LabeledContent("Product", value: sku.name)
-                    if let c = sku.countryName { LabeledContent("Country", value: "\(Format.flag(sku.countryCode)) \(c)") }
-                    if let d = sku.durationLabel { LabeledContent("Duration", value: d) }
-                    LabeledContent("Price", value: Format.money(sku.price))
-                    if maxQuantity > 1 {
-                        Stepper("Quantity: \(quantity)", value: $quantity, in: 1...maxQuantity)
-                    }
-                }
-
-                Section {
-                    LabeledContent("Total", value: Format.money(sku.price * Double(quantity))).font(.headline)
-                } footer: {
-                    Text("Next you'll see the crypto address and exact amount to pay. Delivery starts automatically once payment confirms.")
-                }
-
-                Section {
-                    Button {
-                        Task { await buy() }
-                    } label: {
-                        if busy { ProgressView().tint(.white) } else { Text("Continue to payment") }
-                    }
-                    .buttonStyle(.primary)
-                    .disabled(busy)
-                    .listRowBackground(Color.clear)
+        SheetScaffold(title: "Checkout") {
+            HStack(spacing: 14) {
+                IconTile(symbol: productIcon(for: sku.type), colors: productColors(for: sku.type), size: 54)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(sku.name).font(Typo.rounded(.title3, .bold)).foregroundStyle(Palette.text)
+                    Text([sku.countryName.map { "\(Format.flag(sku.countryCode)) \($0)" }, sku.durationLabel].compactMap { $0 }.joined(separator: " · "))
+                        .font(.subheadline).foregroundStyle(Palette.text2)
                 }
             }
-            .navigationTitle("Checkout")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            .glassCard(highlight: true)
+
+            VStack(spacing: 14) {
+                InfoRow(label: "Price", value: Format.money(sku.price))
+                if maxQuantity > 1 {
+                    CardDivider()
+                    HStack {
+                        Text("Quantity").font(Typo.rounded(.body, .semibold)).foregroundStyle(Palette.text)
+                        Spacer()
+                        QuantityStepper(value: $quantity, range: 1...maxQuantity)
+                    }
+                }
+                CardDivider()
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Total").font(Typo.rounded(.headline, .bold)).foregroundStyle(Palette.text)
+                    Spacer()
+                    Text(Format.money(sku.price * Double(quantity))).font(Typo.rounded(.title, .bold)).foregroundStyle(Palette.text)
+                        .contentTransition(.numericText())
+                        .animation(.spring(), value: quantity)
+                }
             }
+            .glassCard(padding: 18)
+
+            Button {
+                Task { await buy() }
+            } label: {
+                HStack(spacing: 10) {
+                    if busy { ProgressView().tint(.white) }
+                    Text("Continue to payment")
+                    Image(systemName: "arrow.right")
+                }
+            }
+            .buttonStyle(.primary)
+            .disabled(busy)
+
+            NoteView(text: "Next you'll see the crypto address and exact amount to pay. Delivery starts automatically once it confirms.", icon: "lock.shield")
         }
     }
 
@@ -91,44 +104,50 @@ struct BuyProductView: View {
     }
 }
 
+/// One buyable product as a card row.
 struct ProductRow: View {
     let sku: Sku
 
     var body: some View {
-        HStack {
+        HStack(spacing: 14) {
+            Text(Format.flag(sku.countryCode)).font(.title2)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Palette.surfaceStrong))
             VStack(alignment: .leading, spacing: 3) {
-                Text(sku.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                HStack(spacing: 6) {
-                    if let c = sku.countryName { Text("\(Format.flag(sku.countryCode)) \(c)") }
-                    if let d = sku.durationLabel { Text(d) }
-                }
-                .font(.caption).foregroundStyle(.secondary)
+                Text(sku.name).font(Typo.rounded(.subheadline, .bold)).foregroundStyle(Palette.text).lineLimit(2)
+                Text([sku.countryName, sku.durationLabel].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(Palette.text3).lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: 6)
             if sku.soldOut == true {
-                StatusPill(text: "Sold out", color: .red)
+                StatusPill(text: "Sold out", color: Palette.danger)
             } else {
-                Text(Format.money(sku.price)).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.accent)
+                Text(Format.money(sku.price)).font(Typo.rounded(.headline, .bold)).foregroundStyle(Theme.brandText)
             }
         }
+        .glassCard(padding: 14)
     }
 }
 
-/// "Buy" list grouped by country where it matters.
+/// A list of buyable products.
 struct ProductCatalogSection: View {
     let title: String
     let products: [Sku]
     let select: (Sku) -> Void
 
     var body: some View {
-        Section(title) {
-            if products.isEmpty {
-                Text("Nothing available right now.").foregroundStyle(.secondary)
-            }
-            ForEach(products) { sku in
-                Button { select(sku) } label: { ProductRow(sku: sku) }
-                    .disabled(sku.soldOut == true)
-            }
+        SectionTitle(title: title)
+        if products.isEmpty {
+            EmptyStateView(icon: "shippingbox.fill", title: "Nothing available right now", message: "Check back a little later.", colors: TileColors.slate)
+                .glassCard()
+        }
+        ForEach(products) { sku in
+            Button {
+                Haptics.tap()
+                select(sku)
+            } label: { ProductRow(sku: sku) }
+            .buttonStyle(.pressable)
+            .disabled(sku.soldOut == true)
         }
     }
 }

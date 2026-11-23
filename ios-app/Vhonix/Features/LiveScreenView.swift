@@ -20,12 +20,13 @@ struct LiveScreenView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 0) {
+            VStack(spacing: 10) {
                 topBar
 
                 ZStack {
                     if let url = model.url {
                         LiveWebView(url: url, model: model)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
 
                     if model.state != "live" {
@@ -33,6 +34,7 @@ struct LiveScreenView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 6)
 
                 controlBar
             }
@@ -42,46 +44,62 @@ struct LiveScreenView: View {
         .persistentSystemOverlays(.hidden)
         .task { await model.open(deviceId: deviceId) }
         .onDisappear { model.teardown() }
+        .onChange(of: model.state) { state in
+            if state == "live" { Haptics.success() } else if state == "error" { Haptics.error() }
+        }
     }
 
     private var topBar: some View {
         HStack(spacing: 12) {
             Button {
+                Haptics.tap()
                 model.teardown()
                 dismiss()
             } label: {
-                Image(systemName: "xmark").font(.headline).frame(width: 36, height: 36)
-                    .background(Color.white.opacity(0.12)).clipShape(Circle())
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.white.opacity(0.12)))
             }
+            .accessibilityLabel("Close live screen")
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                HStack(spacing: 5) {
-                    Circle().fill(model.state == "live" ? Color.green : (model.state == "error" ? Color.red : Color.orange))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(Typo.rounded(.subheadline, .bold)).lineLimit(1)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(model.state == "live" ? Palette.success : (model.state == "error" ? Palette.danger : Palette.warning))
                         .frame(width: 7, height: 7)
-                    Text(model.stateLabel).font(.caption2).foregroundStyle(.white.opacity(0.7))
+                        .shadow(color: model.state == "live" ? Palette.success : .clear, radius: 4)
+                    Text(model.stateLabel).font(.caption2.weight(.semibold)).foregroundStyle(Palette.text2)
                 }
             }
 
             Spacer()
 
             Button {
+                Haptics.tap()
                 model.reconnect()
             } label: {
-                Image(systemName: "arrow.triangle.2.circlepath").frame(width: 36, height: 36)
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.white.opacity(0.12)))
             }
+            .accessibilityLabel("Reconnect")
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .padding(.top, 4)
     }
 
     private var overlay: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             if model.state == "error" || model.loadError != nil {
-                Image(systemName: "exclamationmark.triangle").font(.largeTitle).foregroundStyle(.orange)
+                IconTile(symbol: "wifi.exclamationmark", colors: TileColors.orange, size: 64)
                 Text(model.loadError ?? model.error ?? "The connection dropped.")
-                    .multilineTextAlignment(.center).foregroundStyle(.white.opacity(0.85))
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Palette.text2)
                 Button("Try again") {
                     if model.url == nil {
                         Task { await model.open(deviceId: deviceId) }
@@ -89,24 +107,32 @@ struct LiveScreenView: View {
                         model.reconnect()
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.primary)
+                .frame(maxWidth: 220)
             } else if model.state == "idle" && model.url != nil && model.hasConnectedOnce {
-                Text("Disconnected").foregroundStyle(.white.opacity(0.8))
-                Button("Reconnect") { model.reconnect() }.buttonStyle(.borderedProminent)
+                IconTile(symbol: "pause.fill", colors: TileColors.slate, size: 64)
+                Text("Disconnected").font(Typo.rounded(.headline, .semibold)).foregroundStyle(Palette.text2)
+                Button("Reconnect") { model.reconnect() }
+                    .buttonStyle(.primary)
+                    .frame(maxWidth: 220)
             } else {
-                ProgressView().tint(.white).scaleEffect(1.3)
-                Text(model.hint?.nonEmpty ?? "Connecting to your phone…").foregroundStyle(.white.opacity(0.7))
+                ZStack {
+                    Circle().fill(Theme.brand).frame(width: 110, height: 110).blur(radius: 34).opacity(0.5)
+                    BrandMark(size: 64, showName: false)
+                }
+                ProgressView().tint(.white)
+                Text(model.hint?.nonEmpty ?? "Connecting to your phone…")
+                    .font(.subheadline).foregroundStyle(Palette.text2)
             }
         }
         .padding(30)
-        .allowsHitTesting(true)
     }
 
     private var controlBar: some View {
-        HStack {
+        HStack(spacing: 2) {
             toolButton("chevron.backward", "Back") { model.call("pressBack()") }
             toolButton("circle", "Home") { model.call("pressHome()") }
-            toolButton("square", "Recents") { model.call("pressRecents()") }
+            toolButton("square.on.square", "Recents") { model.call("pressRecents()") }
             toolButton("keyboard", "Keyboard") { model.call("showKeyboard()") }
 
             Menu {
@@ -131,34 +157,45 @@ struct LiveScreenView: View {
                     Label("Find cameras", systemImage: "arrow.clockwise")
                 }
             } label: {
-                toolLabel("camera", "Camera")
+                toolLabel("camera.fill", "Camera")
             }
 
-            toolButton(model.muted ? "speaker.slash" : "speaker.wave.2", "Sound") {
+            toolButton(model.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", "Sound") {
                 model.muted.toggle()
                 model.call("toggleSound()")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-        .background(Color.black)
+        .padding(6)
+        .background(
+            Capsule().fill(.ultraThinMaterial)
+                .overlay(Capsule().fill(Color.white.opacity(0.04)))
+        )
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
         .disabled(model.state != "live")
         .opacity(model.state == "live" ? 1 : 0.45)
+        .animation(.easeOut(duration: 0.25), value: model.state)
     }
 
     private func toolButton(_ icon: String, _ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { toolLabel(icon, label) }
+        Button {
+            Haptics.tap()
+            action()
+        } label: { toolLabel(icon, label) }
+        .buttonStyle(.pressable)
     }
 
     private func toolLabel(_ icon: String, _ label: String) -> some View {
         VStack(spacing: 3) {
-            Image(systemName: icon).font(.system(size: 19, weight: .medium))
-            Text(label).font(.system(size: 10))
+            Image(systemName: icon).font(.system(size: 18, weight: .semibold))
+            Text(label).font(Typo.rounded(.caption2, .medium))
         }
         .foregroundStyle(.white)
-        .frame(maxWidth: .infinity, minHeight: 46)
+        .frame(maxWidth: .infinity, minHeight: 50)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
     }
 }
 

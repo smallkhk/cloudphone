@@ -340,6 +340,18 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   touches `ios-app/**`. Bump `ios-app/VERSION` for a new release number
   (same version re-uploads over the old `.ipa`). The desktop workflow now has
   a matching `paths:` filter so app/site commits don't rebuild the desktop app.
+- **Design system (v1.2.0 redesign)** — dark-first, all in `ios-app/Vhonix/UI/`:
+  `DesignSystem.swift` holds the tokens (`Palette`, `Theme`, `Typo` rounded
+  type, `Haptics`, nav-bar `Appearance`), the drifting-glow `AppBackground`,
+  `.glassCard()`, button styles (`.primary`, `.glass`, `.chip`,
+  `.pressable`), `IconTile`/`TileColors`; `Components.swift` has the shared
+  pieces (`Screen`, `GlassField`, `SelectRow` + searchable picker sheet,
+  `PillPicker`, `QuantityStepper`, `StatusPill`, shimmer `LoadingView`,
+  `EmptyStateView`, `CryptoPaymentCard` with live countdown, `SheetScaffold`).
+  The tab bar is a custom floating glass capsule (`MainTabView`), not
+  `TabView`. Text colours were contrast-checked with the HIG tool against the
+  card surface — don't use white below 0.52 opacity for text. Every tap
+  target is ≥44pt; animations respect Reduce Motion.
 - **Background**: `UIBackgroundModes: audio` + a `.playback`/`.mixWithOthers`
   audio session, so an open live screen keeps streaming when the user
   switches apps. iOS only keeps a background app alive while it's actually
