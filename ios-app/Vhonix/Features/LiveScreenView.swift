@@ -218,6 +218,8 @@ final class LiveScreenModel: ObservableObject {
     @Published var hasConnectedOnce = false
 
     weak var webView: WKWebView?
+    /// True once the loaded page has reported in — i.e. `window.vhonixLive` exists.
+    var pageReady = false
     private var deviceId: Int?
 
     var stateLabel: String {
@@ -232,9 +234,15 @@ final class LiveScreenModel: ObservableObject {
     func open(deviceId: Int) async {
         self.deviceId = deviceId
         loadError = nil
+        error = nil
         state = "connecting"
+        pageReady = false
+        // Dropping the old address removes the old web view, so the new link
+        // always loads in a clean one (even if it happens to match the old URL).
+        url = nil
 
         do {
+            // Always a fresh link: the page address is signed and only valid for 10 minutes.
             let link: LiveLink = try await APIClient.shared.send("POST", "devices/\(deviceId)/live")
             url = URL(string: link.url)
         } catch {
@@ -258,12 +266,24 @@ final class LiveScreenModel: ObservableObject {
     func reconnect() {
         error = nil
         state = "connecting"
-        if webView != nil {
+        if webView != nil, pageReady, loadError == nil {
             call("disconnect()")
             call("connect()")
-        } else if let deviceId {
-            Task { await open(deviceId: deviceId) }
+        } else {
+            reload()
         }
+    }
+
+    /// Loads the page again from a brand-new signed link (the old one may have expired).
+    func reload() {
+        guard let deviceId else { return }
+        Task { await open(deviceId: deviceId) }
+    }
+
+    func pageFailed(_ message: String) {
+        pageReady = false
+        state = "error"
+        loadError = message
     }
 
     func teardown() {
@@ -275,6 +295,7 @@ final class LiveScreenModel: ObservableObject {
 
         switch type {
         case "state":
+            pageReady = true
             state = msg["state"] as? String ?? state
             error = (msg["error"] as? String)?.nonEmpty
             hint = (msg["hint"] as? String)?.nonEmpty
@@ -356,7 +377,7 @@ struct LiveWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
                      initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
                      decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-            decisionHandler(origin.host.hasSuffix("vhonixcloud.com") ? .grant : .deny)
+            decisionHandler(Self.isOurs(origin.host) ? .grant : .deny)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -370,23 +391,52 @@ struct LiveWebView: UIViewRepresentable {
         // Never leave the live page for another site inside this view.
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let host = action.request.url?.host, !host.hasSuffix("vhonixcloud.com"), action.targetFrame?.isMainFrame == true {
+            if let host = action.request.url?.host, !Self.isOurs(host), action.targetFrame?.isMainFrame == true {
                 decisionHandler(.cancel)
                 return
             }
             decisionHandler(.allow)
         }
 
+        // The page itself failed (e.g. its 10-minute link expired → 403). That's
+        // a "successful" load to WebKit, so catch the status code here.
+        func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+            if navigationResponse.isForMainFrame,
+               let status = (navigationResponse.response as? HTTPURLResponse)?.statusCode,
+               !(200..<300).contains(status) {
+                decisionHandler(.cancel)
+                Task { @MainActor in
+                    self.model.pageFailed("The live screen couldn't open (the link may have expired). Tap Try again.")
+                }
+                return
+            }
+            decisionHandler(.allow)
+        }
+
+        // iOS killed the web page (memory pressure, often while in the background).
+        // Reloading the same address would hit an expired link, so fetch a new one.
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-            webView.reload()
+            Task { @MainActor in
+                self.model.pageReady = false
+                self.model.reload()
+            }
         }
 
         private func report(_ error: Error) {
-            if (error as NSError).code == NSURLErrorCancelled { return }
+            let ns = error as NSError
+            if ns.code == NSURLErrorCancelled { return }
+            // 102 = load stopped by our own policy decision above; already reported.
+            if ns.domain == "WebKitErrorDomain", ns.code == 102 { return }
             Task { @MainActor in
-                self.model.state = "error"
-                self.model.loadError = "Couldn't load the live screen. Check your connection and try again."
+                self.model.pageFailed("Couldn't load the live screen. Check your connection and try again.")
             }
+        }
+
+        /// vhonixcloud.com or one of its subdomains — not e.g. "evilvhonixcloud.com".
+        nonisolated static func isOurs(_ host: String) -> Bool {
+            let h = host.lowercased()
+            return h == "vhonixcloud.com" || h.hasSuffix(".vhonixcloud.com")
         }
     }
 }
