@@ -167,12 +167,11 @@ struct LocaleSettingsView: View {
         ("id", "Indonesian"), ("ms", "Malay"), ("hi", "Hindi"), ("nl", "Dutch"), ("pl", "Polish"),
     ]
 
-    private var zones: [PickOption] {
-        [PickOption(id: "", title: "Don't change")] + TimeZone.knownTimeZoneIdentifiers.map { id in
-            let abbr = TimeZone(identifier: id)?.abbreviation() ?? ""
-            return PickOption(id: id, title: id.replacingOccurrences(of: "_", with: " "), subtitle: abbr)
-        }
+    // Built once, not on every redraw (~400 timezones).
+    private static let zones: [PickOption] = [PickOption(id: "", title: "Don't change")] + TimeZone.knownTimeZoneIdentifiers.map { id in
+        PickOption(id: id, title: id.replacingOccurrences(of: "_", with: " "), subtitle: TimeZone(identifier: id)?.abbreviation())
     }
+    private var zones: [PickOption] { Self.zones }
 
     private var languageOptions: [PickOption] {
         [PickOption(id: "", title: "Don't change")] + Self.languages.map { PickOption(id: $0.0, title: $0.1, subtitle: $0.0) }

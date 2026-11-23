@@ -1,13 +1,36 @@
 import Foundation
 
 enum Format {
-    static func money(_ value: Double?) -> String {
-        guard let value else { return "—" }
+    // Formatters are expensive to create; build each one once.
+    private static let currency: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .currency
         f.currencyCode = "USD"
         f.locale = Locale(identifier: "en_US")
-        return f.string(from: NSNumber(value: value)) ?? String(format: "$%.2f", value)
+        return f
+    }()
+    private static let iso = ISO8601DateFormatter()
+    private static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let plain: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f
+    }()
+    private static let relativeFormatter = RelativeDateTimeFormatter()
+    private static let bytesFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        return f
+    }()
+
+    static func money(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        return currency.string(from: NSNumber(value: value)) ?? String(format: "$%.2f", value)
     }
 
     static func crypto(_ value: Double?) -> String {
@@ -18,16 +41,10 @@ enum Format {
     }
 
     static func date(_ iso: String?) -> Date? {
-        guard let iso else { return nil }
-        let f = ISO8601DateFormatter()
-        if let d = f.date(from: iso) { return d }
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: iso) { return d }
-
-        let plain = DateFormatter()
-        plain.locale = Locale(identifier: "en_US_POSIX")
-        plain.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return plain.date(from: iso)
+        guard let value = iso else { return nil }
+        if let d = Self.iso.date(from: value) { return d }
+        if let d = isoFractional.date(from: value) { return d }
+        return plain.date(from: value)
     }
 
     static func when(_ iso: String?) -> String {
@@ -38,11 +55,11 @@ enum Format {
 
     static func relative(_ iso: String?) -> String {
         guard let d = date(iso) else { return iso ?? "—" }
-        return RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date())
+        return relativeFormatter.localizedString(for: d, relativeTo: Date())
     }
 
     static func bytes(_ value: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
+        bytesFormatter.string(fromByteCount: value)
     }
 
     /// "awaiting_payment" -> "Awaiting payment"

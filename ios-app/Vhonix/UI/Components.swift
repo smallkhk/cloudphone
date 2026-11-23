@@ -11,7 +11,9 @@ struct Screen<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: spacing) {
+            // Lazy: rows off screen aren't built. A plain VStack built every
+            // card at once and froze the app on long lists (watchdog kill).
+            LazyVStack(alignment: .leading, spacing: spacing) {
                 content()
             }
             .padding(.horizontal, 16)
@@ -102,7 +104,6 @@ struct CopyRow: View {
                 Text(value?.nonEmpty ?? "—")
                     .font(monospaced ? .system(.callout, design: .monospaced, weight: .medium) : Typo.rounded(.callout, .medium))
                     .foregroundStyle(Palette.text)
-                    .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)

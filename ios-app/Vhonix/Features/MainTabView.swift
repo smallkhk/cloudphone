@@ -3,16 +3,14 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject private var app: AppState
 
-    private let tabs: [MainTab] = [.devices, .shop, .wallet, .more]
-
     var body: some View {
+        // Only the open tab exists. Keeping all four built at once (1.2/1.3)
+        // multiplied the work on every update; data comes back instantly from
+        // the on-phone cache when a tab is reopened.
         ZStack {
-            ForEach(tabs, id: \.self) { tab in
-                root(for: tab)
-                    .opacity(app.tab == tab ? 1 : 0)
-                    .allowsHitTesting(app.tab == tab)
-                    .accessibilityHidden(app.tab != tab)
-            }
+            root(for: app.tab)
+                .id(app.tab)
+                .transition(.opacity)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: 76) }
         .overlay(alignment: .bottom) {

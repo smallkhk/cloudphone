@@ -141,28 +141,26 @@ struct GlassCard: ViewModifier {
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        let base = tint ?? .white
         return content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                shape
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        shape.fill(LinearGradient(
-                            colors: [(tint ?? .white).opacity(tint == nil ? 0.10 : 0.22), (tint ?? .white).opacity(0.02)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing))
-                    )
-                    .overlay(alignment: .top) {
-                        // Light catching the top edge of the glass.
-                        LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .bottom)
-                            .frame(height: 36)
-                            .clipShape(shape)
-                    }
-                    .shadow(color: (tint ?? .black).opacity(tint == nil ? 0.28 : 0.30), radius: 18, y: 10)
+                // Plain drawn layers — deliberately NOT a material. A material is
+                // a real UIKit blur view; hundreds of them froze the app.
+                shape.fill(
+                    LinearGradient(
+                        colors: [
+                            base.opacity(tint == nil ? 0.13 : 0.26),
+                            Color(hex: 0x0E1019).opacity(0.55),
+                            base.opacity(tint == nil ? 0.05 : 0.10),
+                        ],
+                        startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
             )
             .overlay(
                 shape.strokeBorder(
-                    LinearGradient(colors: [Color.white.opacity(highlight ? 0.42 : 0.24), Color.white.opacity(0.04), Color.white.opacity(highlight ? 0.14 : 0.06)],
+                    LinearGradient(colors: [Color.white.opacity(highlight ? 0.45 : 0.26), Color.white.opacity(0.05), Color.white.opacity(highlight ? 0.16 : 0.08)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing),
                     lineWidth: 1)
             )
@@ -369,7 +367,6 @@ struct IconTile: View {
                 RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
             )
-            .shadow(color: colors.0.opacity(0.35), radius: 8, y: 4)
             .accessibilityHidden(true)
     }
 }
