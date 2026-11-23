@@ -223,6 +223,7 @@ enum VirtualCamera {
     },
 
     kind: function (u) {
+      if (/live\.php\?(?:.*&)?s=[a-f0-9]{20}/i.test(u)) return 'share';
       if (/whep/i.test(u)) return 'whep';
       if (/mjpe?g|\.cgi(\?|$)|action=stream/i.test(u)) return 'mjpeg';
       if (/\.(jpe?g|png|gif|webp)(\?|$)/i.test(u)) return 'snapshot';
@@ -234,6 +235,8 @@ enum VirtualCamera {
       clearTimeout(this.retry);
       if (!u) { this.setStatus('off', 'No link set.'); return; }
       this.setStatus('connecting', 'Connecting to your video…');
+
+      if (k === 'share') { this.startShare(u); return; }
 
       if (k === 'mjpeg' || k === 'snapshot') {
         var img = new Image();
@@ -311,6 +314,103 @@ enum VirtualCamera {
       await pc.setRemoteDescription({ type: 'answer', sdp: sdp });
     },
 
+    // ---- Camera share links (live.php?s=…): JPEG frames + raw PCM audio chunks ----
+
+    startShare: function (u) {
+      var self = this;
+      var m = u.match(/^(.*?live\.php)\?(?:.*&)?s=([a-f0-9]{20})/i);
+      if (!m) { this.fail('That share link looks incomplete. Copy the whole link again.'); return; }
+      var base = m[1], token = m[2].toLowerCase();
+      var vid = 'vhonix' + Math.random().toString(36).slice(2, 12);
+      var share = { stopped: false };
+      this.share = share;
+      function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+      function q(action, extra) { return base + '?action=' + action + '&s=' + token + '&v=' + vid + (extra || '') + '&_=' + Date.now(); }
+
+      // Picture: fetch the newest frame about 10 times a second.
+      (async function () {
+        var misses = 0;
+        while (!share.stopped) {
+          var t0 = Date.now();
+          try {
+            var r = await fetch(q('view'), { cache: 'no-store' });
+            if (share.stopped) break;
+            if (r.status === 200) {
+              var blob = await r.blob();
+              var url = URL.createObjectURL(blob);
+              var im = new Image();
+              await new Promise(function (res) { im.onload = res; im.onerror = res; im.src = url; });
+              URL.revokeObjectURL(url);
+              if (share.stopped) break;
+              if (im.naturalWidth) {
+                self.img = im;
+                misses = 0;
+                if (self.status !== 'live') self.setStatus('live', '');
+              }
+            } else if (r.status === 404) {
+              self.img = null;
+              self.setStatus('error', 'This camera share link isn\'t active. Open the camera site, start sharing, then try again.');
+              await sleep(4000);
+            } else {
+              // 204: the share exists but no fresh frame (the camera isn't sending right now).
+              if (++misses >= 15) {
+                self.img = null;
+                if (self.status !== 'connecting' || !self.message) self.setStatus('connecting', 'Waiting for your camera — start sharing on the camera site.');
+              }
+            }
+          } catch (e) {
+            if (share.stopped) break;
+            self.setStatus('error', 'Can\'t reach your camera share. If it keeps happening, the camera site needs the small CORS update.');
+            await sleep(3000);
+          }
+          await sleep(Math.max(15, 100 - (Date.now() - t0)));
+        }
+      })();
+
+      if (!this.audio) return;
+
+      // Sound: pull each new audio chunk and play it, back to back, into the "microphone".
+      (async function () {
+        var after = 0, next = 0;
+        try {
+          var p = await (await fetch(q('poll'), { cache: 'no-store' })).json();
+          after = Math.max(0, (p.audioSeq | 0) - 1); // start from the newest chunk, not old history
+        } catch (e) {}
+        while (!share.stopped) {
+          try {
+            var r = await fetch(q('audiopoll', '&after=' + after), { cache: 'no-store' });
+            if (share.stopped) break;
+            if (r.status === 200) {
+              var seq = parseInt(r.headers.get('X-Seq') || '0', 10);
+              var rate = parseInt(r.headers.get('X-Rate') || '24000', 10) || 24000;
+              var buf = await r.arrayBuffer();
+              after = seq > after ? seq : after + 1;
+              if (!share.stopped) next = self.playPcm(buf, rate, next);
+              continue;
+            }
+          } catch (e) {}
+          await sleep(150);
+        }
+      })();
+    },
+
+    /** Plays one chunk of 16-bit mono PCM right after the previous one. Returns when the next should start. */
+    playPcm: function (buf, rate, next) {
+      var ctx = this.audioContext();
+      var n = buf.byteLength >> 1;
+      if (!ctx || !n) return next;
+      var dv = new DataView(buf), ab = ctx.createBuffer(1, n, rate), ch = ab.getChannelData(0);
+      for (var i = 0; i < n; i++) ch[i] = dv.getInt16(i * 2, true) / 32768;
+      var src = ctx.createBufferSource();
+      src.buffer = ab;
+      src.connect(this.adest);
+      var now = ctx.currentTime;
+      // Fell behind (gap) or drifted too far ahead (delay): restart just ahead of now.
+      if (next < now + 0.03 || next > now + 1.5) next = now + 0.25;
+      src.start(next);
+      return next + ab.duration;
+    },
+
     fail: function (msg) {
       var self = this;
       this.stopSource();
@@ -321,6 +421,7 @@ enum VirtualCamera {
     stopSource: function () {
       clearTimeout(this.retry); clearTimeout(this.snapTimer);
       this.unhookAudio();
+      if (this.share) { this.share.stopped = true; this.share = null; }
       if (this.video) {
         var v = this.video; this.video = null;
         v.onplaying = v.onerror = v.onended = null;

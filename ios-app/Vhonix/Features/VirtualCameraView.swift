@@ -31,7 +31,7 @@ struct VirtualCameraView: View {
             linkCard.entrance(2)
             optionsCard.entrance(3)
 
-            NoteView(text: "Links that work: HLS (.m3u8), MP4, WebRTC (WHEP) and MJPEG, starting with https://. Your video server must allow cross-origin access (CORS), otherwise the preview shows a warning. RTMP/RTSP links can't play on iPhone — use the HLS or WebRTC link of the same stream.",
+            NoteView(text: "Links that work: your camera share link (live.php?s=…), HLS (.m3u8), MP4, WebRTC (WHEP) and MJPEG, starting with https://. Your video server must allow cross-origin access (CORS), otherwise the preview shows a warning. RTMP/RTSP links can't play on iPhone — use the HLS or WebRTC link of the same stream.",
                      icon: "lightbulb")
                 .padding(.horizontal, 4)
         }
