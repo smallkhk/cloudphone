@@ -2,6 +2,10 @@
 
 Download each version from GitHub → Releases → `ios-v<version>`, sign with ESign.
 
+## 1.9.0
+- Local links work in the virtual camera: http://192.168.x.x, http://localhost and .local addresses on your Wi-Fi.
+  The first time, iPhone asks to allow "local network" access — tap Allow.
+
 ## 1.8.1
 - Fix: camera share links showed nothing — the app now reads the picture and sound from the right place on the camera site.
 - Says "Waiting for your camera — start sharing" sooner when the share isn't live.

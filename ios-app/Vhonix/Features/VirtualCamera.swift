@@ -37,9 +37,18 @@ enum VirtualCamera {
         var url: String
         var enabled: Bool
         var audio: Bool
+        /// "http://127.0.0.1:<port>" when the link is a local-network http link (see LocalRelay).
+        var relay: String?
     }
 
     static var current: Settings { Settings(url: url, enabled: enabled, audio: audio) }
+
+    /// True for an http:// link to this iPhone or the local network.
+    static func isLocalLink(_ link: String) -> Bool {
+        let l = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard l.lowercased().hasPrefix("http://"), let host = URL(string: l)?.host else { return false }
+        return LocalRelay.isLocal(host)
+    }
 
     static func json(_ settings: Settings) -> String {
         (try? JSONEncoder().encode(settings)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
@@ -54,7 +63,8 @@ enum VirtualCamera {
             return "RTMP/RTSP/SRT links can't play inside an iPhone app. Use your video server's HLS link (ends in .m3u8) or its WebRTC (WHEP) link instead — most servers offer both for the same stream."
         }
         if lower.hasPrefix("http://") {
-            return "The link must start with https:// — iPhone blocks plain http:// video inside a secure page. Turn on HTTPS on your video server, then use the https:// link."
+            if isLocalLink(l) { return nil }
+            return "Plain http:// links only work for addresses on your own network (like http://192.168.1.5:8080 or http://localhost). For anything on the internet, use the https:// link."
         }
         guard lower.hasPrefix("https://"), let u = URL(string: l), u.host != nil else {
             return "That doesn't look like a web link. It should start with https://"
@@ -63,8 +73,16 @@ enum VirtualCamera {
     }
 
     /// The script injected at document start, starting with these settings.
+    /// Settings plus the relay address when the link needs it (starts the relay).
+    static func resolved(_ settings: Settings = current) -> Settings {
+        var s = settings
+        if isLocalLink(s.url) { s.relay = LocalRelay.shared.start() }
+        return s
+    }
+
     static func script(_ settings: Settings = current) -> String {
-        template
+        let settings = resolved(settings)
+        return template
             .replacingOccurrences(of: "__VID__", with: "\"\(deviceId)\"")
             .replacingOccurrences(of: "__CONFIG__", with: json(settings))
     }
@@ -81,6 +99,7 @@ enum VirtualCamera {
   function post(m) { try { window.webkit.messageHandlers.vhonix.postMessage(m); } catch (e) {} }
 
   var cam = {
+    relay: CFG.relay || '',
     id: VID, url: (CFG.url || '').trim(), enabled: CFG.enabled !== false, audio: CFG.audio !== false,
     probeNext: false,
     canvas: null, ctx: null, base: null, clones: [], timer: null, watch: null,
@@ -97,6 +116,7 @@ enum VirtualCamera {
       this.url = (cfg.url || '').trim();
       this.enabled = cfg.enabled !== false;
       this.audio = cfg.audio !== false;
+      if (cfg.relay) this.relay = cfg.relay;
       if (this.base) {
         this.stopSource();
         if (this.url) this.startSource(); else this.setStatus('off', 'No link set.');
@@ -230,10 +250,20 @@ enum VirtualCamera {
       return 'video';
     },
 
+    /** Local http:// links go through the app's built-in relay (WebKit blocks http inside an https page). */
+    address: function (u) {
+      if (this.relay && /^http:\/\//i.test(u)) return this.relay + '/' + u.slice(7);
+      return u;
+    },
+
     startSource: function () {
-      var self = this, u = this.url, k = this.kind(u);
+      var self = this, k = this.kind(this.url), u = this.address(this.url);
       clearTimeout(this.retry);
       if (!u) { this.setStatus('off', 'No link set.'); return; }
+      if (/^http:\/\//i.test(this.url) && !this.relay) {
+        this.fail('Local link: the app couldn\'t start its local relay. Close and reopen this screen, then try again.');
+        return;
+      }
       this.setStatus('connecting', 'Connecting to your video…');
 
       if (k === 'share') { this.startShare(u); return; }

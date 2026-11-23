@@ -409,6 +409,18 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   `Access-Control-Expose-Headers: X-Seq, X-Rate` on its public
   poll/view/audiopoll actions — the owner was given a patched copy to upload.
   Tested against the real `live.php` under `php -S` with a fake sender.
+  **1.9.0: local links** (`http://192.168.x.x`, `http://localhost`, `*.local`,
+  bare names — `LocalRelay.isLocal`). WebKit blocks http media inside the https
+  live page, so `Features/LocalRelay.swift` runs a tiny HTTP server on the
+  iPhone's **loopback only** (`127.0.0.1:48731`, falls back up to 48740) that
+  maps `/<host:port>/<path>` → `http://<host:port>/<path>` via URLSession,
+  streams the answer back and adds CORS (so local servers don't need CORS).
+  Only local hosts are relayed. The script gets `relay` in its settings and
+  rewrites http links through it (`address()`). Info.plist gained
+  `NSLocalNetworkUsageDescription` (iOS asks once) and ATS
+  `NSAllowsLocalNetworking`. Relay logic tested with a Python stand-in; the
+  Swift relay itself and WebKit's treatment of http://127.0.0.1 inside an
+  https page are unverified on a real iPhone.
 - **Deploy needs one migration** (`api_tokens`): `~/bin-php84 artisan migrate --force`.
 
 ## `auto_renew` already works — VMOS does it, not this app

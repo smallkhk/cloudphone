@@ -315,7 +315,7 @@ final class LiveScreenModel: ObservableObject {
         if !clean.isEmpty { VirtualCamera.enabled = true }
         virtualCamURL = clean
         virtualCamStatus = clean.isEmpty ? nil : "Virtual camera: waiting for an app to open the camera"
-        run("window.vhonixVirtualCam && window.vhonixVirtualCam.setConfig(\(VirtualCamera.json(VirtualCamera.current)));")
+        run("window.vhonixVirtualCam && window.vhonixVirtualCam.setConfig(\(VirtualCamera.json(VirtualCamera.resolved())));")
         call("loadCameras()")
 
         if !clean.isEmpty {

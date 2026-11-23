@@ -35,6 +35,10 @@ targets:
         NSCameraUsageDescription: Lets apps on your cloud phone use this iPhone's camera.
         NSMicrophoneUsageDescription: Lets apps on your cloud phone use this iPhone's microphone.
         ITSAppUsesNonExemptEncryption: false
+        # Virtual camera: lets local-network video links (http://192.168.x.x) be used.
+        NSLocalNetworkUsageDescription: Lets the virtual camera play video links from devices on your Wi-Fi.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         # Lets the live screen keep streaming (with sound) when you switch apps.
         UIBackgroundModes:
           - audio
