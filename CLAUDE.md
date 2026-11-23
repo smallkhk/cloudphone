@@ -399,11 +399,12 @@ Proxies (buy/add/edit/attach/detach/test), Cloud Drive.
   (`setConfig({url, enabled, audio})`), not just a URL.
   **1.8.0: camera share links** from the owner's own camera-sharing site
   (`…/live.php?s=<20 hex>`, a separate PHP app on eclipselivecam.online, not
-  in this repo) are a source kind of their own (`startShare`): pulls the
+  in this repo) are a source kind of their own (`startShare`). The pasted
+  link is the **viewer page**; data comes from **`/api/live.php`** on the same
+  site (1.8.0 wrongly polled the viewer page — fixed in 1.8.1). Pulls the
   newest JPEG from `?action=view` ~10×/s and audio from
   `?action=audiopoll&after=N` (raw **16-bit little-endian mono PCM**, rate in
-  `X-Rate`, sequence in `X-Seq` — mono/LE is an assumption, the sender code
-  wasn't seen), scheduled back-to-back into the Web Audio "microphone". That
+  `X-Rate`, sequence in `X-Seq` — confirmed mono/24 kHz from the viewer page's own player), scheduled back-to-back into the Web Audio "microphone". That
   site's `live.php` must send `Access-Control-Allow-Origin: *` and
   `Access-Control-Expose-Headers: X-Seq, X-Rate` on its public
   poll/view/audiopoll actions — the owner was given a patched copy to upload.

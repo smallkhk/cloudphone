@@ -2,6 +2,10 @@
 
 Download each version from GitHub → Releases → `ios-v<version>`, sign with ESign.
 
+## 1.8.1
+- Fix: camera share links showed nothing — the app now reads the picture and sound from the right place on the camera site.
+- Says "Waiting for your camera — start sharing" sooner when the share isn't live.
+
 ## 1.8.0
 - The virtual camera plays your camera share links (`…/live.php?s=…`), picture and sound.
   The camera site's `live.php` needs the small CORS update for this to work.

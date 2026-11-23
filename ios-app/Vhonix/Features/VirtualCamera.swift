@@ -321,6 +321,9 @@ enum VirtualCamera {
       var m = u.match(/^(.*?live\.php)\?(?:.*&)?s=([a-f0-9]{20})/i);
       if (!m) { this.fail('That share link looks incomplete. Copy the whole link again.'); return; }
       var base = m[1], token = m[2].toLowerCase();
+      // The link people share is the viewer page (/live.php); its frames and
+      // sound are served by /api/live.php on the same site.
+      if (!/\/api\/live\.php$/i.test(base)) base = base.replace(/live\.php$/i, 'api/live.php');
       var vid = 'vhonix' + Math.random().toString(36).slice(2, 12);
       var share = { stopped: false };
       this.share = share;
@@ -353,7 +356,7 @@ enum VirtualCamera {
               await sleep(4000);
             } else {
               // 204: the share exists but no fresh frame (the camera isn't sending right now).
-              if (++misses >= 15) {
+              if (++misses >= 5) {
                 self.img = null;
                 if (self.status !== 'connecting' || !self.message) self.setStatus('connecting', 'Waiting for your camera — start sharing on the camera site.');
               }
